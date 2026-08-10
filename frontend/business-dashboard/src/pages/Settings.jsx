@@ -51,24 +51,25 @@ const Settings = () => {
           </div>
         </div>
 
-        {/* 2. Custom Domain CNAME */}
+        {/* 2. Custom Domain CNAME / A-Record */}
         <div className="glass-card" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
             <Globe color="var(--primary-start)" size={24} />
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>White-Label Custom CNAME Domain</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>White-Label Custom Domain</h2>
           </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>Connect custom domain for white-label customer booking portal.</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>Connect your custom Apex domain (`beautystudio.az`) or subdomain (`booking.beautystudio.az`) for white-label customer portals.</p>
 
           <div className="form-group" style={{ marginBottom: '1rem' }}>
-            <label className="form-label">Custom Subdomain</label>
-            <input type="text" className="form-control" value={customDomain} onChange={(e) => setCustomDomain(e.target.value)} />
+            <label className="form-label">Custom Domain Name (Apex or Subdomain)</label>
+            <input type="text" className="form-control" value={customDomain} onChange={(e) => setCustomDomain(e.target.value)} placeholder="beautystudio.az or booking.beautystudio.az" />
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--success)' }}>
             <CheckCircle2 size={18} />
-            <span>CNAME Target: app.ai-appointment.com ({domainStatus})</span>
+            <span>Target: app.ai-appointment.com ({domainStatus})</span>
           </div>
         </div>
+
 
         {/* 3. Payment Gateways */}
         <div className="glass-card" style={{ padding: '1.5rem' }}>
