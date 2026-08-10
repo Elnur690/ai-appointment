@@ -44,7 +44,7 @@ const Settings = () => {
           <div className="form-group">
             <label className="form-label">AI Language (Default: Azerbaijani)</label>
             <select className="form-control" value={aiTone.language} onChange={(e) => setAiTone({...aiTone, language: e.target.value})}>
-              <option value="az">Azerbaijani (Süni İntellekt - Sİ)</option>
+              <option value="az">Azerbaijani (Azərbaycan dili)</option>
               <option value="en">English</option>
               <option value="ru">Russian (Русский)</option>
             </select>
