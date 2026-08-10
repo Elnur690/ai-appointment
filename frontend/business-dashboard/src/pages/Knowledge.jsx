@@ -1,0 +1,1 @@
+import React from 'react'; export default () => <div><h2>Knowledge Base</h2></div>;\n

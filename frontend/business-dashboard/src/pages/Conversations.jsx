@@ -1,0 +1,1 @@
+import React from 'react'; export default () => <div><h2>Conversations</h2></div>;\n

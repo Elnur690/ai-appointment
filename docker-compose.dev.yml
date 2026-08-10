@@ -1,0 +1,28 @@
+# Development overrides — use with:
+# docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    volumes:
+      - ./backend:/app
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  celery-worker:
+    volumes:
+      - ./backend:/app
+    environment:
+      - ENVIRONMENT=development
+    command: celery -A app.tasks.celery_app worker --loglevel=debug --concurrency=2
+
+  celery-beat:
+    volumes:
+      - ./backend:/app
+    environment:
+      - ENVIRONMENT=development
+    command: celery -A app.tasks.celery_app beat --loglevel=debug
