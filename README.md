@@ -2,7 +2,7 @@
 
 A high-performance, multi-tenant enterprise SaaS platform where businesses (from 1-person solo shops to multi-branch salon/clinic chains) let an autonomous AI Agent handle appointment bookings, rescheduling, cancellations, customer inquiries, and staff notifications over **WhatsApp**, **Instagram Direct**, and **Facebook Messenger**.
 
-> **Zero-App / Zero-Web Requirement**: Customers and Staff can manage their entire booking workflow over WhatsApp using natural text or **voice notes (audio messages)** in **Azerbaijani (AZ - Süni İntellekt - Sİ)**, **English (EN)**, and **Russian (RU)**.
+> **Zero-App / Zero-Web Requirement**: Customers and Staff can manage their entire booking workflow over WhatsApp using natural text or **voice notes (audio messages)** in **Azerbaijani (AZ)**, **English (EN)**, and **Russian (RU)**.
 
 ---
 
