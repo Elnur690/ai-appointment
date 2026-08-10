@@ -44,20 +44,16 @@ services:
     environment:
       - SERVER_URL=http://localhost:8080
       - DOCKER_ENV=true
-      # Authentication
       - AUTHENTICATION_TYPE=apikey
       - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:-change-me-evolution-key}
-      # Database
       - DATABASE_ENABLED=true
       - DATABASE_PROVIDER=postgresql
       - DATABASE_CONNECTION_URI=postgresql://${POSTGRES_USER:-appointment}:${POSTGRES_PASSWORD:-appointment_secret}@postgres:5432/${POSTGRES_DB:-ai_appointment}?schema=evolution
       - DATABASE_CLIENT_NAME=evolution_v2
-      # Cache
       - CACHE_REDIS_ENABLED=true
       - CACHE_REDIS_URI=redis://redis:6379/3
       - CACHE_REDIS_PREFIX_KEY=evolution
       - CACHE_REDIS_SAVE_INSTANCES=true
-      # Webhooks
       - WEBHOOK_GLOBAL_ENABLED=true
       - WEBHOOK_GLOBAL_URL=http://backend:8000/api/v1/webhooks/whatsapp
       - WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS=false
@@ -84,9 +80,9 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - ENVIRONMENT=${ENVIRONMENT:-production}
-      - DEBUG=${DEBUG:-false}
-      - SECRET_KEY=${SECRET_KEY}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DEBUG=${DEBUG:-true}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-prod}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-appointment}:${POSTGRES_PASSWORD:-appointment_secret}@postgres:5432/${POSTGRES_DB:-ai_appointment}
       - REDIS_URL=redis://redis:6379/0
@@ -95,9 +91,9 @@ services:
       - EVOLUTION_API_URL=http://evolution-api:8080
       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-change-me-evolution-key}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
-      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
-      - REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.5-flash}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+      - REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS:-30}
       - ALGORITHM=${ALGORITHM:-HS256}
     depends_on:
       postgres:
@@ -115,7 +111,7 @@ services:
     restart: unless-stopped
     command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=4
     environment:
-      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-appointment}:${POSTGRES_PASSWORD:-appointment_secret}@postgres:5432/${POSTGRES_DB:-ai_appointment}
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/1
@@ -123,8 +119,8 @@ services:
       - EVOLUTION_API_URL=http://evolution-api:8080
       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-change-me-evolution-key}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
-      - SECRET_KEY=${SECRET_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.5-flash}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-prod}
     depends_on:
       postgres:
         condition: service_healthy
@@ -141,17 +137,43 @@ services:
     restart: unless-stopped
     command: celery -A app.tasks.celery_app beat --loglevel=info
     environment:
-      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-appointment}:${POSTGRES_PASSWORD:-appointment_secret}@postgres:5432/${POSTGRES_DB:-ai_appointment}
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
-      - SECRET_KEY=${SECRET_KEY}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-prod}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - appointment_net
+
+  admin-dashboard:
+    build:
+      context: ./frontend/admin-dashboard
+      dockerfile: Dockerfile
+    container_name: appointment_admin_dashboard
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    networks:
+      - appointment_net
+
+  business-dashboard:
+    build:
+      context: ./frontend/business-dashboard
+      dockerfile: Dockerfile
+    container_name: appointment_business_dashboard
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - VITE_API_URL=http://localhost:8000
     networks:
       - appointment_net
 
