@@ -42,14 +42,19 @@ def get_current_active_user(
     return current_user
 
 def require_role(*roles: str):
-    """Return a dependency that checks if the user has one of the required roles."""
+    """Return a dependency that checks if the user has one of the required roles (owner automatically inherits staff permissions)."""
+    allowed_roles = set(roles)
+    if "staff" in allowed_roles:
+        allowed_roles.add("owner")
+        
     def role_checker(
         current_user: Annotated[dict[str, Any], Depends(get_current_active_user)]
     ) -> dict[str, Any]:
-        if current_user.get("role") not in roles:
+        if current_user.get("role") not in allowed_roles:
             raise ForbiddenException(detail="Operation not permitted")
         return current_user
     return role_checker
+
 
 def get_business_context(
     current_user: Annotated[dict[str, Any], Depends(get_current_active_user)]
