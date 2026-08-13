@@ -106,15 +106,15 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ```bash
 cd backend
 source .venv/bin/activate
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 22800
 ```
 
 ### Launch Web Dashboards
 ```bash
-# SaaS Admin Dashboard
+# SaaS Admin Dashboard (Port 22300)
 cd frontend/admin-dashboard && npm run dev
 
-# Business Owner Dashboard
+# Business Owner Dashboard (Port 22301)
 cd frontend/business-dashboard && npm run dev
 ```
 
