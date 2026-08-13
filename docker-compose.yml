@@ -37,8 +37,7 @@ services:
     image: atendai/evolution-api:v2.2.3
     container_name: appointment_evolution
     restart: unless-stopped
-    ports:
-      - "22880:8080"
+    # Internal docker network only - no public ports exposed to internet
     env_file:
       - .env
     volumes:
