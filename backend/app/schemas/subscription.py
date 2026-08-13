@@ -35,6 +35,8 @@ class PlanResponse(BaseModel):
     allows_emergency_reassignment: bool = False
     allows_omnichannel_messaging: bool = False
     allows_growth_advisor: bool = False
+    allows_geo_routing: bool = False
+    allows_shift_management: bool = False
     features: Optional[Dict[str, Any]] = None
     is_active: bool
 
@@ -57,6 +59,8 @@ class PlanCreate(BaseModel):
     allows_emergency_reassignment: Optional[bool] = False
     allows_omnichannel_messaging: Optional[bool] = False
     allows_growth_advisor: Optional[bool] = False
+    allows_geo_routing: Optional[bool] = False
+    allows_shift_management: Optional[bool] = False
     features: Optional[Dict[str, Any]] = None
 
 class PlanUpdate(BaseModel):
@@ -78,6 +82,8 @@ class PlanUpdate(BaseModel):
     allows_emergency_reassignment: Optional[bool] = None
     allows_omnichannel_messaging: Optional[bool] = None
     allows_growth_advisor: Optional[bool] = None
+    allows_geo_routing: Optional[bool] = None
+    allows_shift_management: Optional[bool] = None
     features: Optional[Dict[str, Any]] = None
 
 

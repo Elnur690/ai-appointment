@@ -157,6 +157,16 @@ const Plans = () => {
               <input type="checkbox" checked={newPlan.allows_custom_domain} onChange={(e) => setNewPlan({...newPlan, allows_custom_domain: e.target.checked})} />
               <span>Allow White-Label Custom CNAME Domain</span>
             </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', cursor: 'pointer' }}>
+              <input type="checkbox" checked={newPlan.allows_geo_routing} onChange={(e) => setNewPlan({...newPlan, allows_geo_routing: e.target.checked})} />
+              <span>Allow WhatsApp Geo-Location & Nearest Branch Auto-Routing</span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', cursor: 'pointer' }}>
+              <input type="checkbox" checked={newPlan.allows_shift_management} onChange={(e) => setNewPlan({...newPlan, allows_shift_management: e.target.checked})} />
+              <span>Allow Shift-Aware Scheduling & Overtime Management</span>
+            </label>
           </div>
 
           <div className="flex-between">

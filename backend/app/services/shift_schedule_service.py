@@ -32,8 +32,20 @@ class ShiftScheduleService:
         custom_shift_start: time | None = None,
         custom_shift_end: time | None = None,
         allow_overtime: bool = False,
+        plan_allows_shift_management: bool = True,
     ) -> ShiftValidationResult:
-        """Validates whether a requested booking slot falls within assigned staff/owner shift hours."""
+        """Validates whether a requested booking slot falls within assigned staff/owner shift hours if plan permits."""
+        if not plan_allows_shift_management:
+            logger.info("[PLAN GATED] Shift management not enabled on plan. Defaulting to open business hours.")
+            return ShiftValidationResult(
+                is_valid=True,
+                reason="Shift management not enabled on plan; open hours apply.",
+                shift_name="Standard Open Hours",
+                is_overtime=False,
+                shift_start="09:00",
+                shift_end="21:00",
+            )
+
         try:
             req_time = datetime.strptime(requested_time_str, "%H:%M").time()
             req_minutes = req_time.hour * 60 + req_time.minute

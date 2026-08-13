@@ -42,6 +42,8 @@ class Plan(Base, TimestampMixin):
     allows_combo_packages: Mapped[bool] = mapped_column(Boolean, default=False)
     allows_group_bookings: Mapped[bool] = mapped_column(Boolean, default=False)
     allows_product_upsells: Mapped[bool] = mapped_column(Boolean, default=False)
+    allows_geo_routing: Mapped[bool] = mapped_column(Boolean, default=False)
+    allows_shift_management: Mapped[bool] = mapped_column(Boolean, default=False)
     allowed_ai_providers: Mapped[dict[str, Any] | list[str] | None] = mapped_column(JSONB, nullable=True, default=["gemini", "claude", "openai"])
     features: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

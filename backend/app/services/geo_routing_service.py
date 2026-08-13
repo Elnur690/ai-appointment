@@ -42,8 +42,13 @@ class GeoRoutingService:
         lat: float | None = None,
         lng: float | None = None,
         location_text: str | None = None,
+        plan_allows_geo_routing: bool = True,
     ) -> BranchDistanceResult | None:
-        """Finds nearest branch using GPS coordinates or landmark text matching."""
+        """Finds nearest branch using GPS coordinates or landmark text matching if plan permits."""
+        if not plan_allows_geo_routing:
+            logger.warning("[PLAN GATED] Geo Routing requested but plan.allows_geo_routing is False.")
+            return None
+
         target_lat, target_lng = lat, lng
 
         if (target_lat is None or target_lng is None) and location_text:
