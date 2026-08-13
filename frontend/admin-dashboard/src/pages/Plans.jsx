@@ -90,6 +90,15 @@ const Plans = () => {
             <label className="form-label">AI Message Quota</label>
             <input type="text" className="form-control" placeholder="1000 messages/mo" value={newPlan.limits} onChange={(e) => setNewPlan({...newPlan, limits: e.target.value})} required />
           </div>
+
+          <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+            <label className="form-label">Assigned AI Model Engine (SaaS Owner Control)</label>
+            <select className="form-control" value={newPlan.assigned_ai_model || 'gemini-3.5-flash'} onChange={(e) => setNewPlan({...newPlan, assigned_ai_model: e.target.value})}>
+              <option value="gemini-3.5-flash">Google Gemini 3.5 Flash (Default Tier Model)</option>
+              <option value="claude-3-7-sonnet">Anthropic Claude 3.7 Sonnet (Pro Tier Model)</option>
+              <option value="gpt-4o">OpenAI GPT-4o (Enterprise Tier Model)</option>
+            </select>
+          </div>
           
           <div style={{ margin: '1.5rem 0' }}>
             <label className="form-label" style={{ marginBottom: '1rem', display: 'block' }}>Feature Entitlements (Plan Gating Switches)</label>

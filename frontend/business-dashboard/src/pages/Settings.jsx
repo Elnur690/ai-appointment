@@ -38,25 +38,25 @@ const Settings = () => {
       <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Configure AI Providers, Payment Gateways, Custom Domains, and WhatsApp Connection.</p>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem' }}>
-        {/* 1. AI Engine Switcher */}
+        {/* 1. AI Engine Provider Assigned by Plan */}
         <div className="glass-card" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
             <Bot color="var(--primary-start)" size={24} />
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>AI Provider Engine Switcher</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>AI Provider Engine (Plan Assigned)</h2>
           </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>Choose active AI Model provider permitted by your subscription plan.</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>
+            AI Model Engine is configured and assigned exclusively by the SaaS Owner based on your active subscription plan tier.
+          </p>
           
-          <div className="form-group" style={{ marginBottom: '1rem' }}>
-            <label className="form-label">Active Provider</label>
-            <select className="form-control" value={selectedProvider} onChange={(e) => setSelectedProvider(e.target.value)}>
-              <option value="gemini">Google Gemini 3.5 Flash (Included in Plan)</option>
-              <option value="claude">Anthropic Claude 3.7 Sonnet (Pro/Enterprise Plan)</option>
-              <option value="openai">OpenAI GPT-4o (Enterprise Plan)</option>
-            </select>
+          <div className="form-group" style={{ marginBottom: '1.25rem', padding: '0.85rem 1rem', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+            <label className="form-label" style={{ marginBottom: '0.25rem' }}>Assigned AI Model Engine</label>
+            <p style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--primary-start)' }}>
+              ⚡ Google Gemini 3.5 Flash (Assigned by Pro Plan)
+            </p>
           </div>
 
           <div className="form-group">
-            <label className="form-label">AI Language (Default: Azerbaijani)</label>
+            <label className="form-label">AI Conversation Language (Default: Azerbaijani)</label>
             <select className="form-control" value={aiTone.language} onChange={(e) => setAiTone({...aiTone, language: e.target.value})}>
               <option value="az">Azerbaijani (Azərbaycan dili)</option>
               <option value="en">English</option>
