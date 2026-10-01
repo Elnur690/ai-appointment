@@ -18,6 +18,11 @@ const Plans = () => {
     allows_gcal_sync: false,
     allows_custom_domain: false,
     allows_branch_level_ai_tone: false,
+    allows_geo_routing: false,
+    allows_shift_management: false,
+    allows_cadence_engine: false,
+    allows_gift_vouchers: false,
+    allows_flash_drops: false,
     features: ''
   });
 
@@ -166,6 +171,21 @@ const Plans = () => {
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', cursor: 'pointer' }}>
               <input type="checkbox" checked={newPlan.allows_shift_management} onChange={(e) => setNewPlan({...newPlan, allows_shift_management: e.target.checked})} />
               <span>Allow Shift-Aware Scheduling & Overtime Management</span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', cursor: 'pointer' }}>
+              <input type="checkbox" checked={newPlan.allows_cadence_engine} onChange={(e) => setNewPlan({...newPlan, allows_cadence_engine: e.target.checked})} />
+              <span>Allow Predictive "Cadence Engine" (Perpetual Rebooking)</span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', cursor: 'pointer' }}>
+              <input type="checkbox" checked={newPlan.allows_gift_vouchers} onChange={(e) => setNewPlan({...newPlan, allows_gift_vouchers: e.target.checked})} />
+              <span>Allow WhatsApp Digital Gift Vouchers & Gifting</span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', cursor: 'pointer' }}>
+              <input type="checkbox" checked={newPlan.allows_flash_drops} onChange={(e) => setNewPlan({...newPlan, allows_flash_drops: e.target.checked})} />
+              <span>Allow "Last-Minute Flash Drop" (Dead-Slot Monetization)</span>
             </label>
           </div>
 

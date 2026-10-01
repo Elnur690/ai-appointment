@@ -37,6 +37,9 @@ class PlanResponse(BaseModel):
     allows_growth_advisor: bool = False
     allows_geo_routing: bool = False
     allows_shift_management: bool = False
+    allows_cadence_engine: bool = False
+    allows_gift_vouchers: bool = False
+    allows_flash_drops: bool = False
     features: Optional[Dict[str, Any]] = None
     is_active: bool
 
@@ -61,6 +64,9 @@ class PlanCreate(BaseModel):
     allows_growth_advisor: Optional[bool] = False
     allows_geo_routing: Optional[bool] = False
     allows_shift_management: Optional[bool] = False
+    allows_cadence_engine: Optional[bool] = False
+    allows_gift_vouchers: Optional[bool] = False
+    allows_flash_drops: Optional[bool] = False
     features: Optional[Dict[str, Any]] = None
 
 class PlanUpdate(BaseModel):
@@ -84,6 +90,9 @@ class PlanUpdate(BaseModel):
     allows_growth_advisor: Optional[bool] = None
     allows_geo_routing: Optional[bool] = None
     allows_shift_management: Optional[bool] = None
+    allows_cadence_engine: Optional[bool] = None
+    allows_gift_vouchers: Optional[bool] = None
+    allows_flash_drops: Optional[bool] = None
     features: Optional[Dict[str, Any]] = None
 
 

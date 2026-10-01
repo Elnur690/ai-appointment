@@ -18,6 +18,9 @@ A high-performance, multi-tenant enterprise SaaS platform where businesses (from
 ### 📍 2. Geo-Location & Shift-Aware Overtime Scheduling
 - **WhatsApp Geo-Routing (`GeoRoutingService`)**: Calculates Haversine GPS distance or matches Baku landmark keywords (28 May, Gənclik, Nərimanov, Elmlər) to route customers to the nearest branch (`allows_geo_routing`).
 - **Shift-Aware Overtime Engine (`ShiftScheduleService`)**: Supports staff & solo-owner shifts (Morning 09-15, Evening 15-21, Full-Day, Custom) and restricts bookings to shift bounds unless marked for Overtime (`allows_shift_management`).
+- **Predictive Cadence Engine (`CadenceRebookingService`)**: Calculates client maintenance intervals (haircut 14-21d, nails 21-28d, coloring 35-45d) and triggers automated 1-tap rebooking prompts on WhatsApp (`allows_cadence_engine`).
+- **WhatsApp Digital Gift Vouchers (`GiftVoucherService`)**: Payriff/EPoint upfront gift voucher generation with personalized celebration notes and automated redemption (`allows_gift_vouchers`).
+- **Last-Minute Flash Drop (`FlashDropService`)**: Automatically turns late cancellations (within 1-4h) into paid slots with expiring micro-discounts (20% off) for nearby clients (`allows_flash_drops`).
 
 ### 📅 3. Calendar Sync & Advanced Scheduling
 - **Single-Truth Availability Engine**: Prevents double-booking across multi-branch staff schedules.
@@ -34,8 +37,8 @@ A high-performance, multi-tenant enterprise SaaS platform where businesses (from
 - **Azerbaijan Payment Gateways**: Native **Payriff** & **EPoint** REST API integrations for online deposit checkout links.
 - **AI Dynamic No-Show Deposits**: Enforces mandatory deposits for high-risk customers (2+ past no-shows) or high-value bookings (>50 AZN).
 
-### 🎛️ 5. 100% Plan-Gated SaaS Entitlements (17 Features)
-- **17 Plan-Gated Entitlement Switches**: Editable per plan tier in SaaS Admin Panel.
+### 🎛️ 5. 100% Plan-Gated SaaS Entitlements (20 Features)
+- **20 Plan-Gated Entitlement Switches**: Editable per plan tier in SaaS Admin Panel.
 - **Tenant Unit Economics & Profit Margins**: Real-time API token cost vs subscription revenue tracking (99%+ net margins).
 - **White-Label Custom Domain Portals**: SSL certificate provisioning for custom Apex domains (`beautystudio.az`) and subdomains (`booking.beautystudio.az`).
 
