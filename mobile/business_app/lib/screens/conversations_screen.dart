@@ -9,6 +9,37 @@ class ConversationsScreen extends StatefulWidget {
 
 class _ConversationsScreenState extends State<ConversationsScreen> {
   bool _aiActive = true;
+  bool _soloOperatorMode = true;
+  final TextEditingController _messageController = TextEditingController();
+  final List<Map<String, dynamic>> _messages = [
+    {'text': 'Hello! I would like to book a haircut for tomorrow.', 'fromAi': false},
+    {
+      'text': 'Hello! We have available slots at 10:00 AM and 02:00 PM tomorrow. Which time works for you?',
+      'fromAi': true,
+    },
+    {'text': '10:00 AM please. Also can you diagnose a scalp allergy?', 'fromAi': false},
+    {
+      'text':
+          'I have booked your Haircut & Styling for tomorrow at 10:00 AM! Regarding the scalp question, Dr. Alex is currently with a client and will personally reply to you here as soon as he finishes.',
+      'fromAi': true,
+    },
+  ];
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  void _sendMessage() {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
+    setState(() {
+      _aiActive = false;
+      _messages.add({'text': text, 'fromAi': true});
+      _messageController.clear();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,25 +65,43 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: _aiActive ? const Color(0xFF0EA5E9).withOpacity(0.1) : Colors.amber.withOpacity(0.1),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(_aiActive ? Icons.smart_toy : Icons.person, color: _aiActive ? const Color(0xFF0EA5E9) : Colors.amber),
-                const SizedBox(width: 12),
-                Text(
-                  _aiActive ? 'AI Agent handling messages' : 'Human Staff Takeover Mode',
-                  style: TextStyle(color: _aiActive ? const Color(0xFF0EA5E9) : Colors.amber, fontWeight: FontWeight.bold),
+                Row(
+                  children: [
+                    Icon(
+                      _aiActive ? Icons.smart_toy : Icons.person,
+                      color: _aiActive ? const Color(0xFF0EA5E9) : Colors.amber,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _aiActive ? 'AI Agent Active' : 'Owner / Staff Takeover',
+                      style: TextStyle(
+                        color: _aiActive ? const Color(0xFF0EA5E9) : Colors.amber,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                FilterChip(
+                  label: Text(
+                    _soloOperatorMode ? 'Solo Mode (Defer Reply)' : 'Team Handoff',
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  selected: _soloOperatorMode,
+                  onSelected: (val) => setState(() => _soloOperatorMode = val),
                 ),
               ],
             ),
           ),
           Expanded(
-            child: ListView(
+            child: ListView.builder(
               padding: const EdgeInsets.all(16),
-              children: [
-                _buildMessageBubble('Hello! I would like to book a haircut for tomorrow.', false),
-                _buildMessageBubble('Hello! We have available slots at 10:00 AM and 02:00 PM tomorrow. Which time works for you?', true),
-                _buildMessageBubble('10:00 AM please.', false),
-                _buildMessageBubble('Great! I have booked your Haircut & Styling for tomorrow at 10:00 AM with Dr. Alex. See you then!', true),
-              ],
+              itemCount: _messages.length,
+              itemBuilder: (context, idx) {
+                final msg = _messages[idx];
+                return _buildMessageBubble(msg['text'] as String, msg['fromAi'] as bool);
+              },
             ),
           ),
           Padding(
@@ -61,8 +110,10 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
               children: [
                 Expanded(
                   child: TextField(
+                    controller: _messageController,
+                    onSubmitted: (_) => _sendMessage(),
                     decoration: InputDecoration(
-                      hintText: _aiActive ? 'Take over to type message...' : 'Type message to customer...',
+                      hintText: _aiActive ? 'Send a manual reply (auto-pauses AI)...' : 'Type message to customer...',
                       border: const OutlineInputBorder(),
                     ),
                   ),
@@ -70,7 +121,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                 const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.send, color: Color(0xFF0EA5E9)),
-                  onPressed: () {},
+                  onPressed: _sendMessage,
                 ),
               ],
             ),

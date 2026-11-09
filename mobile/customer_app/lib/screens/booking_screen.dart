@@ -10,6 +10,14 @@ class BookingScreen extends StatefulWidget {
 class _BookingScreenState extends State<BookingScreen> {
   String? _selectedService = 'Haircut & Styling';
   String? _selectedTime = '10:00 AM';
+  final TextEditingController _voucherController = TextEditingController();
+  bool _voucherApplied = false;
+
+  @override
+  void dispose() {
+    _voucherController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +41,7 @@ class _BookingScreenState extends State<BookingScreen> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: ['09:00 AM', '10:00 AM', '11:30 AM', '02:00 PM', '03:30 PM'].map((time) {
+              children: ['09:00 AM', '10:00 AM', '11:30 AM (Flash -20%)', '02:00 PM', '03:30 PM'].map((time) {
                 final isSelected = _selectedTime == time;
                 return ChoiceChip(
                   label: Text(time),
@@ -41,6 +49,39 @@ class _BookingScreenState extends State<BookingScreen> {
                   onSelected: (selected) => setState(() => _selectedTime = time),
                 );
               }).toList(),
+            ),
+            const SizedBox(height: 24),
+            const Text('Digital Gift Voucher', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _voucherController,
+                    decoration: const InputDecoration(
+                      hintText: 'Enter code (e.g. GIFT-A1B2C3D4)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: () {
+                    final code = _voucherController.text.trim().toUpperCase();
+                    if (code.startsWith('GIFT-')) {
+                      setState(() => _voucherApplied = true);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Gift Voucher $code applied!')),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please enter a valid GIFT-XXXXXXX code.')),
+                      );
+                    }
+                  },
+                  child: Text(_voucherApplied ? 'Applied ✓' : 'Apply'),
+                ),
+              ],
             ),
             const SizedBox(height: 32),
             SizedBox(
@@ -50,6 +91,9 @@ class _BookingScreenState extends State<BookingScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Appointment Booked Successfully!')),
                   );
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0EA5E9),
@@ -67,7 +111,7 @@ class _BookingScreenState extends State<BookingScreen> {
   Widget _buildServiceCard(String name, String price, String duration) {
     final isSelected = _selectedService == name;
     return Card(
-      color: isSelected ? Colors.sky.withOpacity(0.1) : null,
+      color: isSelected ? const Color(0xFF0EA5E9).withOpacity(0.12) : null,
       shape: RoundedRectangleBorder(
         side: BorderSide(color: isSelected ? const Color(0xFF0EA5E9) : Colors.grey.shade300),
         borderRadius: BorderRadius.circular(12),
@@ -75,7 +119,10 @@ class _BookingScreenState extends State<BookingScreen> {
       child: ListTile(
         title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(duration),
-        trailing: Text(price, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0EA5E9))),
+        trailing: Text(
+          price,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0EA5E9)),
+        ),
         onTap: () => setState(() => _selectedService = name),
       ),
     );

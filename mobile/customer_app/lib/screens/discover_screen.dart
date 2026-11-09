@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'booking_screen.dart';
+import 'business_profile_screen.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
@@ -25,7 +27,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
                 fillColor: Colors.grey.shade100,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
               ),
             ),
           ),
@@ -55,8 +60,18 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                _buildBusinessCard('Beauty Studio Baku', 'Hair & Beauty • 4.9 ★', 'Nizami St 42, Baku (0.5 km)', 'https://example.com/logo.png'),
-                _buildBusinessCard('Baku White City Dental', 'Dental Care • 4.8 ★', 'White City Blvd 12 (2.1 km)', 'https://example.com/logo2.png'),
+                _buildBusinessCard(
+                  context,
+                  'Beauty Studio Baku',
+                  'Hair & Beauty • 4.9 ★',
+                  'Nizami St 42, Baku (0.5 km)',
+                ),
+                _buildBusinessCard(
+                  context,
+                  'Baku White City Dental',
+                  'Dental Care • 4.8 ★',
+                  'White City Blvd 12 (2.1 km)',
+                ),
               ],
             ),
           ),
@@ -65,27 +80,42 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     );
   }
 
-  Widget _buildBusinessCard(String title, String subtitle, String address, String img) {
+  Widget _buildBusinessCard(BuildContext context, String title, String subtitle, String address) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Column(
-        children: [
-          Container(
-            height: 120,
-            decoration: BoxDecoration(color: const Color(0xFF0EA5E9).withOpacity(0.2), borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
-            child: const Center(child: Icon(Icons.store, size: 48, color: Color(0xFF0EA5E9))),
-          ),
-          ListTile(
-            title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            subtitle: Text('$subtitle\n$address'),
-            trailing: ElevatedButton(
-              onPressed: () {},
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0EA5E9)),
-              child: const Text('Book', style: TextStyle(color: Colors.white)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => BusinessProfileScreen(businessName: title)),
+          );
+        },
+        child: Column(
+          children: [
+            Container(
+              height: 120,
+              decoration: BoxDecoration(
+                color: const Color(0xFF0EA5E9).withOpacity(0.2),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: const Center(child: Icon(Icons.store, size: 48, color: Color(0xFF0EA5E9))),
             ),
-          ),
-        ],
+            ListTile(
+              title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              subtitle: Text('$subtitle\n$address'),
+              trailing: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const BookingScreen()),
+                  );
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0EA5E9)),
+                child: const Text('Book', style: TextStyle(color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'appointment_detail_screen.dart';
 
 class AppointmentsHistoryScreen extends StatelessWidget {
   const AppointmentsHistoryScreen({super.key});
@@ -10,18 +11,51 @@ class AppointmentsHistoryScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _buildAppointmentCard('Haircut & Styling', 'Beauty Studio Baku', 'Tomorrow, 10:00 AM', 'Confirmed', Colors.green),
-          _buildAppointmentCard('Manicure & Polish', 'Beauty Studio Baku', 'Aug 15, 02:00 PM', 'Confirmed', Colors.green),
-          _buildAppointmentCard('Beard Trim', 'Beauty Studio Baku', 'Jul 28, 11:30 AM', 'Completed', Colors.blue),
+          _buildAppointmentCard(
+            context,
+            'Haircut & Styling',
+            'Beauty Studio Baku',
+            'Tomorrow, 10:00 AM',
+            'Confirmed',
+            Colors.green,
+          ),
+          _buildAppointmentCard(
+            context,
+            'Manicure & Polish',
+            'Beauty Studio Baku',
+            'Aug 15, 02:00 PM',
+            'Confirmed',
+            Colors.green,
+          ),
+          _buildAppointmentCard(
+            context,
+            'Beard Trim',
+            'Beauty Studio Baku',
+            'Jul 28, 11:30 AM',
+            'Completed',
+            Colors.blue,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildAppointmentCard(String service, String branch, String date, String status, Color statusColor) {
+  Widget _buildAppointmentCard(
+    BuildContext context,
+    String service,
+    String branch,
+    String date,
+    String status,
+    Color statusColor,
+  ) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const CustomerAppointmentDetailScreen()),
+          );
+        },
         title: Text(service, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text('$branch • $date'),
         trailing: Container(
@@ -30,7 +64,10 @@ class AppointmentsHistoryScreen extends StatelessWidget {
             color: statusColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Text(status, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12)),
+          child: Text(
+            status,
+            style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12),
+          ),
         ),
       ),
     );

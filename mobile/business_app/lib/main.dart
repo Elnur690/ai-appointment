@@ -11,7 +11,7 @@ class BusinessApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AI Appointment Business',
+      title: 'Randevu.vip Business',
       debugShowCheckedModeBanner: false,
       locale: const Locale('az'),
       themeMode: ThemeMode.dark,

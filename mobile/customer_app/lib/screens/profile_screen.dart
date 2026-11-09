@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
+import 'otp_login_screen.dart';
 
 class CustomerProfileSettingsScreen extends StatefulWidget {
   const CustomerProfileSettingsScreen({super.key});
@@ -28,7 +30,9 @@ class _CustomerProfileSettingsScreenState extends State<CustomerProfileSettingsS
             title: const Text('Language Preference'),
             trailing: DropdownButton<String>(
               value: _language,
-              items: ['Azerbaijani (az)', 'English (en)', 'Russian (ru)'].map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
+              items: ['Azerbaijani (az)', 'English (en)', 'Russian (ru)']
+                  .map((l) => DropdownMenuItem(value: l, child: Text(l)))
+                  .toList(),
               onChanged: (v) => setState(() => _language = v!),
             ),
           ),
@@ -37,6 +41,25 @@ class _CustomerProfileSettingsScreenState extends State<CustomerProfileSettingsS
             leading: Icon(Icons.notifications),
             title: Text('WhatsApp & Push Reminders'),
             trailing: Icon(Icons.check_circle, color: Colors.green),
+          ),
+          const Divider(),
+          const ListTile(
+            leading: Icon(Icons.card_giftcard, color: Color(0xFF0EA5E9)),
+            title: Text('Gift Voucher Balance'),
+            subtitle: Text('1 Active Voucher (GIFT-VIP2026 • 50 AZN)'),
+          ),
+          const SizedBox(height: 24),
+          OutlinedButton.icon(
+            onPressed: () async {
+              await CustomerApiService().logout();
+              if (!context.mounted) return;
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const OtpLoginScreen()),
+                (_) => false,
+              );
+            },
+            icon: const Icon(Icons.logout, color: Colors.red),
+            label: const Text('Sign Out', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),

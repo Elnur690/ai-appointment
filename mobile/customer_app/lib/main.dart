@@ -11,7 +11,7 @@ class CustomerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Book Appointment',
+      title: 'Randevu.vip',
       debugShowCheckedModeBanner: false,
       locale: const Locale('az'),
       theme: ThemeData(

@@ -12,6 +12,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _phoneController = TextEditingController();
 
   @override
+  void dispose() {
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('Setup Branch — Step $_step of 2')),
@@ -23,9 +29,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 children: [
                   const Icon(Icons.qr_code_2, size: 80, color: Color(0xFF0EA5E9)),
                   const SizedBox(height: 16),
-                  const Text('Link WhatsApp Instance', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                  const Text(
+                    'Link WhatsApp Instance',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
                   const SizedBox(height: 8),
-                  const Text('Scan this QR code using WhatsApp on your business phone to pair the AI agent.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+                  const Text(
+                    'Scan this QR code using WhatsApp on your business phone to pair the Randevu.vip AI agent securely via our internal gateway.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey),
+                  ),
                   const SizedBox(height: 32),
                   Container(
                     height: 200,
@@ -35,7 +49,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   const Spacer(),
                   ElevatedButton(
                     onPressed: () => setState(() => _step = 2),
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0EA5E9), padding: const EdgeInsets.all(16)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0EA5E9),
+                      padding: const EdgeInsets.all(16),
+                    ),
                     child: const Text('Next: Set Working Hours', style: TextStyle(fontSize: 16, color: Colors.white)),
                   )
                 ],
@@ -45,15 +62,31 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 children: [
                   const Icon(Icons.access_time, size: 80, color: Color(0xFF0EA5E9)),
                   const SizedBox(height: 16),
-                  const Text('Configure Working Hours', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                  const Text(
+                    'Configure Working Hours',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
                   const SizedBox(height: 24),
-                  const ListTile(title: Text('Monday - Friday'), trailing: Text('09:00 - 18:00', style: TextStyle(fontWeight: FontWeight.bold))),
-                  const ListTile(title: Text('Saturday'), trailing: Text('10:00 - 15:00', style: TextStyle(fontWeight: FontWeight.bold))),
-                  const ListTile(title: Text('Sunday'), trailing: Text('Closed', style: TextStyle(color: Colors.grey))),
+                  const ListTile(
+                    title: Text('Monday - Friday'),
+                    trailing: Text('09:00 - 18:00', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                  const ListTile(
+                    title: Text('Saturday'),
+                    trailing: Text('10:00 - 15:00', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                  const ListTile(
+                    title: Text('Sunday'),
+                    trailing: Text('Closed', style: TextStyle(color: Colors.grey)),
+                  ),
                   const Spacer(),
                   ElevatedButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0EA5E9), padding: const EdgeInsets.all(16)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0EA5E9),
+                      padding: const EdgeInsets.all(16),
+                    ),
                     child: const Text('Complete Onboarding', style: TextStyle(fontSize: 16, color: Colors.white)),
                   )
                 ],
