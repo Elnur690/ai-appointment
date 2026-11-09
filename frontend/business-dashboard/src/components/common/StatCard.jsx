@@ -13,4 +13,4 @@ export const StatCard = ({ title, value, icon: Icon, trend }) => (
       </div>
     )}
   </div>
-);\n
+);

@@ -21,4 +21,4 @@ const Dashboard = () => {
     </div>
   );
 };
-export default Dashboard;\n
+export default Dashboard;

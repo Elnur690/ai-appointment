@@ -6,4 +6,4 @@ export const useAppointmentStore = create((set) => ({
   ],
   filters: {},
   setFilters: (filters) => set({ filters }),
-}));\n
+}));

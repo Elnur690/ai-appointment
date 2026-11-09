@@ -21,4 +21,4 @@ export const DataTable = ({ columns, data }) => (
       </tbody>
     </table>
   </div>
-);\n
+);

@@ -25,4 +25,4 @@ export const Layout = () => {
       </div>
     </div>
   );
-};\n
+};

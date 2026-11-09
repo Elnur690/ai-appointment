@@ -7,17 +7,23 @@
   
   --primary-accent: #0ea5e9;
   --secondary-accent: #06b6d4;
+  --primary-start: #0ea5e9;
+  --primary: linear-gradient(135deg, #0ea5e9, #06b6d4);
   --gradient-accent: linear-gradient(135deg, var(--primary-accent), var(--secondary-accent));
   
   --text-main: #f8fafc;
+  --text-primary: #f8fafc;
   --text-muted: #94a3b8;
+  --text-secondary: #94a3b8;
   
   --border-color: rgba(255, 255, 255, 0.1);
+  --border: rgba(255, 255, 255, 0.1);
   --border-glass: 1px solid var(--border-color);
   
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
+  --error: #ef4444;
   --info: #3b82f6;
   
   --radius-sm: 8px;
@@ -56,13 +62,43 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Glassmorphism Classes */
-.glass-card {
+.glass, .glass-card {
   background: var(--bg-card);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: var(--border-glass);
   border-radius: var(--radius-md);
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+}
+
+.text-gradient {
+  background: var(--gradient-accent);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.form-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.form-control {
+  background: rgba(0, 0, 0, 0.25);
+  border: var(--border-glass);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  color: var(--text-main);
+  font-family: inherit;
+  width: 100%;
 }
 
 .glass-modal {

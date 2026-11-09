@@ -36,6 +36,10 @@ services:
     command: celery -A app.tasks.celery_app beat --loglevel=debug
 
   admin-dashboard:
+    build:
+      context: ./frontend/admin-dashboard
+      dockerfile: Dockerfile
+      target: development
     volumes:
       - ./frontend/admin-dashboard:/app
       - /app/node_modules
@@ -44,6 +48,10 @@ services:
     command: npm run dev -- --host 0.0.0.0 --port 22300
 
   business-dashboard:
+    build:
+      context: ./frontend/business-dashboard
+      dockerfile: Dockerfile
+      target: development
     volumes:
       - ./frontend/business-dashboard:/app
       - /app/node_modules

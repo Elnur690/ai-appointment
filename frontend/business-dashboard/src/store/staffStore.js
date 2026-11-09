@@ -5,4 +5,4 @@ export const useStaffStore = create((set) => ({
     { id: 1, name: 'Alice Smith', role: 'Stylist' },
     { id: 2, name: 'Bob Jones', role: 'Massage Therapist' }
   ],
-}));\n
+}));

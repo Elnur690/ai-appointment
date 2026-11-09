@@ -22,4 +22,4 @@ export const StatusBadge = ({ status }) => {
       {status.replace('_', ' ')}
     </span>
   );
-};\n
+};

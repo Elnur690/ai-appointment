@@ -24,4 +24,4 @@ const AppointmentsPage = () => {
     </div>
   );
 };
-export default AppointmentsPage;\n
+export default AppointmentsPage;
