@@ -1,6 +1,14 @@
 # Development overrides — launch with:
 # docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 services:
+  postgres:
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-22432}:5432"
+
+  redis:
+    ports:
+      - "127.0.0.1:22379:6379"
+
   backend:
     build:
       context: ./backend
@@ -11,7 +19,7 @@ services:
     environment:
       - ENVIRONMENT=development
       - DEBUG=true
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --proxy-headers --forwarded-allow-ips="*"
 
   celery-worker:
     volumes:

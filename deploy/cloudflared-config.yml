@@ -1,0 +1,24 @@
+# ==============================================================================
+# Cloudflare Tunnel (cloudflared) Ingress Configuration for randevu.vip
+# ==============================================================================
+# All Docker containers bind strictly to 127.0.0.1 (localhost) with ZERO public
+# ports exposed on 0.0.0.0. Your host cloudflared tunnel connects directly to:
+#   - randevu.vip / app.randevu.vip  -> http://127.0.0.1:22301
+#   - admin.randevu.vip              -> http://127.0.0.1:22300
+#   - api.randevu.vip                -> http://127.0.0.1:22800
+# ==============================================================================
+
+ingress:
+  - hostname: randevu.vip
+    service: http://127.0.0.1:22301
+  - hostname: www.randevu.vip
+    service: http://127.0.0.1:22301
+  - hostname: app.randevu.vip
+    service: http://127.0.0.1:22301
+  - hostname: cname.randevu.vip
+    service: http://127.0.0.1:22301
+  - hostname: admin.randevu.vip
+    service: http://127.0.0.1:22300
+  - hostname: api.randevu.vip
+    service: http://127.0.0.1:22800
+  - service: http_status:404

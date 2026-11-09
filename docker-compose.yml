@@ -3,10 +3,9 @@ services:
     image: pgvector/pgvector:pg16
     container_name: appointment_postgres
     restart: unless-stopped
+    # 100% internal Docker network only — no host ports exposed
     env_file:
       - .env
-    ports:
-      - "${POSTGRES_PORT:-22432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -21,8 +20,7 @@ services:
     image: redis:7-alpine
     container_name: appointment_redis
     restart: unless-stopped
-    ports:
-      - "22379:6379"
+    # 100% internal Docker network only — no host ports exposed
     volumes:
       - redis_data:/data
     healthcheck:
@@ -37,7 +35,7 @@ services:
     image: atendai/evolution-api:v2.2.3
     container_name: appointment_evolution
     restart: unless-stopped
-    # Internal docker network only - no public ports exposed to internet
+    # 100% internal Docker network only — no host ports exposed
     env_file:
       - .env
     volumes:
@@ -56,8 +54,9 @@ services:
       dockerfile: Dockerfile
     container_name: appointment_backend
     restart: unless-stopped
+    # Bound strictly to 127.0.0.1 (localhost) for cloudflared tunnel — never exposed on 0.0.0.0
     ports:
-      - "22800:8000"
+      - "127.0.0.1:22800:8000"
     env_file:
       - .env
     depends_on:
@@ -108,8 +107,9 @@ services:
       dockerfile: Dockerfile
     container_name: appointment_admin_dashboard
     restart: unless-stopped
+    # Bound strictly to 127.0.0.1 (localhost) for cloudflared tunnel — never exposed on 0.0.0.0
     ports:
-      - "22300:22300"
+      - "127.0.0.1:22300:22300"
     env_file:
       - .env
     networks:
@@ -121,8 +121,9 @@ services:
       dockerfile: Dockerfile
     container_name: appointment_business_dashboard
     restart: unless-stopped
+    # Bound strictly to 127.0.0.1 (localhost) for cloudflared tunnel — never exposed on 0.0.0.0
     ports:
-      - "22301:22301"
+      - "127.0.0.1:22301:22301"
     env_file:
       - .env
     networks:
