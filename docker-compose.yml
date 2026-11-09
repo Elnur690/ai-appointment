@@ -35,7 +35,9 @@ services:
     image: atendai/evolution-api:v2.2.3
     container_name: appointment_evolution
     restart: unless-stopped
-    # 100% internal Docker network only — no host ports exposed
+    # 100% internal Docker network only on custom port 22880 — no host ports exposed
+    environment:
+      - SERVER_PORT=22880
     env_file:
       - .env
     volumes:
@@ -56,7 +58,7 @@ services:
     restart: unless-stopped
     # Bound strictly to 127.0.0.1 (localhost) for cloudflared tunnel — never exposed on 0.0.0.0
     ports:
-      - "127.0.0.1:22800:8000"
+      - "127.0.0.1:22800:22800"
     env_file:
       - .env
     depends_on:

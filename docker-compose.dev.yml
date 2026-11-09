@@ -19,7 +19,7 @@ services:
     environment:
       - ENVIRONMENT=development
       - DEBUG=true
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --proxy-headers --forwarded-allow-ips="*"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 22800 --reload --proxy-headers --forwarded-allow-ips="*"
 
   celery-worker:
     volumes:

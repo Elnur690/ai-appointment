@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     ALGORITHM: str = "HS256"
 
-    EVOLUTION_API_URL: str = "http://evolution-api:8080"
+    EVOLUTION_API_URL: str = "http://evolution-api:22880"
     EVOLUTION_API_KEY: str = "dev-evolution-key"
 
     GEMINI_API_KEY: str = "dev-gemini-key"
