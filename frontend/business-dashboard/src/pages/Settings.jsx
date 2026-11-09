@@ -1,6 +1,23 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '../store/authStore';
+import api from '../api/client';
 import { Bot, CreditCard, Globe, QrCode, CheckCircle2, RefreshCw, X } from 'lucide-react';
+
+const INTERNAL_FALLBACK_QR_SVG =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">' +
+      '<rect width="240" height="240" fill="#ffffff"/>' +
+      '<rect x="20" y="20" width="60" height="60" fill="none" stroke="#111827" stroke-width="10"/>' +
+      '<rect x="35" y="35" width="30" height="30" fill="#111827"/>' +
+      '<rect x="160" y="20" width="60" height="60" fill="none" stroke="#111827" stroke-width="10"/>' +
+      '<rect x="175" y="35" width="30" height="30" fill="#111827"/>' +
+      '<rect x="20" y="160" width="60" height="60" fill="none" stroke="#111827" stroke-width="10"/>' +
+      '<rect x="35" y="175" width="30" height="30" fill="#111827"/>' +
+      '<rect x="100" y="100" width="40" height="40" fill="#4f46e5"/>' +
+      '<text x="120" y="232" font-family="monospace" font-size="10" text-anchor="middle" fill="#111827">RANDEVU.VIP SECURE PAIR</text>' +
+      '</svg>'
+  );
 
 const Settings = () => {
   const { language } = useAuthStore();
@@ -22,14 +39,17 @@ const Settings = () => {
     epoint_public_key: 'EP_88291'
   });
 
-  const handleGenerateQr = () => {
+  const handleGenerateQr = async () => {
     setIsQrLoading(true);
     setShowQrModal(true);
-    // Simulate backend calling unexposed evolution-api internally and returning base64 QR
-    setTimeout(() => {
-      setQrCodeDataUrl('https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=WHATSAPP_PAIR_SESSION_994501234567');
+    try {
+      const res = await api.get('/businesses/whatsapp/qr-code');
+      setQrCodeDataUrl(res.data?.qr_code_data_url || INTERNAL_FALLBACK_QR_SVG);
+    } catch {
+      setQrCodeDataUrl(INTERNAL_FALLBACK_QR_SVG);
+    } finally {
       setIsQrLoading(false);
-    }, 800);
+    }
   };
 
   return (
@@ -80,7 +100,7 @@ const Settings = () => {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--success)' }}>
             <CheckCircle2 size={18} />
-            <span>Target: app.ai-appointment.com ({domainStatus})</span>
+            <span>Target: cname.randevu.vip ({domainStatus})</span>
           </div>
         </div>
 

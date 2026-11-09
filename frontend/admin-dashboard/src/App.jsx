@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Businesses from './pages/Businesses';
 import Plans from './pages/Plans';
 import Subscriptions from './pages/Subscriptions';
+import Resellers from './pages/Resellers';
 
 const App = () => {
   return (
@@ -14,6 +15,7 @@ const App = () => {
       <Route path="/" element={<Layout />}>
         <Route index element={<Dashboard />} />
         <Route path="businesses" element={<Businesses />} />
+        <Route path="resellers" element={<Resellers />} />
         <Route path="plans" element={<Plans />} />
         <Route path="subscriptions" element={<Subscriptions />} />
       </Route>

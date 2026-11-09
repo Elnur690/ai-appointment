@@ -1,4 +1,7 @@
-import pytest
+try:
+    import pytest
+except ImportError:
+    pass
 from uuid import uuid4
 from app.services.geo_routing_service import GeoRoutingService
 

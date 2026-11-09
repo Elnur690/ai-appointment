@@ -43,8 +43,8 @@ const Login = () => {
           <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '16px', marginBottom: '1rem' }}>
             <Sparkles size={32} color="var(--primary-start)" />
           </div>
-          <h1 className="gradient-text" style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>AI Admin Portal</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Sign in to manage the platform</p>
+          <h1 className="gradient-text" style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>Randevu.vip Admin</h1>
+          <p style={{ color: 'var(--text-secondary)' }}>Sign in to manage tenants, resellers & AI models</p>
         </div>
 
         {error && (
@@ -59,7 +59,7 @@ const Login = () => {
             <input 
               type="email" 
               className="form-control" 
-              placeholder="admin@ai-appointment.com"
+              placeholder="admin@randevu.vip"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />

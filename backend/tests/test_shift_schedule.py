@@ -1,4 +1,7 @@
-import pytest
+try:
+    import pytest
+except ImportError:
+    pass
 from app.services.shift_schedule_service import ShiftScheduleService
 
 def test_slot_within_morning_shift():

@@ -11,11 +11,14 @@ from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.payment import Payment, PaymentGatewayConfig, PaymentMethod, PaymentStatus
 from app.models.knowledge import KnowledgeEntry, KnowledgeEntryType, KnowledgeEntryStatus
 from app.models.waitlist import WaitlistEntry, WaitlistStatus
+from app.models.reseller import Reseller, ResellerPayout
 
 __all__ = [
     "Base",
     "SaasOwner",
     "Plan",
+    "Reseller",
+    "ResellerPayout",
     "Business",
     "BusinessOwner",
     "Branch",

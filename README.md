@@ -1,4 +1,10 @@
-# AI Appointment SaaS — Master Multi-Tenant Enterprise Platform (100% Completed)
+# Randevu.vip — AI Appointment SaaS (Production-Ready Enterprise Platform)
+
+Official Domain: **`https://randevu.vip`**
+- **Business & Salon Portal**: `https://randevu.vip` / `https://app.randevu.vip` (Port `22301`)
+- **SaaS Owner & Reseller Admin**: `https://admin.randevu.vip` (Port `22300`)
+- **Backend REST API**: `https://api.randevu.vip` (Port `22800`)
+- **White-Label Custom CNAME Target**: `cname.randevu.vip`
 
 A high-performance, multi-tenant enterprise SaaS platform where businesses (from 1-person solo shops to multi-branch salon/clinic chains) let an autonomous AI Agent handle appointment bookings, rescheduling, cancellations, customer inquiries, and staff notifications over **WhatsApp**, **Instagram Direct**, and **Facebook Messenger**.
 
@@ -37,10 +43,11 @@ A high-performance, multi-tenant enterprise SaaS platform where businesses (from
 - **Azerbaijan Payment Gateways**: Native **Payriff** & **EPoint** REST API integrations for online deposit checkout links.
 - **AI Dynamic No-Show Deposits**: Enforces mandatory deposits for high-risk customers (2+ past no-shows) or high-value bookings (>50 AZN).
 
-### 🎛️ 5. 100% Plan-Gated SaaS Entitlements (20 Features)
+### 🎛️ 5. 100% Plan-Gated SaaS Entitlements (20 Features) & Reseller Program
 - **20 Plan-Gated Entitlement Switches**: Editable per plan tier in SaaS Admin Panel.
+- **Reseller & Agency Partner Program (`ResellerService`)**: Onboard digital agencies and sales partners on `randevu.vip` with custom referral links (`https://randevu.vip/register?ref=PARTNER-CODE`), recurring monthly commission splits (e.g. 20–30%), partner white-label domains, and payout tracking.
 - **Tenant Unit Economics & Profit Margins**: Real-time API token cost vs subscription revenue tracking (99%+ net margins).
-- **White-Label Custom Domain Portals**: SSL certificate provisioning for custom Apex domains (`beautystudio.az`) and subdomains (`booking.beautystudio.az`).
+- **White-Label Custom Domain Portals**: SSL certificate provisioning for custom Apex domains (`beautystudio.az`) and subdomains (`booking.beautystudio.az` ➔ `cname.randevu.vip`).
 
 ---
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Building2, Layers, CreditCard, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Building2, Layers, CreditCard, Handshake, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
 const Sidebar = () => {
@@ -16,6 +16,7 @@ const Sidebar = () => {
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/businesses', icon: Building2, label: 'Businesses' },
+    { path: '/resellers', icon: Handshake, label: 'Resellers & Partners' },
     { path: '/plans', icon: Layers, label: 'Plans' },
     { path: '/subscriptions', icon: CreditCard, label: 'Subscriptions' },
   ];
@@ -39,7 +40,7 @@ const Sidebar = () => {
         justifyContent: collapsed ? 'center' : 'space-between',
         borderBottom: '1px solid var(--border-color)'
       }}>
-        {!collapsed && <h2 className="gradient-text" style={{ margin: 0, fontSize: '1.25rem' }}>AI Admin</h2>}
+        {!collapsed && <h2 className="gradient-text" style={{ margin: 0, fontSize: '1.25rem' }}>Randevu.vip</h2>}
         <button onClick={() => setCollapsed(!collapsed)} className="btn-ghost" style={{ padding: '0.25rem', border: 'none' }}>
           {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
         </button>

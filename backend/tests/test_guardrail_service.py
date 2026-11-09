@@ -1,4 +1,7 @@
-import pytest
+try:
+    import pytest
+except ImportError:
+    pass
 from app.services.guardrail_service import GuardrailService
 
 def test_guardrail_solo_business_az():

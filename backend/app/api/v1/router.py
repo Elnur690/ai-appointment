@@ -2,12 +2,13 @@ from fastapi import APIRouter
 from app.api.v1 import (
     auth, saas_admin, businesses, branches, staff, 
     services, appointments, customers, conversations, 
-    payments, webhooks, knowledge, whatsapp_groups, waitlist
+    payments, webhooks, knowledge, whatsapp_groups, waitlist, resellers
 )
 
 api_v1_router = APIRouter(prefix="/api/v1")
 api_v1_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 api_v1_router.include_router(saas_admin.router, prefix="/admin", tags=["SaaS Admin"])
+api_v1_router.include_router(resellers.router, prefix="/resellers", tags=["Resellers & Partners"])
 api_v1_router.include_router(businesses.router, prefix="/businesses", tags=["Businesses"])
 api_v1_router.include_router(branches.router, prefix="/branches", tags=["Branches"])
 api_v1_router.include_router(staff.router, prefix="/staff", tags=["Staff"])

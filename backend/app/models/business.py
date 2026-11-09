@@ -30,6 +30,8 @@ class Business(Base, TimestampMixin):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=generate_uuid7)
     name: Mapped[str] = mapped_column(String, nullable=False)
     plan_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("plans.id"), nullable=True)
+    reseller_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("resellers.id"), nullable=True, index=True)
+    custom_domain: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     subscription_status: Mapped[str] = mapped_column(String, default="trial")
     default_ai_tone_config: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True, default=DEFAULT_AI_TONE)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
