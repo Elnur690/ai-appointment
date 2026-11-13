@@ -34,6 +34,8 @@ class Appointment(Base, TimestampMixin):
     status: Mapped[AppointmentStatus] = mapped_column(Enum(AppointmentStatus), nullable=False, default=AppointmentStatus.pending)
     source: Mapped[AppointmentSource] = mapped_column(Enum(AppointmentSource), nullable=False, default=AppointmentSource.ai_chat)
     notes: Mapped[str | None] = mapped_column(String, nullable=True)
+    reminder_24h_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reminder_2h_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint("end_time > start_time", name="check_appointment_end_time_after_start"),

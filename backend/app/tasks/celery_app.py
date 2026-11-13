@@ -4,7 +4,12 @@ from app.core.config import settings
 celery_app = Celery(
     "ai_appointment_tasks",
     broker=settings.CELERY_BROKER_URL,
-    backend=settings.CELERY_RESULT_BACKEND
+    backend=settings.CELERY_RESULT_BACKEND,
+    include=[
+        "app.tasks.reminders",
+        "app.tasks.winback",
+        "app.tasks.business_advisor",
+    ],
 )
 
 celery_app.conf.update(
@@ -15,6 +20,11 @@ celery_app.conf.update(
     enable_utc=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,
+    imports=(
+        "app.tasks.reminders",
+        "app.tasks.winback",
+        "app.tasks.business_advisor",
+    ),
     beat_schedule={
         "send-reminders-every-5m": {
             "task": "send_appointment_reminders",
@@ -24,8 +34,10 @@ celery_app.conf.update(
             "task": "run_winback_campaigns",
             "schedule": 86400.0,
         },
+        "run-weekly-growth-advisor": {
+            "task": "run_weekly_growth_advisor",
+            "schedule": 604800.0,
+        },
     },
 )
-
-celery_app.autodiscover_tasks(['app.tasks'])
 

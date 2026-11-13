@@ -44,6 +44,11 @@ async def init_db() -> None:
         except Exception as exc:
             logger.warning(f"pgvector extension check skipped or unavailable: {exc}")
         await conn.run_sync(Base.metadata.create_all)
+        try:
+            await conn.execute(text("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminder_24h_sent_at TIMESTAMP WITH TIME ZONE;"))
+            await conn.execute(text("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminder_2h_sent_at TIMESTAMP WITH TIME ZONE;"))
+        except Exception as exc:
+            logger.warning(f"Reminder columns check skipped: {exc}")
 
     # Seed initial SaaS Owner & default plans if database is fresh
     try:
