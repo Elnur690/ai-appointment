@@ -34,6 +34,7 @@ class RegisterBusinessRequest(BaseModel):
     password: str
     category: Optional[str] = "Hair & Beauty"
     referral_code: Optional[str] = None
+    plan_id: Optional[str] = None
 
 
 class RefreshTokenRequest(BaseModel):
@@ -265,6 +266,32 @@ async def verify_customer_otp(req: OtpVerifyRequest):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OTP code")
     access = create_access_token(subject=f"customer:{req.phone}", role="customer")
     return TokenResponse(access_token=access, role="customer")
+
+
+@router.get("/plans")
+async def get_public_plans(
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Public endpoint returning active subscription plans for randevu.vip landing & registration."""
+    plans = (
+        await db.execute(select(Plan).where(Plan.is_active == True).order_by(Plan.price.asc()))
+    ).scalars().all()
+    return [
+        {
+            "id": str(p.id),
+            "name": p.name,
+            "price": float(p.price),
+            "max_branches": p.max_branches,
+            "max_whatsapp_numbers": p.max_whatsapp_numbers,
+            "ai_message_quota": p.ai_message_quota,
+            "allows_cadence_engine": bool(p.allows_cadence_engine),
+            "allows_gift_vouchers": bool(p.allows_gift_vouchers),
+            "allows_flash_drops": bool(p.allows_flash_drops),
+            "allows_custom_domain": bool(p.allows_custom_domain),
+            "features": p.features or {},
+        }
+        for p in plans
+    ]
 
 
 @router.get("/me", response_model=UserInfoResponse)

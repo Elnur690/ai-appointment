@@ -3,12 +3,14 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.core.dependencies import require_role
 from app.models.business import Business
 from app.models.saas import Plan
+from app.models.subscription import Subscription
 from app.models.appointment import Appointment
 from app.models.conversation import Message
 from app.models.reseller import Reseller
@@ -19,9 +21,13 @@ router = APIRouter()
 class BusinessResponse(BaseModel):
     id: str
     name: str
+    owner: Optional[str] = None
+    plan: Optional[str] = None
+    branches: int = 0
     status: str
     custom_domain: Optional[str] = None
     reseller_id: Optional[str] = None
+    created_at: Optional[str] = None
 
 
 class PlanResponse(BaseModel):
@@ -119,6 +125,7 @@ class BusinessStatusUpdate(BaseModel):
 
 class AnalyticsResponse(BaseModel):
     total_businesses: int
+    active_subscriptions: int = 0
     total_appointments: int
     total_messages: int
     total_resellers: int = 0
@@ -157,26 +164,44 @@ def _plan_to_response(p: Plan) -> PlanResponse:
     )
 
 
+def _biz_to_response(b: Business) -> BusinessResponse:
+    owner_str = b.owners[0].email if getattr(b, "owners", None) else "—"
+    plan_str = b.plan.name if getattr(b, "plan", None) else "Starter"
+    branch_cnt = len(b.branches) if getattr(b, "branches", None) else 0
+    return BusinessResponse(
+        id=str(b.id),
+        name=b.name,
+        owner=owner_str,
+        plan=plan_str,
+        branches=branch_cnt,
+        status=b.subscription_status if b.is_active else "suspended",
+        custom_domain=b.custom_domain,
+        reseller_id=str(b.reseller_id) if b.reseller_id else None,
+        created_at=b.created_at.strftime("%Y-%m-%d") if b.created_at else None,
+    )
+
+
 @router.get("/businesses", response_model=List[BusinessResponse])
 async def list_businesses(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
     skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
-    db: Annotated[AsyncSession, Depends(get_db)] = None,
-    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))] = None,
+    limit: int = Query(100, ge=1, le=200),
 ):
-    """List all businesses on the platform (paginated)."""
-    res = await db.execute(select(Business).offset(skip).limit(limit).order_by(Business.created_at.desc()))
-    businesses = list(res.scalars().all())
-    return [
-        BusinessResponse(
-            id=str(b.id),
-            name=b.name,
-            status="active" if b.is_active else "suspended",
-            custom_domain=b.custom_domain,
-            reseller_id=str(b.reseller_id) if b.reseller_id else None,
+    """List all businesses on the platform from PostgreSQL."""
+    stmt = (
+        select(Business)
+        .options(
+            selectinload(Business.owners),
+            selectinload(Business.plan),
+            selectinload(Business.branches),
         )
-        for b in businesses
-    ]
+        .offset(skip)
+        .limit(limit)
+        .order_by(Business.created_at.desc())
+    )
+    res = await db.execute(stmt)
+    return [_biz_to_response(b) for b in res.scalars().all()]
 
 
 @router.get("/businesses/{id}", response_model=BusinessResponse)
@@ -186,19 +211,19 @@ async def get_business(
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
     """Get business details by ID."""
-    try:
-        biz = (await db.execute(select(Business).where(Business.id == UUID(id)))).scalar_one_or_none()
-        if biz:
-            return BusinessResponse(
-                id=str(biz.id),
-                name=biz.name,
-                status="active" if biz.is_active else "suspended",
-                custom_domain=biz.custom_domain,
-                reseller_id=str(biz.reseller_id) if biz.reseller_id else None,
-            )
-    except ValueError:
-        pass
-    return BusinessResponse(id=id, name="Placeholder Business", status="active")
+    stmt = (
+        select(Business)
+        .where(Business.id == UUID(id))
+        .options(
+            selectinload(Business.owners),
+            selectinload(Business.plan),
+            selectinload(Business.branches),
+        )
+    )
+    biz = (await db.execute(stmt)).scalar_one_or_none()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Business not found")
+    return _biz_to_response(biz)
 
 
 @router.put("/businesses/{id}/status", response_model=BusinessResponse)
@@ -209,24 +234,24 @@ async def update_business_status(
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
     """Approve, suspend, or assign white-label domain to a business."""
-    try:
-        biz = (await db.execute(select(Business).where(Business.id == UUID(id)))).scalar_one_or_none()
-        if biz:
-            biz.is_active = status_update.status.lower() == "active"
-            biz.subscription_status = status_update.status.lower()
-            if status_update.custom_domain is not None:
-                biz.custom_domain = status_update.custom_domain.strip().lower()
-            await db.flush()
-            return BusinessResponse(
-                id=str(biz.id),
-                name=biz.name,
-                status=status_update.status,
-                custom_domain=biz.custom_domain,
-                reseller_id=str(biz.reseller_id) if biz.reseller_id else None,
-            )
-    except ValueError:
-        pass
-    return BusinessResponse(id=id, name="Placeholder Business", status=status_update.status)
+    stmt = (
+        select(Business)
+        .where(Business.id == UUID(id))
+        .options(
+            selectinload(Business.owners),
+            selectinload(Business.plan),
+            selectinload(Business.branches),
+        )
+    )
+    biz = (await db.execute(stmt)).scalar_one_or_none()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Business not found")
+    biz.is_active = status_update.status.lower() != "suspended"
+    biz.subscription_status = status_update.status.lower()
+    if status_update.custom_domain is not None:
+        biz.custom_domain = status_update.custom_domain.strip().lower() or None
+    await db.flush()
+    return _biz_to_response(biz)
 
 
 @router.get("/plans", response_model=List[PlanResponse])
@@ -234,7 +259,7 @@ async def list_plans(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
-    """List all subscription plans."""
+    """List all subscription plans from PostgreSQL."""
     res = await db.execute(select(Plan).order_by(Plan.price.asc()))
     return [_plan_to_response(p) for p in res.scalars().all()]
 
@@ -260,16 +285,38 @@ async def update_plan(
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
     """Update a subscription plan."""
-    try:
-        plan = (await db.execute(select(Plan).where(Plan.id == UUID(id)))).scalar_one_or_none()
-        if plan:
-            for k, v in plan_in.model_dump(exclude_unset=True).items():
-                setattr(plan, k, v)
-            await db.flush()
-            return _plan_to_response(plan)
-    except ValueError:
-        pass
-    return PlanResponse(id=id, name=plan_in.name or "Updated", price=plan_in.price or 0.0)
+    plan = (await db.execute(select(Plan).where(Plan.id == UUID(id)))).scalar_one_or_none()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    for k, v in plan_in.model_dump(exclude_unset=True).items():
+        setattr(plan, k, v)
+    await db.flush()
+    return _plan_to_response(plan)
+
+
+@router.get("/subscriptions")
+async def list_subscriptions(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    """List all business subscriptions from PostgreSQL."""
+    stmt = (
+        select(Business)
+        .options(selectinload(Business.plan))
+        .order_by(Business.created_at.desc())
+    )
+    businesses = (await db.execute(stmt)).scalars().all()
+    return [
+        {
+            "id": str(b.id),
+            "business": b.name,
+            "plan": b.plan.name if b.plan else "Starter",
+            "status": b.subscription_status if b.is_active else "suspended",
+            "period": "Monthly",
+            "messagesUsed": f"0 / {b.plan.ai_message_quota if b.plan else 1000}",
+        }
+        for b in businesses
+    ]
 
 
 @router.get("/analytics", response_model=AnalyticsResponse)
@@ -277,13 +324,17 @@ async def get_platform_analytics(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
-    """Get platform-wide analytics."""
+    """Get real platform-wide analytics from PostgreSQL."""
     biz_cnt = (await db.execute(select(func.count(Business.id)))).scalar_one()
+    active_cnt = (
+        await db.execute(select(func.count(Business.id)).where(Business.is_active == True))
+    ).scalar_one()
     appt_cnt = (await db.execute(select(func.count(Appointment.id)))).scalar_one()
     msg_cnt = (await db.execute(select(func.count(Message.id)))).scalar_one()
     res_cnt = (await db.execute(select(func.count(Reseller.id)))).scalar_one()
     return AnalyticsResponse(
         total_businesses=int(biz_cnt or 0),
+        active_subscriptions=int(active_cnt or 0),
         total_appointments=int(appt_cnt or 0),
         total_messages=int(msg_cnt or 0),
         total_resellers=int(res_cnt or 0),
@@ -318,22 +369,3 @@ async def activate_model_version(
         "message": f"Successfully activated '{req.model_id}' for provider '{req.provider}' live with zero downtime.",
         "active_config": AIRegistryService.get_provider_config(req.provider),
     }
-
-
-@router.get("/margins")
-async def get_tenant_margins_analytics(
-    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
-):
-    """Get live unit economics, AI token costs, and net profit margins per tenant business."""
-    from decimal import Decimal
-    from app.services.saas_analytics_service import SaaSAnalyticsService
-
-    sample_tenant = SaaSAnalyticsService.calculate_tenant_margin(
-        business_id="b1",
-        business_name="Beauty Studio Baku",
-        plan_name="Pro Business Tier",
-        subscription_price=Decimal("79.00"),
-        provider="gemini",
-        total_tokens=150000,
-    )
-    return {"tenants": [sample_tenant.__dict__]}

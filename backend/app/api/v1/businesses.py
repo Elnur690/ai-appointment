@@ -146,18 +146,39 @@ async def verify_business_custom_domain(
 
 @router.get("/whatsapp/qr-code")
 async def get_whatsapp_pairing_qr(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("owner"))],
+    business_id: Annotated[str, Depends(get_business_context)],
     branch_id: Optional[str] = None,
-    db: Annotated[AsyncSession, Depends(get_db)] = None,
-    user: Annotated[dict[str, Any], Depends(require_role("owner"))] = None,
-    business_id: Annotated[str, Depends(get_business_context)] = None,
 ):
-    """Proxy WhatsApp QR code generation from internal unexposed Evolution API container."""
-    instance_name = f"randevu_{business_id}_{branch_id or 'main'}"
+    """Proxy WhatsApp QR code generation and status from internal Evolution API container."""
+    instance_name = f"randevu_{business_id[:8]}_{branch_id[:8] if branch_id else 'main'}"
     evo_client = EvolutionAPIClient(
         base_url=settings.EVOLUTION_API_URL,
         api_key=settings.EVOLUTION_API_KEY,
     )
     try:
+        try:
+            state_res = await evo_client.get_instance_status(instance_name)
+            conn_state = (
+                state_res.get("instance", {}).get("state")
+                or state_res.get("state")
+                or ""
+            )
+            if conn_state == "open":
+                await evo_client.close()
+                return {
+                    "instance_name": instance_name,
+                    "status": "connected",
+                    "qr_code_data_url": None,
+                    "source": "evolution_api_internal",
+                }
+        except Exception:
+            await evo_client.create_instance(
+                instance_name,
+                webhook_url="http://backend:22800/api/v1/webhooks/whatsapp",
+            )
+
         connect_res = await evo_client.connect_instance(instance_name)
         await evo_client.close()
         qr_base64 = connect_res.get("base64") or connect_res.get("qrcode", {}).get("base64")
@@ -168,27 +189,18 @@ async def get_whatsapp_pairing_qr(
                 "qr_code_data_url": qr_base64,
                 "source": "evolution_api_internal",
             }
-    except Exception:
+        return {
+            "instance_name": instance_name,
+            "status": connect_res.get("instance", {}).get("state", "initializing"),
+            "qr_code_data_url": None,
+            "source": "evolution_api_internal",
+        }
+    except Exception as exc:
         await evo_client.close()
-
-    # Self-contained internal SVG QR placeholder when Evolution API container is warming up in dev/test
-    svg_qr = (
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">'
-        '<rect width="240" height="240" fill="#ffffff"/>'
-        '<rect x="20" y="20" width="60" height="60" fill="none" stroke="#111827" stroke-width="10"/>'
-        '<rect x="35" y="35" width="30" height="30" fill="#111827"/>'
-        '<rect x="160" y="20" width="60" height="60" fill="none" stroke="#111827" stroke-width="10"/>'
-        '<rect x="175" y="35" width="30" height="30" fill="#111827"/>'
-        '<rect x="20" y="160" width="60" height="60" fill="none" stroke="#111827" stroke-width="10"/>'
-        '<rect x="35" y="175" width="30" height="30" fill="#111827"/>'
-        '<rect x="100" y="100" width="40" height="40" fill="#4f46e5"/>'
-        '<text x="120" y="232" font-family="monospace" font-size="10" text-anchor="middle" fill="#111827">RANDEVU.VIP SECURE PAIR</text>'
-        '</svg>'
-    )
-    b64_svg = base64.b64encode(svg_qr.encode("utf-8")).decode("utf-8")
-    return {
-        "instance_name": instance_name,
-        "status": "ready_to_scan",
-        "qr_code_data_url": f"data:image/svg+xml;base64,{b64_svg}",
-        "source": "internal_gateway",
-    }
+        return {
+            "instance_name": instance_name,
+            "status": "unavailable",
+            "qr_code_data_url": None,
+            "detail": str(exc),
+            "source": "evolution_api_internal",
+        }

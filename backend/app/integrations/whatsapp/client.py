@@ -53,10 +53,16 @@ class EvolutionAPIClient:
         data = {
             "instanceName": instance_name,
             "token": instance_name,
-            "qrcode": True
+            "qrcode": True,
+            "integration": "WHATSAPP-BAILEYS",
         }
         if webhook_url:
-            data["webhook"] = webhook_url
+            data["webhook"] = {
+                "url": webhook_url,
+                "byEvents": False,
+                "base64": False,
+                "events": ["MESSAGES_UPSERT"],
+            }
             
         response = await client.post("/instance/create", json=data)
         response.raise_for_status()

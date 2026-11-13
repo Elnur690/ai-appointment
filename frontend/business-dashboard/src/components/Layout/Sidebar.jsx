@@ -22,7 +22,7 @@ export const Sidebar = () => {
   return (
     <div className="sidebar glass">
       <div className="sidebar-header">
-        <h2 className="text-gradient">{businessContext.name}</h2>
+        <h2 className="text-gradient">{businessContext?.name || 'Randevu.vip'}</h2>
       </div>
       <nav className="sidebar-nav">
         {navItems.map(item => (

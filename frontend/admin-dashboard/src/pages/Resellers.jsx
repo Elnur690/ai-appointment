@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDataStore } from '../store/dataStore';
 import DataTable from '../components/common/DataTable';
 import StatusBadge from '../components/common/StatusBadge';
@@ -7,10 +7,14 @@ import Modal from '../components/common/Modal';
 import { Users, DollarSign, Percent, Globe, Copy, Plus, CheckCircle2 } from 'lucide-react';
 
 const Resellers = () => {
-  const { resellers, createReseller, recordResellerPayout } = useDataStore();
+  const { resellers, fetchResellers, createReseller, recordResellerPayout } = useDataStore();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedReseller, setSelectedReseller] = useState(null);
   const [copiedCode, setCopiedCode] = useState('');
+
+  useEffect(() => {
+    fetchResellers();
+  }, [fetchResellers]);
   const [form, setForm] = useState({
     name: '',
     company_name: '',

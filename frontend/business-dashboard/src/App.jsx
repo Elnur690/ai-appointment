@@ -18,6 +18,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Login initialMode="register" />} />
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="calendar" element={<CalendarPage />} />

@@ -4,8 +4,8 @@ const resolveBaseUrl = () => {
   if (import.meta.env.VITE_API_URL) {
     return `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api/v1`;
   }
-  if (typeof window !== 'undefined' && window.location.hostname.endsWith('randevu.vip')) {
-    return 'https://api.randevu.vip/api/v1';
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return '/api/v1';
   }
   return 'http://localhost:22800/api/v1';
 };
@@ -22,5 +22,19 @@ api.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('business_user');
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/register')) {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default api;

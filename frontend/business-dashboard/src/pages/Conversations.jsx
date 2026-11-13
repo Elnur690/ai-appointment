@@ -1,32 +1,56 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DataTable } from '../components/common/DataTable';
-import { Bot, UserCheck } from 'lucide-react';
+import api from '../api/client';
+import { Bot, UserCheck, RefreshCw } from 'lucide-react';
 
 const Conversations = () => {
-  const [chats, setChats] = useState([
-    { id: 'c1', customer: '+994 50 211 44 55 (Murad)', channel: 'WhatsApp', lastMsg: 'Sabah saat 16:00-da yer var?', aiActive: true, guardrail: 'In-Scope (Booking)' },
-    { id: 'c2', customer: '+994 55 322 11 99 (Nigar)', channel: 'WhatsApp', lastMsg: 'Dəri allergiyam var, hansı dərmanı məsləhət görürsünüz?', aiActive: false, guardrail: 'Out-of-Scope (Human Takeover)' },
-    { id: 'c3', customer: '@aysel_baku', channel: 'Instagram DM', lastMsg: 'Balayage qiyməti nə qədərdir?', aiActive: true, guardrail: 'In-Scope (Catalog)' },
-  ]);
+  const [chats, setChats] = useState([]);
 
-  const toggleAi = (id) => {
-    setChats(chats.map((c) => (c.id === id ? { ...c, aiActive: !c.aiActive } : c)));
+  const loadConversations = async () => {
+    try {
+      const res = await api.get('/conversations/');
+      setChats(res.data || []);
+    } catch {
+      setChats([]);
+    }
+  };
+
+  useEffect(() => {
+    loadConversations();
+  }, []);
+
+  const toggleAi = async (row) => {
+    if (row.ai_active) {
+      await api.post(`/conversations/${row.id}/takeover`);
+    } else {
+      await api.post(`/conversations/${row.id}/release`);
+    }
+    await loadConversations();
   };
 
   const columns = [
     { header: 'Customer', accessor: 'customer' },
     { header: 'Channel', accessor: 'channel' },
-    { header: 'Latest Message', accessor: 'lastMsg' },
+    { header: 'Latest Message', accessor: 'last_message' },
     { header: 'Guardrail Status', accessor: 'guardrail' },
     {
       header: 'AI / Human Mode',
       cell: (row) => (
         <button
-          className={`btn ${row.aiActive ? 'btn-primary' : 'btn-danger'}`}
+          type="button"
+          className={`btn ${row.ai_active ? 'btn-primary' : 'btn-danger'}`}
           style={{ padding: '4px 10px', fontSize: '12px' }}
-          onClick={() => toggleAi(row.id)}
+          onClick={() => toggleAi(row)}
         >
-          {row.aiActive ? <><Bot size={14} /> AI Active</> : <><UserCheck size={14} /> Human Takeover</>}
+          {row.ai_active ? (
+            <>
+              <Bot size={14} /> AI Active
+            </>
+          ) : (
+            <>
+              <UserCheck size={14} /> Human Takeover
+            </>
+          )}
         </button>
       ),
     },
@@ -38,11 +62,19 @@ const Conversations = () => {
         <div>
           <h2>Omnichannel Conversations & Guardrail Hand-Offs</h2>
           <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-            Monitor WhatsApp, Instagram DM, and Facebook Messenger chats. Out-of-scope queries pause the bot automatically for human reply.
+            Monitor real-time WhatsApp, Instagram DM, and Facebook Messenger chats. Switch between AI mode and human takeover anytime.
           </p>
         </div>
+        <button type="button" className="btn btn-secondary" onClick={loadConversations}>
+          <RefreshCw size={16} />
+          Refresh
+        </button>
       </div>
-      <DataTable columns={columns} data={chats} />
+      <DataTable
+        columns={columns}
+        data={chats}
+        emptyMessage="No active customer conversations yet. Pair your WhatsApp number in Settings to start receiving messages."
+      />
     </div>
   );
 };

@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDataStore } from '../store/dataStore';
 import Modal from '../components/common/Modal';
-import { Check, Sparkles, Mic, TrendingUp, Megaphone, Search, CreditCard, Calendar, Globe } from 'lucide-react';
+import { Check, Mic, TrendingUp, Megaphone, Search } from 'lucide-react';
 
 const Plans = () => {
-  const { plans, createPlan } = useDataStore();
+  const { plans, fetchPlans, createPlan } = useDataStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    fetchPlans();
+  }, [fetchPlans]);
   const [newPlan, setNewPlan] = useState({
     name: '',
     price: '',

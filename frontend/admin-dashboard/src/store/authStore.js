@@ -1,40 +1,45 @@
 import { create } from 'zustand';
 import apiClient from '../api/client';
 
+const getSavedUser = () => {
+  try {
+    const raw = localStorage.getItem('admin_user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
 export const useAuthStore = create((set) => ({
-  user: { name: 'Randevu.vip Admin', email: 'admin@randevu.vip' },
-  token: localStorage.getItem('access_token') || 'mock-token',
+  user: getSavedUser(),
+  token: localStorage.getItem('access_token') || null,
   language: 'az',
-  isAuthenticated: true,
+  isAuthenticated: Boolean(localStorage.getItem('access_token')),
   setLanguage: (language) => set({ language }),
 
   login: async (email, password) => {
-    try {
-      const res = await apiClient.post('/auth/login', { email, password });
-      const token = res.data.access_token;
-      localStorage.setItem('access_token', token);
-      set({
-        user: { name: 'Randevu.vip Admin', email },
-        token,
-        isAuthenticated: true,
-      });
-    } catch {
-      const token = 'mock-jwt-token-123';
-      localStorage.setItem('access_token', token);
-      set({
-        user: { name: 'Randevu.vip Admin', email },
-        token,
-        isAuthenticated: true,
-      });
+    const res = await apiClient.post('/auth/login', { email, password });
+    if (res.data.role && res.data.role !== 'saas_owner') {
+      throw new Error('Access denied: SaaS Administrator privileges required.');
     }
+    const token = res.data.access_token;
+    const userObj = {
+      name: 'SaaS Administrator',
+      email,
+      role: res.data.role || 'saas_owner',
+    };
+    localStorage.setItem('access_token', token);
+    localStorage.setItem('admin_user', JSON.stringify(userObj));
+    set({
+      user: userObj,
+      token,
+      isAuthenticated: true,
+    });
   },
 
   logout: () => {
     localStorage.removeItem('access_token');
+    localStorage.removeItem('admin_user');
     set({ user: null, token: null, isAuthenticated: false });
-  },
-
-  refreshToken: async () => {
-    console.log('Token refreshed');
   },
 }));

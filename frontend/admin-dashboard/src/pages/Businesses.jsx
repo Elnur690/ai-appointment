@@ -1,21 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDataStore } from '../store/dataStore';
 import DataTable from '../components/common/DataTable';
 import StatusBadge from '../components/common/StatusBadge';
 import Modal from '../components/common/Modal';
-import { Globe, Shield, Bot, CheckCircle } from 'lucide-react';
+import { Globe } from 'lucide-react';
 
 const Businesses = () => {
-  const { businesses, plans, updateBusinessStatus } = useDataStore();
+  const { businesses, plans, fetchBusinesses, fetchPlans, updateBusinessStatus } = useDataStore();
   const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [customDomainInput, setCustomDomainInput] = useState('');
   const [selectedPlanInput, setSelectedPlanInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    fetchBusinesses();
+    fetchPlans();
+  }, [fetchBusinesses, fetchPlans]);
 
   const handleRowClick = (row) => {
     setSelectedBusiness(row);
-    setCustomDomainInput(row.customDomain || 'booking.mysalon.az');
-    setSelectedPlanInput(row.plan || 'Enterprise Tier');
+    setCustomDomainInput(row.customDomain || '');
+    setSelectedPlanInput(row.plan || (plans[0]?.name ?? ''));
   };
+
+  const filteredBusinesses = businesses.filter(
+    (b) =>
+      b.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      b.owner?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const columns = [
     { header: 'Business Name', accessor: 'name', render: (row) => <span style={{ fontWeight: 500 }}>{row.name}</span> },
@@ -34,13 +46,20 @@ const Businesses = () => {
           <p style={{ color: 'var(--text-secondary)' }}>Manage business tenants, white-label custom domain assignments, and subscription plans.</p>
         </div>
         <div className="flex-center" style={{ gap: '1rem' }}>
-          <input type="text" className="form-control" placeholder="Search businesses..." style={{ width: '250px' }} />
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Search businesses..."
+            style={{ width: '250px' }}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
       </div>
 
       <DataTable 
         columns={columns} 
-        data={businesses} 
+        data={filteredBusinesses} 
         onRowClick={handleRowClick} 
       />
 

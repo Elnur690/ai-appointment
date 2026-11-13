@@ -1,172 +1,298 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
 import api from '../api/client';
-import { Bot, CreditCard, Globe, QrCode, CheckCircle2, RefreshCw, X } from 'lucide-react';
-
-const INTERNAL_FALLBACK_QR_SVG =
-  'data:image/svg+xml;utf8,' +
-  encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">' +
-      '<rect width="240" height="240" fill="#ffffff"/>' +
-      '<rect x="20" y="20" width="60" height="60" fill="none" stroke="#111827" stroke-width="10"/>' +
-      '<rect x="35" y="35" width="30" height="30" fill="#111827"/>' +
-      '<rect x="160" y="20" width="60" height="60" fill="none" stroke="#111827" stroke-width="10"/>' +
-      '<rect x="175" y="35" width="30" height="30" fill="#111827"/>' +
-      '<rect x="20" y="160" width="60" height="60" fill="none" stroke="#111827" stroke-width="10"/>' +
-      '<rect x="35" y="175" width="30" height="30" fill="#111827"/>' +
-      '<rect x="100" y="100" width="40" height="40" fill="#4f46e5"/>' +
-      '<text x="120" y="232" font-family="monospace" font-size="10" text-anchor="middle" fill="#111827">RANDEVU.VIP SECURE PAIR</text>' +
-      '</svg>'
-  );
+import { Bot, CreditCard, Globe, QrCode, CheckCircle2, RefreshCw, X, Save } from 'lucide-react';
 
 const Settings = () => {
-  const { language } = useAuthStore();
-  const [selectedProvider, setSelectedProvider] = useState('gemini');
-  const [customDomain, setCustomDomain] = useState('booking.beautystudio.az');
-  const [domainStatus, setDomainStatus] = useState('Verified & Active');
+  const { fetchBusinessProfile } = useAuthStore();
+  const [businessName, setBusinessName] = useState('');
+  const [customDomain, setCustomDomain] = useState('');
+  const [domainVerifyResult, setDomainVerifyResult] = useState(null);
   const [showQrModal, setShowQrModal] = useState(false);
   const [isQrLoading, setIsQrLoading] = useState(false);
-  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
+  const [whatsappState, setWhatsappState] = useState({ status: 'not_checked', qr_code_data_url: null, instance_name: '' });
+  const [saveMessage, setSaveMessage] = useState('');
 
   const [aiTone, setAiTone] = useState({
     language: 'az',
     tone: 'professional',
-    greeting_style: 'formal',
-    custom_instructions: 'Alisiz və mehriban xidmət göstərin.'
+    custom_instructions: '',
+    payriff_merchant_id: '',
+    epoint_public_key: '',
   });
-  const [gateways, setGateways] = useState({
-    payriff_merchant_id: 'PRF_99841',
-    epoint_public_key: 'EP_88291'
-  });
+
+  useEffect(() => {
+    api
+      .get('/businesses/')
+      .then((res) => {
+        const b = res.data;
+        setBusinessName(b.name || '');
+        setCustomDomain(b.custom_domain || '');
+        const s = b.settings || {};
+        setAiTone({
+          language: s.language || 'az',
+          tone: s.tone || 'professional',
+          custom_instructions: s.custom_instructions || '',
+          payriff_merchant_id: s.payriff_merchant_id || '',
+          epoint_public_key: s.epoint_public_key || '',
+        });
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSaveSettings = async (e) => {
+    e.preventDefault();
+    setSaveMessage('');
+    await api.put('/businesses/', {
+      name: businessName,
+      custom_domain: customDomain || null,
+      settings: aiTone,
+    });
+    await fetchBusinessProfile();
+    setSaveMessage('Settings saved successfully.');
+    setTimeout(() => setSaveMessage(''), 3000);
+  };
+
+  const handleVerifyDomain = async () => {
+    if (!customDomain) return;
+    try {
+      const res = await api.post('/businesses/custom-domain/verify', { custom_domain: customDomain });
+      setDomainVerifyResult(res.data);
+      await fetchBusinessProfile();
+    } catch (err) {
+      setDomainVerifyResult({ error: err.response?.data?.detail || 'Verification failed' });
+    }
+  };
 
   const handleGenerateQr = async () => {
     setIsQrLoading(true);
     setShowQrModal(true);
     try {
       const res = await api.get('/businesses/whatsapp/qr-code');
-      setQrCodeDataUrl(res.data?.qr_code_data_url || INTERNAL_FALLBACK_QR_SVG);
-    } catch {
-      setQrCodeDataUrl(INTERNAL_FALLBACK_QR_SVG);
+      setWhatsappState(res.data || { status: 'unavailable', qr_code_data_url: null });
+    } catch (err) {
+      setWhatsappState({ status: 'unavailable', detail: err.message, qr_code_data_url: null });
     } finally {
       setIsQrLoading(false);
     }
   };
 
   return (
-    <div className="page-container" style={{ padding: '2rem' }}>
-      <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>Business Settings & Integration</h1>
-      <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Configure AI Providers, Payment Gateways, Custom Domains, and WhatsApp Connection.</p>
+    <div style={{ padding: '1rem 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Business Settings & Integrations</h1>
+          <p style={{ color: 'var(--text-secondary)' }}>
+            Configure your business profile, AI receptionist language, payment gateway keys, custom domain, and WhatsApp line.
+          </p>
+        </div>
+        <button type="button" className="btn btn-primary" onClick={handleSaveSettings}>
+          <Save size={16} />
+          Save All Changes
+        </button>
+      </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem' }}>
-        {/* 1. AI Engine Provider Assigned by Plan */}
+      {saveMessage && (
+        <div style={{ padding: '0.75rem 1rem', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid var(--success)', borderRadius: '8px', color: 'var(--success)', marginBottom: '1.5rem' }}>
+          {saveMessage}
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '1.5rem' }}>
+        {/* 1. Business Profile & AI Language */}
         <div className="glass-card" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <Bot color="var(--primary-start)" size={24} />
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>AI Provider Engine (Plan Assigned)</h2>
-          </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-            AI Model Engine is configured and assigned exclusively by the SaaS Owner based on your active subscription plan tier.
-          </p>
-          
-          <div className="form-group" style={{ marginBottom: '1.25rem', padding: '0.85rem 1rem', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <label className="form-label" style={{ marginBottom: '0.25rem' }}>Assigned AI Model Engine</label>
-            <p style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--primary-start)' }}>
-              ⚡ Google Gemini 3.5 Flash (Assigned by Pro Plan)
-            </p>
+            <Bot color="var(--primary)" size={24} />
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Business Profile & AI Receptionist</h2>
           </div>
 
           <div className="form-group">
-            <label className="form-label">AI Conversation Language (Default: Azerbaijani)</label>
-            <select className="form-control" value={aiTone.language} onChange={(e) => setAiTone({...aiTone, language: e.target.value})}>
+            <label className="form-label">Business Name</label>
+            <input
+              type="text"
+              className="form-control"
+              value={businessName}
+              onChange={(e) => setBusinessName(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Default AI Language</label>
+            <select
+              className="form-control"
+              value={aiTone.language}
+              onChange={(e) => setAiTone({ ...aiTone, language: e.target.value })}
+            >
               <option value="az">Azerbaijani (Azərbaycan dili)</option>
               <option value="en">English</option>
               <option value="ru">Russian (Русский)</option>
+              <option value="tr">Turkish (Türkçe)</option>
             </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Custom AI Instructions / Greeting</label>
+            <textarea
+              className="form-control"
+              rows={3}
+              placeholder="Optional instructions for how the AI should greet and assist customers..."
+              value={aiTone.custom_instructions}
+              onChange={(e) => setAiTone({ ...aiTone, custom_instructions: e.target.value })}
+            />
           </div>
         </div>
 
-        {/* 2. Custom Domain CNAME / A-Record */}
+        {/* 2. White-Label Custom Domain */}
         <div className="glass-card" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <Globe color="var(--primary-start)" size={24} />
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>White-Label Custom Domain</h2>
+            <Globe color="var(--primary)" size={24} />
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>White-Label Custom Domain</h2>
           </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>Connect your custom Apex domain (`beautystudio.az`) or subdomain (`booking.beautystudio.az`) for white-label customer portals.</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>
+            Point your custom domain or subdomain via CNAME to <code>cname.randevu.vip</code>.
+          </p>
 
           <div className="form-group" style={{ marginBottom: '1rem' }}>
-            <label className="form-label">Custom Domain Name (Apex or Subdomain)</label>
-            <input type="text" className="form-control" value={customDomain} onChange={(e) => setCustomDomain(e.target.value)} placeholder="beautystudio.az or booking.beautystudio.az" />
+            <label className="form-label">Custom Domain</label>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                type="text"
+                className="form-control"
+                value={customDomain}
+                onChange={(e) => setCustomDomain(e.target.value)}
+                placeholder="booking.yourdomain.az"
+              />
+              <button type="button" className="btn btn-secondary" onClick={handleVerifyDomain}>
+                Verify DNS
+              </button>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--success)' }}>
-            <CheckCircle2 size={18} />
-            <span>Target: cname.randevu.vip ({domainStatus})</span>
-          </div>
+          {domainVerifyResult && (
+            <div style={{ fontSize: '0.85rem', color: domainVerifyResult.cname_verified ? 'var(--success)' : 'var(--warning)' }}>
+              {domainVerifyResult.error ||
+                (domainVerifyResult.cname_verified
+                  ? `Verified CNAME -> ${domainVerifyResult.expected_target}`
+                  : `Pending DNS CNAME -> ${domainVerifyResult.expected_target || 'cname.randevu.vip'}`)}
+            </div>
+          )}
         </div>
 
         {/* 3. Payment Gateways */}
         <div className="glass-card" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <CreditCard color="var(--primary-start)" size={24} />
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>Azerbaijan Payment Gateways</h2>
+            <CreditCard color="var(--primary)" size={24} />
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Payment Gateway Credentials</h2>
           </div>
-          
-          <div className="form-group" style={{ marginBottom: '1rem' }}>
-            <label className="form-label">Payriff Merchant Secret Key</label>
-            <input type="password" value="••••••••••••••••" className="form-control" readOnly />
+
+          <div className="form-group">
+            <label className="form-label">Payriff Merchant ID</label>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Enter your Payriff Merchant ID"
+              value={aiTone.payriff_merchant_id}
+              onChange={(e) => setAiTone({ ...aiTone, payriff_merchant_id: e.target.value })}
+            />
           </div>
 
           <div className="form-group">
             <label className="form-label">EPoint Public Key</label>
-            <input type="text" value={gateways.epoint_public_key} className="form-control" readOnly />
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Enter your EPoint Public Key"
+              value={aiTone.epoint_public_key}
+              onChange={(e) => setAiTone({ ...aiTone, epoint_public_key: e.target.value })}
+            />
           </div>
         </div>
 
-        {/* 4. WhatsApp Instance QR Code (Generated in-dashboard from internal Evolution API) */}
+        {/* 4. WhatsApp Instance QR Code */}
         <div className="glass-card" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <QrCode color="var(--primary-start)" size={24} />
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>WhatsApp Pair via In-Dashboard QR</h2>
+            <QrCode color="var(--primary)" size={24} />
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>WhatsApp Business Line</h2>
           </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-            Evolution API is 100% unexposed and secure inside internal backend network. Generate and scan your QR code right here.
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
+            Link your business WhatsApp number directly to your AI receptionist by scanning the Evolution API QR code.
           </p>
-          <p style={{ color: 'var(--success)', fontWeight: 'bold', marginBottom: '1rem' }}>Status: CONNECTED (+994 50 123 45 67)</p>
-          <button className="btn btn-primary" onClick={handleGenerateQr} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleGenerateQr}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+          >
             <QrCode size={18} />
-            <span>Generate In-Dashboard WhatsApp QR Code</span>
+            <span>Check Status / Generate WhatsApp QR Code</span>
           </button>
         </div>
       </div>
 
       {/* WhatsApp QR Modal */}
       {showQrModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
-        }}>
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.85)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+        >
           <div className="glass-card" style={{ padding: '2rem', maxWidth: '420px', width: '100%', textAlign: 'center', position: 'relative' }}>
-            <button onClick={() => setShowQrModal(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}>
+            <button
+              type="button"
+              onClick={() => setShowQrModal(false)}
+              style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}
+            >
               <X size={24} />
             </button>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>Pair WhatsApp Line</h2>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>WhatsApp Connection</h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-              Open WhatsApp on your phone ➔ Linked Devices ➔ Link a Device, and scan this QR code.
+              Open WhatsApp on your phone ➔ Linked Devices ➔ Link a Device.
             </p>
 
             {isQrLoading ? (
-              <div style={{ padding: '3rem 0' }}>
-                <RefreshCw size={36} className="spin" color="var(--primary-start)" style={{ marginBottom: '1rem' }} />
-                <p>Generating internal QR code via backend...</p>
+              <div style={{ padding: '2.5rem 0' }}>
+                <RefreshCw size={32} color="var(--primary)" style={{ marginBottom: '1rem' }} />
+                <p>Connecting to Evolution API...</p>
+              </div>
+            ) : whatsappState.status === 'connected' ? (
+              <div style={{ padding: '2rem 0', color: 'var(--success)' }}>
+                <CheckCircle2 size={42} style={{ marginBottom: '0.75rem' }} />
+                <div style={{ fontWeight: 600 }}>WhatsApp Instance Connected</div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                  Instance: {whatsappState.instance_name}
+                </div>
+              </div>
+            ) : whatsappState.qr_code_data_url ? (
+              <div>
+                <img
+                  src={whatsappState.qr_code_data_url}
+                  alt="WhatsApp Pairing QR Code"
+                  style={{ width: '240px', height: '240px', borderRadius: '12px', padding: '0.75rem', background: '#fff', marginBottom: '1rem' }}
+                />
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  Scan with WhatsApp to pair ({whatsappState.instance_name})
+                </div>
               </div>
             ) : (
-              <div>
-                <img src={qrCodeDataUrl} alt="WhatsApp Pairing QR Code" style={{ width: '240px', height: '240px', borderRadius: '12px', padding: '1rem', background: '#fff', marginBottom: '1.5rem' }} />
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', color: 'var(--success)', fontSize: '0.9rem' }}>
-                  <CheckCircle2 size={18} />
-                  <span>Evolution API internal container connected securely</span>
-                </div>
+              <div style={{ padding: '1.5rem 0', color: 'var(--warning)' }}>
+                <p style={{ margin: 0 }}>
+                  Evolution API status: <strong>{whatsappState.status}</strong>
+                </p>
+                {whatsappState.detail && (
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                    {whatsappState.detail}
+                  </p>
+                )}
               </div>
             )}
           </div>

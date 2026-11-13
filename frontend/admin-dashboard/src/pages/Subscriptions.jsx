@@ -1,10 +1,14 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useDataStore } from '../store/dataStore';
 import DataTable from '../components/common/DataTable';
 import StatusBadge from '../components/common/StatusBadge';
 
 const Subscriptions = () => {
-  const { subscriptions } = useDataStore();
+  const { subscriptions, fetchSubscriptions } = useDataStore();
+
+  useEffect(() => {
+    fetchSubscriptions();
+  }, [fetchSubscriptions]);
 
   const columns = [
     { header: 'Business', accessor: 'business', render: (row) => <span style={{ fontWeight: 500 }}>{row.business}</span> },
