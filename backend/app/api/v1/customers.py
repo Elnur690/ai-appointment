@@ -16,6 +16,7 @@ router = APIRouter()
 class CustomerCreate(BaseModel):
     phone: str
     name: str | None = None
+    email: str | None = None
     language_pref: str = "az"
 
 
@@ -24,6 +25,9 @@ class CustomerResponse(BaseModel):
     business_id: str
     phone: str
     name: str | None = None
+    email: str | None = None
+    visits: int = 0
+    tier: str = "Standard"
     language_pref: str = "az"
 
 
@@ -31,12 +35,16 @@ class CustomerDetailResponse(CustomerResponse):
     appointments: List[dict] = []
 
 
-def _to_response(c: Customer) -> CustomerResponse:
+def _to_response(c: Customer, visits: int = 0) -> CustomerResponse:
+    tier = "VIP Gold" if visits >= 10 else ("Silver" if visits >= 5 else "Standard")
     return CustomerResponse(
         id=str(c.id),
         business_id=str(c.business_id),
         phone=c.phone_number,
-        name=c.name,
+        name=c.name or c.phone_number,
+        email=None,
+        visits=visits,
+        tier=tier,
         language_pref=c.language_pref or "az",
     )
 
@@ -49,13 +57,18 @@ async def list_customers(
     q: str | None = Query(None, description="Search by name or phone"),
 ):
     """List customers from PostgreSQL, searchable by name/phone."""
-    stmt = select(Customer).where(Customer.business_id == UUID(business_id))
+    from sqlalchemy.orm import selectinload
+    stmt = (
+        select(Customer)
+        .where(Customer.business_id == UUID(business_id))
+        .options(selectinload(Customer.appointments))
+    )
     if q:
         pattern = f"%{q.strip()}%"
         stmt = stmt.where(or_(Customer.name.ilike(pattern), Customer.phone_number.ilike(pattern)))
     stmt = stmt.order_by(Customer.created_at.desc())
     res = await db.execute(stmt)
-    return [_to_response(c) for c in res.scalars().all()]
+    return [_to_response(c, visits=len(c.appointments or [])) for c in res.scalars().all()]
 
 
 @router.post("/", response_model=CustomerResponse)

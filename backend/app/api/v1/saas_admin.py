@@ -37,6 +37,7 @@ class PlanResponse(BaseModel):
     max_branches: int = 1
     max_whatsapp_numbers: int = 1
     ai_message_quota: int = 1000
+    message_limit: int = 1000
     allows_voice_messages: bool = False
     allows_dynamic_pricing: bool = False
     allows_winback_campaigns: bool = False
@@ -67,6 +68,7 @@ class PlanCreate(BaseModel):
     max_branches: int = 1
     max_whatsapp_numbers: int = 1
     ai_message_quota: int = 1000
+    message_limit: Optional[int] = None
     allows_voice_messages: bool = False
     allows_dynamic_pricing: bool = False
     allows_winback_campaigns: bool = False
@@ -119,26 +121,31 @@ class PlanUpdate(BaseModel):
 
 
 class BusinessStatusUpdate(BaseModel):
-    status: str
+    status: Optional[str] = None
     custom_domain: Optional[str] = None
+    plan: Optional[str] = None
 
 
 class AnalyticsResponse(BaseModel):
     total_businesses: int
     active_subscriptions: int = 0
-    total_appointments: int
-    total_messages: int
+    mrr_usd: float = 0.0
+    total_appointments: int = 0
+    total_messages: int = 0
+    total_messages_this_month: int = 0
     total_resellers: int = 0
 
 
 def _plan_to_response(p: Plan) -> PlanResponse:
+    quota = int(p.ai_message_quota or 1000)
     return PlanResponse(
         id=str(p.id),
         name=p.name,
         price=float(p.price),
         max_branches=p.max_branches,
         max_whatsapp_numbers=p.max_whatsapp_numbers,
-        ai_message_quota=p.ai_message_quota,
+        ai_message_quota=quota,
+        message_limit=quota,
         allows_voice_messages=bool(p.allows_voice_messages),
         allows_dynamic_pricing=bool(p.allows_dynamic_pricing),
         allows_winback_campaigns=bool(p.allows_winback_campaigns),
@@ -246,10 +253,18 @@ async def update_business_status(
     biz = (await db.execute(stmt)).scalar_one_or_none()
     if not biz:
         raise HTTPException(status_code=404, detail="Business not found")
-    biz.is_active = status_update.status.lower() != "suspended"
-    biz.subscription_status = status_update.status.lower()
+    if status_update.status:
+        biz.is_active = status_update.status.lower() != "suspended"
+        biz.subscription_status = status_update.status.lower()
     if status_update.custom_domain is not None:
         biz.custom_domain = status_update.custom_domain.strip().lower() or None
+    if status_update.plan:
+        plan_obj = (
+            await db.execute(select(Plan).where(Plan.name == status_update.plan))
+        ).scalar_one_or_none()
+        if plan_obj:
+            biz.plan_id = plan_obj.id
+            biz.plan = plan_obj
     await db.flush()
     return _biz_to_response(biz)
 
@@ -271,7 +286,11 @@ async def create_plan(
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
     """Create a new subscription plan with all 20 entitlement flags."""
-    plan = Plan(**plan_in.model_dump(), is_active=True)
+    dump = plan_in.model_dump()
+    msg_limit = dump.pop("message_limit", None)
+    if msg_limit is not None:
+        dump["ai_message_quota"] = msg_limit
+    plan = Plan(**dump, is_active=True)
     db.add(plan)
     await db.flush()
     return _plan_to_response(plan)
@@ -332,11 +351,21 @@ async def get_platform_analytics(
     appt_cnt = (await db.execute(select(func.count(Appointment.id)))).scalar_one()
     msg_cnt = (await db.execute(select(func.count(Message.id)))).scalar_one()
     res_cnt = (await db.execute(select(func.count(Reseller.id)))).scalar_one()
+    mrr_val = (
+        await db.execute(
+            select(func.coalesce(func.sum(Plan.price), 0))
+            .select_from(Business)
+            .join(Plan, Business.plan_id == Plan.id)
+            .where(Business.is_active == True)
+        )
+    ).scalar_one()
     return AnalyticsResponse(
         total_businesses=int(biz_cnt or 0),
         active_subscriptions=int(active_cnt or 0),
+        mrr_usd=float(mrr_val or 0.0),
         total_appointments=int(appt_cnt or 0),
         total_messages=int(msg_cnt or 0),
+        total_messages_this_month=int(msg_cnt or 0),
         total_resellers=int(res_cnt or 0),
     )
 

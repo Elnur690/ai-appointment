@@ -20,11 +20,14 @@ class MessageSendRequest(BaseModel):
 class ConversationResponse(BaseModel):
     id: str
     business_id: str
+    customer: str
     customer_phone: str
     customer_name: str | None = None
     branch_id: str
+    channel: str = "WhatsApp"
     ai_active: bool
     status: str
+    guardrail: str = "In-Scope (Booking)"
     last_message: str | None = None
 
 
@@ -33,15 +36,21 @@ class ConversationDetailResponse(ConversationResponse):
 
 
 def _to_response(c: Conversation, last_msg: str | None = None) -> ConversationResponse:
+    phone = c.customer.phone_number if c.customer else "Unknown"
+    name = c.customer.name if c.customer else None
+    display_customer = f"{phone} ({name})" if name else phone
     return ConversationResponse(
         id=str(c.id),
         business_id=str(c.business_id),
-        customer_phone=c.customer.phone_number if c.customer else "Unknown",
-        customer_name=c.customer.name if c.customer else None,
+        customer=display_customer,
+        customer_phone=phone,
+        customer_name=name,
         branch_id=str(c.branch_id),
+        channel="WhatsApp",
         ai_active=bool(c.ai_active),
         status="ai_active" if c.ai_active else "human_takeover",
-        last_message=last_msg,
+        guardrail="In-Scope (Booking)" if c.ai_active else "Human Takeover",
+        last_message=last_msg or "—",
     )
 
 

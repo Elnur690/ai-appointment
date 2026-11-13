@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, and_
 from app.tasks.celery_app import celery_app
-from app.core.database import AsyncSessionLocal
+from app.core.database import AsyncSessionLocal, engine
 from app.models.appointment import Appointment, AppointmentStatus
 from app.integrations.whatsapp.client import EvolutionAPIClient
 from app.integrations.whatsapp.message_sender import WhatsAppMessageSender
@@ -61,3 +61,4 @@ async def _async_send_reminders():
             logger.info(f"Dispatched 2h reminder for appointment {appt.id}")
             
         await session.commit()
+    await engine.dispose()

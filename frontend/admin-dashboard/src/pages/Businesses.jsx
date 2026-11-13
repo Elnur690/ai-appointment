@@ -97,25 +97,42 @@ const Businesses = () => {
                 Enables custom branded booking portal (`booking.mysalon.az`). Requires Enterprise Plan (`allows_custom_domain`).
               </p>
               <div className="flex-between" style={{ gap: '0.5rem' }}>
-                <input type="text" className="form-control" placeholder="booking.mysalon.az" value={customDomainInput} onChange={(e) => setCustomDomainInput(e.target.value)} />
-                <button className="btn btn-secondary" onClick={() => alert(`White-label domain '${customDomainInput}' verified and assigned!`)}>Verify & Assign</button>
+                <input type="text" className="form-control" placeholder="booking.yourdomain.az" value={customDomainInput} onChange={(e) => setCustomDomainInput(e.target.value)} />
+                <button
+                  className="btn btn-secondary"
+                  onClick={async () => {
+                    await updateBusinessStatus(selectedBusiness.id, selectedBusiness.status, {
+                      custom_domain: customDomainInput,
+                      plan: selectedPlanInput,
+                    });
+                    setSelectedBusiness(null);
+                  }}
+                >
+                  Verify & Assign
+                </button>
               </div>
             </div>
 
             <div className="flex-between" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
               {selectedBusiness.status !== 'active' ? (
-                <button className="btn btn-primary" onClick={() => {
-                  updateBusinessStatus(selectedBusiness.id, 'active');
+                <button className="btn btn-primary" onClick={async () => {
+                  await updateBusinessStatus(selectedBusiness.id, 'active', {
+                    custom_domain: customDomainInput,
+                    plan: selectedPlanInput,
+                  });
                   setSelectedBusiness(null);
                 }}>Approve & Activate</button>
               ) : (
-                <button className="btn btn-secondary" onClick={() => {
-                  updateBusinessStatus(selectedBusiness.id, 'suspended');
+                <button className="btn btn-secondary" onClick={async () => {
+                  await updateBusinessStatus(selectedBusiness.id, 'suspended');
                   setSelectedBusiness(null);
                 }} style={{ color: 'var(--error)' }}>Suspend Tenant</button>
               )}
-              <button className="btn btn-primary" onClick={() => {
-                alert("Tenant settings saved successfully!");
+              <button className="btn btn-primary" onClick={async () => {
+                await updateBusinessStatus(selectedBusiness.id, selectedBusiness.status, {
+                  custom_domain: customDomainInput,
+                  plan: selectedPlanInput,
+                });
                 setSelectedBusiness(null);
               }}>Save Tenant Setup</button>
             </div>

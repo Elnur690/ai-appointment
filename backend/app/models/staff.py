@@ -17,6 +17,9 @@ class Staff(Base, TimestampMixin):
     phone: Mapped[str | None] = mapped_column(String, nullable=True)
     email: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
     password_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    shift_type: Mapped[str] = mapped_column(String(50), default="Full-Day (09:00 - 20:00)", nullable=False)
+    allow_overtime: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    max_overtime_minutes: Mapped[int] = mapped_column(default=60, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     branch: Mapped["Branch"] = relationship("Branch", back_populates="staff")
@@ -34,6 +37,9 @@ class StaffSchedule(Base, TimestampMixin):
     day_of_week: Mapped[int] = mapped_column(nullable=False)
     start_time: Mapped[time] = mapped_column(Time, nullable=False)
     end_time: Mapped[time] = mapped_column(Time, nullable=False)
+    shift_type: Mapped[str] = mapped_column(String(50), default="full_day", nullable=False)
+    allow_overtime: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    max_overtime_minutes: Mapped[int] = mapped_column(default=60, nullable=False)
 
     __table_args__ = (
         CheckConstraint("end_time > start_time", name="check_end_time_after_start"),

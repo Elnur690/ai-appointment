@@ -15,6 +15,8 @@ class Service(Base, TimestampMixin):
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     duration_minutes: Mapped[int] = mapped_column(nullable=False)
     price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(10), default="AZN", nullable=False)
+    recommended_rebooking_days: Mapped[int | None] = mapped_column(nullable=True, default=21)
     buffer_minutes: Mapped[int] = mapped_column(default=0, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 

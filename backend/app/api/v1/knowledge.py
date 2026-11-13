@@ -15,8 +15,9 @@ router = APIRouter()
 class KnowledgeBase(BaseModel):
     type: str = "faq"
     title: str | None = None
-    question_context: str
-    answer_content: str
+    content: str | None = None
+    question_context: str | None = None
+    answer_content: str | None = None
     branch_id: str | None = None
     tags: List[str] = []
 
@@ -27,6 +28,7 @@ class KnowledgeCreate(KnowledgeBase):
 
 class KnowledgeUpdate(BaseModel):
     title: str | None = None
+    content: str | None = None
     question_context: str | None = None
     answer_content: str | None = None
     tags: List[str] | None = None
@@ -68,6 +70,7 @@ def _to_response(k: KnowledgeEntry) -> KnowledgeResponse:
         branch_id=str(k.branch_id) if k.branch_id else None,
         type=k.entry_type.value if hasattr(k.entry_type, "value") else str(k.entry_type),
         title=k.title,
+        content=k.answer_content,
         question_context=k.question_context,
         answer_content=k.answer_content,
         status=k.status.value if hasattr(k.status, "value") else str(k.status),
@@ -108,14 +111,16 @@ async def create_knowledge(
     entry_type_val = entry.type.lower() if entry.type else "faq"
     if entry_type_val not in {"faq", "correction", "best_practice"}:
         entry_type_val = "faq"
+    q_text = (entry.question_context or entry.title or entry.content or "General Info").strip()
+    a_text = (entry.answer_content or entry.content or entry.question_context or "").strip()
     row = KnowledgeEntry(
         business_id=UUID(business_id),
         branch_id=UUID(entry.branch_id) if entry.branch_id else None,
         entry_type=KnowledgeEntryType(entry_type_val),
         status=KnowledgeEntryStatus.ACTIVE,
-        title=entry.title or entry.question_context[:80],
-        question_context=entry.question_context.strip(),
-        answer_content=entry.answer_content.strip(),
+        title=entry.title or q_text[:80],
+        question_context=q_text,
+        answer_content=a_text,
         tags={"items": entry.tags} if entry.tags else None,
     )
     db.add(row)

@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, and_, func
 from app.tasks.celery_app import celery_app
-from app.core.database import AsyncSessionLocal
+from app.core.database import AsyncSessionLocal, engine
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.customer import Customer
 from app.models.business import Business
@@ -60,3 +60,4 @@ async def _async_run_winback_campaigns():
                     f"[WIN-BACK CAMPAIGN] Dispatched WhatsApp win-back message to {customer.name or customer.phone_number} "
                     f"for Business '{business.name}' (Last visit: {last_visit.strftime('%Y-%m-%d')})"
                 )
+    await engine.dispose()

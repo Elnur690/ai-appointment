@@ -86,8 +86,8 @@ export const useDataStore = create((set, get) => ({
     }
   },
 
-  updateBusinessStatus: async (id, status) => {
-    await apiClient.put(`/saas-admin/businesses/${id}/status`, { status });
+  updateBusinessStatus: async (id, status, extra = {}) => {
+    await apiClient.put(`/saas-admin/businesses/${id}/status`, { status, ...extra });
     await get().fetchBusinesses();
     await get().fetchAnalytics();
   },

@@ -17,11 +17,14 @@ router = APIRouter()
 class StaffBase(BaseModel):
     name: str
     role: str | None = "Specialist"
+    role_title: str | None = None
     phone: str | None = None
     email: str | None = None
     branch_id: str | None = None
-    shift_type: str | None = "full_day"
-    allow_overtime: bool = False
+    shift_type: str | None = "Full-Day (09:00 - 20:00)"
+    shift: str | None = None
+    allow_overtime: bool = True
+    overtime_enabled: bool | None = None
     max_overtime_minutes: int = 60
 
 
@@ -32,11 +35,14 @@ class StaffCreate(StaffBase):
 class StaffUpdate(BaseModel):
     name: str | None = None
     role: str | None = None
+    role_title: str | None = None
     phone: str | None = None
     email: str | None = None
     branch_id: str | None = None
     shift_type: str | None = None
+    shift: str | None = None
     allow_overtime: bool | None = None
+    overtime_enabled: bool | None = None
     max_overtime_minutes: int | None = None
     is_active: bool | None = None
 
@@ -77,14 +83,22 @@ async def _resolve_branch_id(db: AsyncSession, business_id: UUID, branch_id: str
 
 
 def _to_response(s: Staff) -> StaffResponse:
+    shift_str = getattr(s, "shift_type", None) or "Full-Day (09:00 - 20:00)"
+    overtime_bool = bool(getattr(s, "allow_overtime", True))
     return StaffResponse(
         id=str(s.id),
         business_id=str(s.business_id),
         branch_id=str(s.branch_id),
         name=s.name,
         role=s.role,
+        role_title=s.role,
         phone=s.phone,
         email=s.email,
+        shift_type=shift_str,
+        shift=shift_str,
+        allow_overtime=overtime_bool,
+        overtime_enabled=overtime_bool,
+        max_overtime_minutes=int(getattr(s, "max_overtime_minutes", 60)),
         is_active=bool(s.is_active),
     )
 
@@ -118,13 +132,19 @@ async def create_staff(
     """Create a new staff member in PostgreSQL."""
     biz_uuid = UUID(business_id)
     branch_uuid = await _resolve_branch_id(db, biz_uuid, staff.branch_id)
+    role_val = (staff.role_title or staff.role or "Specialist").strip()
+    shift_val = staff.shift or staff.shift_type or "Full-Day (09:00 - 20:00)"
+    overtime_val = staff.overtime_enabled if staff.overtime_enabled is not None else staff.allow_overtime
     new_staff = Staff(
         business_id=biz_uuid,
         branch_id=branch_uuid,
         name=staff.name.strip(),
-        role=staff.role or "Specialist",
+        role=role_val,
         phone=staff.phone,
         email=staff.email,
+        shift_type=shift_val,
+        allow_overtime=bool(overtime_val),
+        max_overtime_minutes=staff.max_overtime_minutes,
         is_active=True,
     )
     db.add(new_staff)
@@ -161,7 +181,14 @@ async def update_staff(
     s = (await db.execute(stmt)).scalar_one_or_none()
     if not s:
         raise HTTPException(status_code=404, detail="Staff member not found")
-    for k, v in staff_update.model_dump(exclude_unset=True).items():
+    data = staff_update.model_dump(exclude_unset=True)
+    if "role_title" in data and data["role_title"] is not None:
+        s.role = data.pop("role_title")
+    if "shift" in data and data["shift"] is not None:
+        s.shift_type = data.pop("shift")
+    if "overtime_enabled" in data and data["overtime_enabled"] is not None:
+        s.allow_overtime = bool(data.pop("overtime_enabled"))
+    for k, v in data.items():
         if hasattr(s, k) and k != "branch_id":
             setattr(s, k, v)
     await db.flush()

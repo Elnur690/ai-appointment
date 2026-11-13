@@ -19,6 +19,7 @@ class ServiceBase(BaseModel):
     duration_minutes: int
     price: float
     currency: str = "AZN"
+    recommended_rebooking_days: int | None = 21
     buffer_minutes: int = 0
     branch_id: str | None = None
 
@@ -32,6 +33,7 @@ class ServiceUpdate(BaseModel):
     description: str | None = None
     duration_minutes: int | None = None
     price: float | None = None
+    recommended_rebooking_days: int | None = None
     buffer_minutes: int | None = None
     is_active: bool | None = None
 
@@ -62,12 +64,13 @@ def _to_response(s: Service) -> ServiceResponse:
     return ServiceResponse(
         id=str(s.id),
         business_id=str(s.business_id),
-        branch_id=str(s.branch_id),
+        branch_id=str(s.branch_id) if s.branch_id else None,
         name=s.name,
         description=s.description,
         duration_minutes=int(s.duration_minutes),
         price=float(s.price),
-        currency=s.currency or "AZN",
+        currency=getattr(s, "currency", None) or "AZN",
+        recommended_rebooking_days=getattr(s, "recommended_rebooking_days", 21),
         buffer_minutes=int(s.buffer_minutes or 0),
         is_active=bool(s.is_active),
     )
@@ -103,6 +106,7 @@ async def create_service(
         duration_minutes=service.duration_minutes,
         price=service.price,
         currency=service.currency or "AZN",
+        recommended_rebooking_days=service.recommended_rebooking_days,
         buffer_minutes=service.buffer_minutes or 0,
         is_active=True,
     )

@@ -47,8 +47,17 @@ async def init_db() -> None:
         try:
             await conn.execute(text("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminder_24h_sent_at TIMESTAMP WITH TIME ZONE;"))
             await conn.execute(text("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminder_2h_sent_at TIMESTAMP WITH TIME ZONE;"))
+            await conn.execute(text("ALTER TABLE branches ADD COLUMN IF NOT EXISTS phone VARCHAR;"))
+            await conn.execute(text("ALTER TABLE services ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'AZN';"))
+            await conn.execute(text("ALTER TABLE services ADD COLUMN IF NOT EXISTS recommended_rebooking_days INTEGER DEFAULT 21;"))
+            await conn.execute(text("ALTER TABLE staff ADD COLUMN IF NOT EXISTS shift_type VARCHAR(50) DEFAULT 'Full-Day (09:00 - 20:00)';"))
+            await conn.execute(text("ALTER TABLE staff ADD COLUMN IF NOT EXISTS allow_overtime BOOLEAN DEFAULT TRUE;"))
+            await conn.execute(text("ALTER TABLE staff ADD COLUMN IF NOT EXISTS max_overtime_minutes INTEGER DEFAULT 60;"))
+            await conn.execute(text("ALTER TABLE staff_schedules ADD COLUMN IF NOT EXISTS shift_type VARCHAR(50) DEFAULT 'full_day';"))
+            await conn.execute(text("ALTER TABLE staff_schedules ADD COLUMN IF NOT EXISTS allow_overtime BOOLEAN DEFAULT FALSE;"))
+            await conn.execute(text("ALTER TABLE staff_schedules ADD COLUMN IF NOT EXISTS max_overtime_minutes INTEGER DEFAULT 60;"))
         except Exception as exc:
-            logger.warning(f"Reminder columns check skipped: {exc}")
+            logger.warning(f"Schema migration columns check skipped: {exc}")
 
     # Seed initial SaaS Owner & default plans if database is fresh
     try:

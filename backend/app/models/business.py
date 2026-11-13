@@ -43,6 +43,7 @@ class Business(Base, TimestampMixin):
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     
+    plan: Mapped["Plan"] = relationship("Plan")
     owners: Mapped[List["BusinessOwner"]] = relationship("BusinessOwner", back_populates="business")
     branches: Mapped[List["Branch"]] = relationship("Branch", back_populates="business")
     staff: Mapped[List["Staff"]] = relationship("Staff", back_populates="business")
@@ -74,6 +75,7 @@ class Branch(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String, nullable=False)
     whatsapp_instance_id: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
     location: Mapped[str | None] = mapped_column(String, nullable=True)
+    phone: Mapped[str | None] = mapped_column(String, nullable=True)
     latitude: Mapped[float | None] = mapped_column(nullable=True)
     longitude: Mapped[float | None] = mapped_column(nullable=True)
     working_hours: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=DEFAULT_WORKING_HOURS)

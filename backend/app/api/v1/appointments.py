@@ -250,6 +250,28 @@ async def check_availability(
     return []
 
 
+@router.get("/my", response_model=List[AppointmentResponse])
+async def get_my_appointments(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(get_current_active_user)],
+):
+    """Get appointments for the authenticated customer (Customer Mobile App)."""
+    phone = user.get("phone") or user.get("sub") or ""
+    stmt = (
+        select(Appointment)
+        .join(Customer, Appointment.customer_id == Customer.id)
+        .where(Customer.phone_number == phone)
+        .options(
+            selectinload(Appointment.customer),
+            selectinload(Appointment.service),
+            selectinload(Appointment.staff),
+        )
+        .order_by(Appointment.start_time.desc())
+    )
+    res = await db.execute(stmt)
+    return [_to_response(a) for a in res.scalars().all()]
+
+
 @router.get("/{id}", response_model=AppointmentResponse)
 async def get_appointment(
     id: str,
@@ -274,6 +296,7 @@ async def get_appointment(
 
 
 @router.put("/{id}", response_model=AppointmentResponse)
+@router.put("/{id}/status", response_model=AppointmentResponse)
 async def update_appointment(
     id: str,
     update_data: AppointmentUpdate,

@@ -18,30 +18,47 @@ class PaymentCreate(BaseModel):
     amount: float
     currency: str = "AZN"
     method: str = "cash"
+    status: str | None = None
     notes: str | None = None
 
 
-class PaymentResponse(PaymentCreate):
+class PaymentResponse(BaseModel):
     id: str
     business_id: str
+    appointment_id: str | None = None
+    customer: str = "Walk-In / Direct"
+    gateway: str = "Cash"
+    amount: str
+    amount_value: float
+    currency: str = "AZN"
+    method: str = "cash"
     status: str
+    notes: str | None = None
     created_at: str | None = None
 
 
 class RevenueSummaryResponse(BaseModel):
     total_revenue: float
+    count: int = 0
     currency: str = "AZN"
 
 
 def _to_response(p: Payment) -> PaymentResponse:
+    method_val = p.method.value if hasattr(p.method, "value") else str(p.method)
+    status_val = p.status.value if hasattr(p.status, "value") else str(p.status)
+    amt_float = float(p.amount)
+    curr = p.currency or "AZN"
     return PaymentResponse(
         id=str(p.id),
         business_id=str(p.business_id),
         appointment_id=str(p.appointment_id) if p.appointment_id else None,
-        amount=float(p.amount),
-        currency=p.currency or "AZN",
-        method=p.method.value if hasattr(p.method, "value") else str(p.method),
-        status=p.status.value if hasattr(p.status, "value") else str(p.status),
+        customer=p.notes or "Direct Checkout",
+        gateway=method_val.capitalize(),
+        amount=f"{amt_float:.2f} {curr}",
+        amount_value=amt_float,
+        currency=curr,
+        method=method_val,
+        status=status_val,
         notes=p.notes,
         created_at=p.created_at.isoformat() if p.created_at else None,
     )
@@ -103,7 +120,10 @@ async def revenue_summary(
     end_date: date | None = None,
 ):
     """Get real revenue summary from PostgreSQL."""
-    stmt = select(func.coalesce(func.sum(Payment.amount), 0)).where(
+    stmt = select(
+        func.coalesce(func.sum(Payment.amount), 0),
+        func.count(Payment.id),
+    ).where(
         Payment.business_id == UUID(business_id),
         Payment.status == PaymentStatus.completed,
     )
@@ -111,5 +131,5 @@ async def revenue_summary(
         stmt = stmt.where(Payment.created_at >= datetime.combine(start_date, time.min, tzinfo=timezone.utc))
     if end_date:
         stmt = stmt.where(Payment.created_at <= datetime.combine(end_date, time.max, tzinfo=timezone.utc))
-    total = (await db.execute(stmt)).scalar_one()
-    return RevenueSummaryResponse(total_revenue=float(total or 0.0))
+    row = (await db.execute(stmt)).one()
+    return RevenueSummaryResponse(total_revenue=float(row[0] or 0.0), count=int(row[1] or 0))

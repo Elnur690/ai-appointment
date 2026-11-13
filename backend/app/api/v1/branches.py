@@ -48,7 +48,7 @@ def _to_response(b: Branch) -> BranchResponse:
         id=str(b.id),
         business_id=str(b.business_id),
         name=b.name,
-        address=b.address,
+        address=b.location,
         phone=b.phone,
         latitude=b.latitude,
         longitude=b.longitude,
@@ -79,7 +79,7 @@ async def create_branch(
     new_branch = Branch(
         business_id=UUID(business_id),
         name=branch.name.strip(),
-        address=branch.address,
+        location=branch.address,
         phone=branch.phone,
         latitude=branch.latitude,
         longitude=branch.longitude,
@@ -119,7 +119,10 @@ async def update_branch(
     if not b:
         raise HTTPException(status_code=404, detail="Branch not found")
     for k, v in branch_update.model_dump(exclude_unset=True).items():
-        setattr(b, k, v)
+        if k == "address":
+            b.location = v
+        elif hasattr(b, k):
+            setattr(b, k, v)
     await db.flush()
     return _to_response(b)
 
