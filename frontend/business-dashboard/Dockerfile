@@ -27,6 +27,9 @@ RUN printf 'server {\n\
     listen 22301;\n\
     server_name _;\n\
     server_tokens off;\n\
+    if ($host = "cname.randevu.vip") {\n\
+        return 403;\n\
+    }\n\
     root /usr/share/nginx/html;\n\
     index index.html;\n\
     gzip on;\n\
