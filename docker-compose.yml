@@ -32,7 +32,7 @@ services:
       - appointment_net
 
   evolution-api:
-    image: atendai/evolution-api:v2.2.3
+    image: evoapicloud/evolution-api:v2.2.3
     container_name: appointment_evolution
     restart: unless-stopped
     # 100% internal Docker network only on custom port 22880 — no host ports exposed
