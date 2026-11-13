@@ -41,23 +41,23 @@ async def log_payment(
 
 @router.get("/", response_model=List[PaymentResponse])
 async def list_payments(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(get_current_active_user)],
+    business_id: Annotated[str, Depends(get_business_context)],
     start_date: date | None = None,
     end_date: date | None = None,
     method: str | None = None,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    user: Annotated[dict[str, Any], Depends(get_current_active_user)],
-    business_id: Annotated[str, Depends(get_business_context)]
 ):
     """List payments with optional filters."""
     return []
 
 @router.get("/summary", response_model=RevenueSummaryResponse)
 async def revenue_summary(
-    start_date: date | None = None,
-    end_date: date | None = None,
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(get_current_active_user)],
-    business_id: Annotated[str, Depends(get_business_context)]
+    business_id: Annotated[str, Depends(get_business_context)],
+    start_date: date | None = None,
+    end_date: date | None = None,
 ):
     """Get revenue summary."""
     return RevenueSummaryResponse(total_revenue=0.0)

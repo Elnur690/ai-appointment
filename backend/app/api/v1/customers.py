@@ -22,10 +22,10 @@ class CustomerDetailResponse(CustomerResponse):
 
 @router.get("/", response_model=List[CustomerResponse])
 async def list_customers(
-    q: str | None = Query(None, description="Search by name or phone"),
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(get_current_active_user)],
-    business_id: Annotated[str, Depends(get_business_context)]
+    business_id: Annotated[str, Depends(get_business_context)],
+    q: str | None = Query(None, description="Search by name or phone"),
 ):
     """List customers, searchable by name/phone."""
     return []

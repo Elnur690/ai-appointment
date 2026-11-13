@@ -37,14 +37,14 @@ class AvailableSlot(BaseModel):
 
 @router.get("/", response_model=List[AppointmentResponse])
 async def list_appointments(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(get_current_active_user)],
+    business_id: Annotated[str, Depends(get_business_context)],
     branch_id: str | None = None,
     staff_id: str | None = None,
     status: str | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    user: Annotated[dict[str, Any], Depends(get_current_active_user)],
-    business_id: Annotated[str, Depends(get_business_context)]
 ):
     """List appointments with filters."""
     return []
@@ -66,10 +66,10 @@ async def create_appointment(
 async def get_appointments_calendar(
     start_date: date,
     end_date: date,
-    branch_id: str | None = None,
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(get_current_active_user)],
-    business_id: Annotated[str, Depends(get_business_context)]
+    business_id: Annotated[str, Depends(get_business_context)],
+    branch_id: str | None = None,
 ):
     """Get appointments for calendar view."""
     return []
@@ -78,10 +78,10 @@ async def get_appointments_calendar(
 async def check_availability(
     service_id: str,
     target_date: date,
-    staff_id: str | None = None,
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(get_current_active_user)],
-    business_id: Annotated[str, Depends(get_business_context)]
+    business_id: Annotated[str, Depends(get_business_context)],
+    staff_id: str | None = None,
 ):
     """Check available slots."""
     return []

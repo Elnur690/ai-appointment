@@ -38,10 +38,10 @@ class StaffScheduleResponse(StaffScheduleCreate):
 
 @router.get("/", response_model=List[StaffResponse])
 async def list_staff(
-    branch_id: str | None = Query(None),
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(get_current_active_user)],
-    business_id: Annotated[str, Depends(get_business_context)]
+    business_id: Annotated[str, Depends(get_business_context)],
+    branch_id: str | None = Query(None),
 ):
     """List staff members, optionally filtered by branch."""
     return []

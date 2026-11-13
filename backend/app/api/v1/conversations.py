@@ -23,11 +23,11 @@ class ConversationDetailResponse(ConversationResponse):
 
 @router.get("/", response_model=List[ConversationResponse])
 async def list_conversations(
-    ai_active: bool | None = None,
-    branch_id: str | None = None,
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(get_current_active_user)],
-    business_id: Annotated[str, Depends(get_business_context)]
+    business_id: Annotated[str, Depends(get_business_context)],
+    ai_active: bool | None = None,
+    branch_id: str | None = None,
 ):
     """List conversations."""
     return []

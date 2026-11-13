@@ -39,12 +39,12 @@ class SearchResponse(BaseModel):
 
 @router.get("/", response_model=List[KnowledgeResponse])
 async def list_knowledge(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(get_current_active_user)],
+    business_id: Annotated[str, Depends(get_business_context)],
     type: str | None = None,
     status: str | None = None,
     branch_id: str | None = None,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    user: Annotated[dict[str, Any], Depends(get_current_active_user)],
-    business_id: Annotated[str, Depends(get_business_context)]
 ):
     """List knowledge entries."""
     return []
