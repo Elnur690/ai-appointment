@@ -226,7 +226,7 @@ class AvailabilityEngine:
         
         stmt = select(Appointment).options(selectinload(Appointment.service)).where(
             Appointment.staff_id == staff_id,
-            Appointment.status.notin_([AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW]),
+            Appointment.status.notin_([AppointmentStatus.cancelled, AppointmentStatus.no_show]),
             Appointment.start_time < utc_end,
             Appointment.end_time > utc_start
         )
@@ -285,7 +285,7 @@ class AvailabilityEngine:
     async def _check_appointment_conflict(self, staff_id: UUID, buffered_start: datetime, buffered_end: datetime) -> bool:
         stmt = select(Appointment).where(
             Appointment.staff_id == staff_id,
-            Appointment.status.notin_([AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW]),
+            Appointment.status.notin_([AppointmentStatus.cancelled, AppointmentStatus.no_show]),
             Appointment.start_time < buffered_end,
             Appointment.end_time > buffered_start
         )

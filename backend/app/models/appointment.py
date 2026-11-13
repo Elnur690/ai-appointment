@@ -13,6 +13,12 @@ class AppointmentStatus(str, enum.Enum):
     completed = "completed"
     cancelled = "cancelled"
     no_show = "no_show"
+    # Uppercase aliases for backwards compatibility
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+    NO_SHOW = "no_show"
 
 class AppointmentSource(str, enum.Enum):
     ai_chat = "ai_chat"

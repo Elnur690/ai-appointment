@@ -2,7 +2,8 @@ from datetime import datetime
 from uuid import UUID
 from sqlalchemy import select, func
 from app.repositories.base import BaseRepository
-from app.models.payment import Payment
+from app.models.appointment import Appointment
+from app.models.payment import Payment, PaymentStatus
 
 class PaymentRepository(BaseRepository[Payment]):
     def __init__(self, session, business_id: UUID | None = None):
@@ -22,12 +23,14 @@ class PaymentRepository(BaseRepository[Payment]):
         stmt = select(func.sum(Payment.amount)).where(
             Payment.created_at >= start,
             Payment.created_at <= end,
-            Payment.status == 'completed'
+            Payment.status == PaymentStatus.completed
         )
         if self.business_id:
             stmt = stmt.where(Payment.business_id == self.business_id)
         if branch_id:
-            stmt = stmt.where(Payment.branch_id == branch_id)
+            stmt = stmt.join(Appointment, Payment.appointment_id == Appointment.id).where(
+                Appointment.branch_id == branch_id
+            )
             
         result = await self.session.execute(stmt)
         total = result.scalar_one_or_none()

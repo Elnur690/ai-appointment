@@ -40,7 +40,7 @@ class AppointmentRepository(BaseRepository[Appointment]):
         stmt = self._scoped_query().where(
             Appointment.customer_id == customer_id,
             Appointment.start_time >= now,
-            Appointment.status.notin_([AppointmentStatus.CANCELLED, AppointmentStatus.COMPLETED])
+            Appointment.status.notin_([AppointmentStatus.cancelled, AppointmentStatus.completed])
         ).order_by(Appointment.start_time.asc()).options(selectinload(Appointment.service), selectinload(Appointment.staff))
         result = await self.session.execute(stmt)
         return list(result.scalars().all())

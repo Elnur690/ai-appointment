@@ -25,6 +25,14 @@ class ToolExecutor:
             'get_past_visit_history': self._get_past_visit_history,
             'request_human_agent': self._request_human_agent,
         }
+        handler = handlers.get(tool_call.name)
+        if not handler:
+            return {'error': f'Unknown tool: {tool_call.name}'}
+
+        try:
+            return await handler(**tool_call.arguments)
+        except Exception as e:
+            return {'error': str(e)}
 
     async def _get_next_upcoming_appointment(self) -> dict:
         return {
@@ -45,16 +53,6 @@ class ToolExecutor:
                 {"date": "2026-06-10", "service": "Beard Trim", "price": "15 AZN", "staff": "Elvin A."}
             ]
         }
-
-        
-        handler = handlers.get(tool_call.name)
-        if not handler:
-            return {'error': f'Unknown tool: {tool_call.name}'}
-            
-        try:
-            return await handler(**tool_call.arguments)
-        except Exception as e:
-            return {'error': str(e)}
 
     # TODO: Wire these up to actual service layer implementations.
     # Currently returning mock data to allow conversation handler testing.
