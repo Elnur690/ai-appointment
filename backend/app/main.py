@@ -69,10 +69,13 @@ async def health_check():
 
 
 @app.get("/", tags=["System"])
+@app.get("/api", tags=["System"])
+@app.get("/api/v1", tags=["System"])
 async def root():
     """Root endpoint."""
     return {
-        "app": "Randevu.vip — AI Appointment SaaS",
+        "status": "online",
+        "app": "Randevu.vip — AI Appointment SaaS API",
         "domain": settings.PLATFORM_DOMAIN,
         "version": "1.0.0",
     }

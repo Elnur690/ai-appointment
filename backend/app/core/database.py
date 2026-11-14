@@ -38,30 +38,45 @@ async def init_db() -> None:
     from app.models.saas import SaasOwner, Plan
     from app.core.security import hash_password
 
-    async with engine.begin() as conn:
-        try:
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("SELECT pg_advisory_xact_lock(2280099);"))
             await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
-        except Exception as exc:
-            logger.warning(f"pgvector extension check skipped or unavailable: {exc}")
-        await conn.run_sync(Base.metadata.create_all)
+    except Exception as exc:
+        logger.warning(f"pgvector extension check skipped or unavailable: {exc}")
+
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("SELECT pg_advisory_xact_lock(2280099);"))
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as exc:
+        logger.warning(f"create_all check skipped or completed by another worker: {exc}")
+
+    alter_statements = [
+        "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminder_24h_sent_at TIMESTAMP WITH TIME ZONE;",
+        "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminder_2h_sent_at TIMESTAMP WITH TIME ZONE;",
+        "ALTER TABLE branches ADD COLUMN IF NOT EXISTS phone VARCHAR;",
+        "ALTER TABLE services ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'AZN';",
+        "ALTER TABLE services ADD COLUMN IF NOT EXISTS recommended_rebooking_days INTEGER DEFAULT 21;",
+        "ALTER TABLE staff ADD COLUMN IF NOT EXISTS shift_type VARCHAR(50) DEFAULT 'Full-Day (09:00 - 20:00)';",
+        "ALTER TABLE staff ADD COLUMN IF NOT EXISTS allow_overtime BOOLEAN DEFAULT TRUE;",
+        "ALTER TABLE staff ADD COLUMN IF NOT EXISTS max_overtime_minutes INTEGER DEFAULT 60;",
+        "ALTER TABLE staff_schedules ADD COLUMN IF NOT EXISTS shift_type VARCHAR(50) DEFAULT 'full_day';",
+        "ALTER TABLE staff_schedules ADD COLUMN IF NOT EXISTS allow_overtime BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE staff_schedules ADD COLUMN IF NOT EXISTS max_overtime_minutes INTEGER DEFAULT 60;",
+    ]
+    for stmt_sql in alter_statements:
         try:
-            await conn.execute(text("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminder_24h_sent_at TIMESTAMP WITH TIME ZONE;"))
-            await conn.execute(text("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminder_2h_sent_at TIMESTAMP WITH TIME ZONE;"))
-            await conn.execute(text("ALTER TABLE branches ADD COLUMN IF NOT EXISTS phone VARCHAR;"))
-            await conn.execute(text("ALTER TABLE services ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'AZN';"))
-            await conn.execute(text("ALTER TABLE services ADD COLUMN IF NOT EXISTS recommended_rebooking_days INTEGER DEFAULT 21;"))
-            await conn.execute(text("ALTER TABLE staff ADD COLUMN IF NOT EXISTS shift_type VARCHAR(50) DEFAULT 'Full-Day (09:00 - 20:00)';"))
-            await conn.execute(text("ALTER TABLE staff ADD COLUMN IF NOT EXISTS allow_overtime BOOLEAN DEFAULT TRUE;"))
-            await conn.execute(text("ALTER TABLE staff ADD COLUMN IF NOT EXISTS max_overtime_minutes INTEGER DEFAULT 60;"))
-            await conn.execute(text("ALTER TABLE staff_schedules ADD COLUMN IF NOT EXISTS shift_type VARCHAR(50) DEFAULT 'full_day';"))
-            await conn.execute(text("ALTER TABLE staff_schedules ADD COLUMN IF NOT EXISTS allow_overtime BOOLEAN DEFAULT FALSE;"))
-            await conn.execute(text("ALTER TABLE staff_schedules ADD COLUMN IF NOT EXISTS max_overtime_minutes INTEGER DEFAULT 60;"))
+            async with engine.begin() as conn:
+                await conn.execute(text("SELECT pg_advisory_xact_lock(2280099);"))
+                await conn.execute(text(stmt_sql))
         except Exception as exc:
-            logger.warning(f"Schema migration columns check skipped: {exc}")
+            logger.warning(f"Schema migration column check skipped ({stmt_sql}): {exc}")
 
     # Seed initial SaaS Owner & default plans if database is fresh
     try:
         async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT pg_advisory_xact_lock(2280099);"))
             existing_admin = (
                 await session.execute(select(SaasOwner).where(SaasOwner.email == settings.SAAS_ADMIN_EMAIL))
             ).scalar_one_or_none()

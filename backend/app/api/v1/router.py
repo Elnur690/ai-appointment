@@ -8,6 +8,7 @@ from app.api.v1 import (
 api_v1_router = APIRouter(prefix="/api/v1")
 api_v1_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 api_v1_router.include_router(saas_admin.router, prefix="/admin", tags=["SaaS Admin"])
+api_v1_router.include_router(saas_admin.router, prefix="/saas-admin", tags=["SaaS Admin"])
 api_v1_router.include_router(resellers.router, prefix="/resellers", tags=["Resellers & Partners"])
 api_v1_router.include_router(businesses.router, prefix="/businesses", tags=["Businesses"])
 api_v1_router.include_router(branches.router, prefix="/branches", tags=["Branches"])
