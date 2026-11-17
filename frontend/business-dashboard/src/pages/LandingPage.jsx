@@ -1113,8 +1113,14 @@ const LandingPage = () => {
                       left: '50%',
                       transform: 'translateX(-50%)',
                       fontWeight: 800,
-                      fontSize: '0.75rem',
-                      padding: '0.3rem 1rem',
+                      fontSize: '0.72rem',
+                      padding: '0.32rem 0.95rem',
+                      whiteSpace: 'nowrap',
+                      width: 'max-content',
+                      maxWidth: 'calc(100% - 1.5rem)',
+                      background: 'linear-gradient(135deg, #2b220d 0%, #141821 100%)',
+                      boxShadow: '0 6px 18px rgba(0, 0, 0, 0.55)',
+                      zIndex: 2,
                     }}
                   >
                     {t.mostPopularBadge}
