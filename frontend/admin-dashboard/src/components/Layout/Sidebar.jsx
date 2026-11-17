@@ -58,9 +58,11 @@ const Sidebar = () => {
         }}
       >
         {!collapsed && (
-          <h2 className="gradient-text" style={{ margin: 0, fontSize: '1.25rem' }}>
-            Randevu.vip
-          </h2>
+          <NavLink to="/" style={{ textDecoration: 'none' }}>
+            <h2 className="gradient-text" style={{ margin: 0, fontSize: '1.25rem', cursor: 'pointer' }}>
+              Randevu.vip
+            </h2>
+          </NavLink>
         )}
         <button onClick={() => setCollapsed(!collapsed)} className="btn-ghost" style={{ padding: '0.25rem', border: 'none' }}>
           {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}

@@ -8,7 +8,9 @@ import { Sparkles, MessageSquare, Calendar, ShieldCheck, Globe, Check, X } from 
 const Login = ({ initialMode = 'login' }) => {
   const [searchParams] = useSearchParams();
   const refParam = searchParams.get('ref') || '';
-  const [mode, setMode] = useState(refParam ? 'register' : initialMode);
+  const planParam = searchParams.get('plan') || '';
+  const [mode, setMode] = useState(refParam || planParam ? 'register' : initialMode);
+  const [showFullMatrix, setShowFullMatrix] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [businessName, setBusinessName] = useState('');
@@ -32,7 +34,10 @@ const Login = ({ initialMode = 'login' }) => {
         const list = res.data || [];
         setPlans(list);
         if (list.length > 0 && !selectedPlanId) {
-          setSelectedPlanId(list[0].id);
+          const matched = planParam
+            ? list.find((item) => String(item.name || '').toLowerCase() === planParam.toLowerCase())
+            : null;
+          setSelectedPlanId((matched || list[0]).id);
         }
       })
       .catch(() => setPlans([]));
@@ -120,12 +125,16 @@ const Login = ({ initialMode = 'login' }) => {
           gap: '1rem',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <a
+          href="https://randevu.vip"
+          style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', textDecoration: 'none', cursor: 'pointer' }}
+          title="Randevu.vip — Ana Səhifə"
+        >
           <Sparkles size={28} color="var(--primary)" />
           <span className="text-gradient" style={{ fontSize: '1.6rem', fontWeight: 700 }}>
             Randevu.vip
           </span>
-        </div>
+        </a>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           {/* Language Switcher (AZ default | EN) */}
           <div
@@ -409,16 +418,32 @@ const Login = ({ initialMode = 'login' }) => {
         </div>
       </div>
 
-      {/* Live Subscription Plans with ALL Platform Features */}
+      {/* Live Subscription Plans with Distinct Included Features */}
       {plans.length > 0 && (
         <section style={{ marginBottom: '3rem' }}>
           <h2 style={{ textAlign: 'center', marginBottom: '0.5rem' }}>{t.plansTitle}</h2>
-          <p style={{ textAlign: 'center', color: 'var(--text-secondary)', marginBottom: '2rem' }}>
+          <p style={{ textAlign: 'center', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
             {t.plansSubtitle}
           </p>
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ fontSize: '0.85rem' }}
+              onClick={() => setShowFullMatrix((prev) => !prev)}
+            >
+              {showFullMatrix
+                ? lang === 'en'
+                  ? 'Show Only Included Features per Plan'
+                  : 'Yalnız Paketə Daxil Olanları Göstər'
+                : lang === 'en'
+                ? 'Show Full 29-Feature Comparison Matrix'
+                : 'Bütün 29 Xüsusiyyətin Müqayisəsini Göstər'}
+            </button>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem' }}>
             {plans.map((p) => {
-              const allFeatures = getPlanFeatureItems(p, lang);
+              const allFeatures = getPlanFeatureItems(p, lang, !showFullMatrix);
               return (
                 <div key={p.id} className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>

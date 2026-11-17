@@ -190,6 +190,68 @@ async def init_db() -> None:
                         is_active=True,
                     ),
                 ])
+            else:
+                for ep in existing_plans:
+                    p_name = (ep.name or "").strip().lower()
+                    if p_name == "starter":
+                        ep.allows_whatsapp = True
+                        if not ep.trial_days:
+                            ep.trial_days = 14
+                    elif p_name == "pro":
+                        ep.max_branches = max(ep.max_branches or 1, 3)
+                        ep.max_whatsapp_numbers = max(ep.max_whatsapp_numbers or 1, 3)
+                        ep.ai_message_quota = max(ep.ai_message_quota or 1000, 5000)
+                        ep.allows_whatsapp = True
+                        ep.allows_instagram = True
+                        ep.allows_telegram = True
+                        ep.allows_omnichannel_messaging = True
+                        ep.allows_voice_messages = True
+                        ep.allows_dynamic_pricing = True
+                        ep.allows_winback_campaigns = True
+                        ep.allows_online_payments = True
+                        ep.allows_gcal_sync = True
+                        ep.allows_apple_cal_sync = True
+                        ep.allows_no_show_deposits = True
+                        ep.allows_loyalty_program = True
+                        ep.allows_combo_packages = True
+                        ep.allows_geo_routing = True
+                        ep.allows_shift_management = True
+                        ep.allows_cadence_engine = True
+                        ep.allows_gift_vouchers = True
+                        ep.allows_flash_drops = True
+                        if not ep.features or not ep.features.get("assigned_model"):
+                            ep.features = {"assigned_model": "claude-3-7-sonnet"}
+                    elif p_name == "enterprise":
+                        ep.max_branches = max(ep.max_branches or 1, 20)
+                        ep.max_whatsapp_numbers = max(ep.max_whatsapp_numbers or 1, 20)
+                        ep.ai_message_quota = max(ep.ai_message_quota or 1000, 50000)
+                        ep.allows_whatsapp = True
+                        ep.allows_instagram = True
+                        ep.allows_telegram = True
+                        ep.allows_branch_level_ai_tone = True
+                        ep.allows_voice_messages = True
+                        ep.allows_dynamic_pricing = True
+                        ep.allows_winback_campaigns = True
+                        ep.allows_discovery = True
+                        ep.allows_online_payments = True
+                        ep.allows_gcal_sync = True
+                        ep.allows_apple_cal_sync = True
+                        ep.allows_custom_domain = True
+                        ep.allows_no_show_deposits = True
+                        ep.allows_emergency_reassignment = True
+                        ep.allows_omnichannel_messaging = True
+                        ep.allows_growth_advisor = True
+                        ep.allows_loyalty_program = True
+                        ep.allows_combo_packages = True
+                        ep.allows_group_bookings = True
+                        ep.allows_product_upsells = True
+                        ep.allows_geo_routing = True
+                        ep.allows_shift_management = True
+                        ep.allows_cadence_engine = True
+                        ep.allows_gift_vouchers = True
+                        ep.allows_flash_drops = True
+                        if not ep.features or not ep.features.get("assigned_model"):
+                            ep.features = {"assigned_model": "gpt-4o"}
             await session.commit()
     except Exception as exc:
         logger.warning(f"Initial seed skipped or failed: {exc}")
