@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/otp_login_screen.dart';
+import 'screens/splash_screen.dart';
 
 void main() {
   runApp(const CustomerApp());
@@ -14,11 +14,16 @@ class CustomerApp extends StatelessWidget {
       title: 'Randevu.vip',
       debugShowCheckedModeBanner: false,
       locale: const Locale('az'),
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0EA5E9)),
+      themeMode: ThemeMode.dark,
+      darkTheme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: const Color(0xFF06080F),
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF38BDF8),
+          secondary: Color(0xFFF59E0B),
+          surface: Color(0xFF0F1420),
+        ),
       ),
-      home: const OtpLoginScreen(),
+      home: const CustomerSplashScreen(),
     );
   }
 }

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../api/client';
 import { getPlanFeatureItems } from '../i18n/translations';
+import { BrandLogo } from '../components/common/BrandLogo';
 import {
   Sparkles,
   MessageSquare,
@@ -744,10 +745,7 @@ const LandingPage = () => {
           }}
           title="Randevu.vip — Ana Səhifə"
         >
-          <Sparkles size={28} color="var(--primary)" />
-          <span className="text-gradient" style={{ fontSize: '1.65rem', fontWeight: 800 }}>
-            Randevu.vip
-          </span>
+          <BrandLogo size={40} fontSize="1.65rem" />
         </a>
 
         <nav style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
@@ -1501,14 +1499,13 @@ const LandingPage = () => {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
+              gap: '0.6rem',
               textDecoration: 'none',
               color: 'var(--text-secondary)',
               cursor: 'pointer',
             }}
           >
-            <Sparkles size={18} color="var(--primary)" />
-            <strong style={{ color: 'var(--text-primary)' }}>Randevu.vip</strong> — {t.footerTagline}
+            <BrandLogo size={28} fontSize="1.1rem" /> — {t.footerTagline}
           </a>
           <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
             <button

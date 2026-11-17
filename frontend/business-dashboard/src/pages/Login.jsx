@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { UI_TEXT, getPlanFeatureItems } from '../i18n/translations';
+import { BrandLogo } from '../components/common/BrandLogo';
 import api from '../api/client';
 import { Sparkles, MessageSquare, Calendar, ShieldCheck, Globe, Check, X } from 'lucide-react';
 
@@ -130,10 +131,7 @@ const Login = ({ initialMode = 'login' }) => {
           style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', textDecoration: 'none', cursor: 'pointer' }}
           title="Randevu.vip — Ana Səhifə"
         >
-          <Sparkles size={28} color="var(--primary)" />
-          <span className="text-gradient" style={{ fontSize: '1.6rem', fontWeight: 700 }}>
-            Randevu.vip
-          </span>
+          <BrandLogo size={40} fontSize="1.6rem" />
         </a>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           {/* Language Switcher (AZ default | EN) */}

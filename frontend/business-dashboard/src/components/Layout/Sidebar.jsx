@@ -14,6 +14,7 @@ import {
 import './Layout.css';
 import { useAuthStore } from '../../store/authStore';
 import { UI_TEXT } from '../../i18n/translations';
+import { BrandLogo } from '../common/BrandLogo';
 
 export const Sidebar = () => {
   const { businessContext, language } = useAuthStore();
@@ -37,9 +38,7 @@ export const Sidebar = () => {
     <div className="sidebar glass">
       <div className="sidebar-header">
         <NavLink to="/" style={{ textDecoration: 'none' }}>
-          <h2 className="text-gradient" style={{ cursor: 'pointer', margin: 0 }}>
-            {businessContext?.name || 'Randevu.vip'}
-          </h2>
+          <BrandLogo size={34} fontSize="1.25rem" label={businessContext?.name || 'Randevu.vip'} />
         </NavLink>
       </div>
       <nav className="sidebar-nav">

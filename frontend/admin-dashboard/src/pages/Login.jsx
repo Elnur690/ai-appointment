@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { Sparkles } from 'lucide-react';
+import { BrandLogo } from '../components/common/BrandLogo';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -99,8 +99,8 @@ const Login = () => {
         </div>
 
         <div className="flex-center" style={{ flexDirection: 'column', marginBottom: '2rem', textAlign: 'center' }}>
-          <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '16px', marginBottom: '1rem' }}>
-            <Sparkles size={32} color="var(--primary-start)" />
+          <div style={{ marginBottom: '1rem' }}>
+            <BrandLogo size={68} showText={false} />
           </div>
           <h1 className="gradient-text" style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>
             Randevu.vip Admin

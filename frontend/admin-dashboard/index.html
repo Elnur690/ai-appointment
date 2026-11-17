@@ -1,12 +1,46 @@
 <!doctype html>
-<html lang="en">
+<html lang="az">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Randevu.vip — SaaS Admin & Reseller Control Panel</title>
+    <meta name="theme-color" content="#06080F" />
+    <title>Randevu.vip — SaaS Admin &amp; Reseller Control Panel</title>
+    <style>
+      .randevu-splash {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at 50% 35%, #11192e 0%, #06080f 70%);
+        color: #f8fafc;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      .randevu-splash-logo {
+        width: 88px;
+        height: 88px;
+        border-radius: 22px;
+        box-shadow: 0 16px 48px rgba(56, 189, 248, 0.32), 0 0 0 1px rgba(245, 158, 11, 0.45);
+        margin-bottom: 1.15rem;
+      }
+      .randevu-splash-title {
+        font-size: 1.6rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #fbbf24 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="randevu-splash">
+        <img src="/logo.png" alt="Randevu.vip Admin" class="randevu-splash-logo" />
+        <div class="randevu-splash-title">Randevu.vip Admin</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

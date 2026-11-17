@@ -12,6 +12,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { BrandLogo } from '../common/BrandLogo';
 
 const Sidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
@@ -59,9 +60,7 @@ const Sidebar = () => {
       >
         {!collapsed && (
           <NavLink to="/" style={{ textDecoration: 'none' }}>
-            <h2 className="gradient-text" style={{ margin: 0, fontSize: '1.25rem', cursor: 'pointer' }}>
-              Randevu.vip
-            </h2>
+            <BrandLogo size={32} fontSize="1.2rem" />
           </NavLink>
         )}
         <button onClick={() => setCollapsed(!collapsed)} className="btn-ghost" style={{ padding: '0.25rem', border: 'none' }}>
