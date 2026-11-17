@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/client';
 import { StatusBadge } from '../components/common/StatusBadge';
+import { useAuthStore } from '../store/authStore';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const CalendarPage = () => {
+  const { language } = useAuthStore();
+  const isAz = (language || 'az') !== 'en';
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -40,9 +43,11 @@ const CalendarPage = () => {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2>Schedule Calendar</h2>
+          <h2>{isAz ? 'Randevu Təqvimi' : 'Schedule Calendar'}</h2>
           <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-            Real-time daily schedule synchronized with WhatsApp & Instagram bookings.
+            {isAz
+              ? 'WhatsApp, Instagram və Telegram randevuları ilə canlı sinxronlaşdırılmış gündəlik cədvəl.'
+              : 'Real-time daily schedule synchronized with WhatsApp, Instagram & Telegram bookings.'}
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -66,7 +71,7 @@ const CalendarPage = () => {
 
       <div className="glass" style={{ padding: '1.5rem' }}>
         {loading ? (
-          <p style={{ color: 'var(--text-secondary)' }}>Loading schedule...</p>
+          <p style={{ color: 'var(--text-secondary)' }}>{isAz ? 'Cədvəl yüklənir...' : 'Loading schedule...'}</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {hours.map((hour) => {
@@ -92,7 +97,9 @@ const CalendarPage = () => {
                     {label}
                   </span>
                   {slotAppts.length === 0 ? (
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Available</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                      {isAz ? 'Boşdur' : 'Available'}
+                    </span>
                   ) : (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
                       {slotAppts.map((appt) => (

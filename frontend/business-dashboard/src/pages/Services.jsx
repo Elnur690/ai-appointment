@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { DataTable } from '../components/common/DataTable';
 import { Modal } from '../components/common/Modal';
+import { useAuthStore } from '../store/authStore';
 import api from '../api/client';
 import { Plus, RefreshCw } from 'lucide-react';
 
 const Services = () => {
+  const { language } = useAuthStore();
+  const isAz = (language || 'az') !== 'en';
   const [services, setServices] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState({
@@ -43,15 +46,21 @@ const Services = () => {
   };
 
   const columns = [
-    { header: 'Service / Package', accessor: 'name' },
-    { header: 'Duration', cell: (row) => `${row.duration_minutes} mins` },
-    { header: 'Price', cell: (row) => `${Number(row.price).toFixed(2)} ${row.currency || 'AZN'}` },
+    { header: isAz ? 'Xidmət / Paket' : 'Service / Package', accessor: 'name' },
+    { header: isAz ? 'Müddət' : 'Duration', cell: (row) => `${row.duration_minutes} ${isAz ? 'dəq' : 'mins'}` },
+    { header: isAz ? 'Qiymət' : 'Price', cell: (row) => `${Number(row.price).toFixed(2)} ${row.currency || 'AZN'}` },
     {
-      header: 'Predictive Cadence Cycle',
+      header: isAz ? 'Avtomatik Təkrar Dövrü' : 'Predictive Cadence Cycle',
       cell: (row) => (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--primary)' }}>
           <RefreshCw size={14} />
-          {row.recommended_rebooking_days ? `Every ${row.recommended_rebooking_days} days` : 'On demand'}
+          {row.recommended_rebooking_days
+            ? isAz
+              ? `Hər ${row.recommended_rebooking_days} gündən bir`
+              : `Every ${row.recommended_rebooking_days} days`
+            : isAz
+            ? 'Tələbə görə'
+            : 'On demand'}
         </span>
       ),
     },
@@ -61,49 +70,59 @@ const Services = () => {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
-          <h2>Services & Predictive Rebooking Cycles</h2>
+          <h2>{isAz ? 'Xidmətlər və Avtomatik Təkrar Randevu' : 'Services & Predictive Rebooking Cycles'}</h2>
           <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-            Manage your service menu, durations, pricing, and automated rebooking intervals.
+            {isAz
+              ? 'Xidmət menyunuzu, müddətləri, qiymətləri və avtomatik xatırlatma intervallarını idarə edin.'
+              : 'Manage your service menu, durations, pricing, and automated rebooking intervals.'}
           </p>
         </div>
         <button type="button" className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
           <Plus size={16} />
-          Add Service
+          {isAz ? 'Xidmət Əlavə Et' : 'Add Service'}
         </button>
       </div>
 
       <DataTable
         columns={columns}
         data={services}
-        emptyMessage="No services configured yet. Click 'Add Service' to build your catalog."
+        emptyMessage={
+          isAz
+            ? "Hələ xidmət əlavə edilməyib. Kataloqunuzu yaratmaq üçün 'Xidmət Əlavə Et' düyməsinə klikləyin."
+            : "No services configured yet. Click 'Add Service' to build your catalog."
+        }
       />
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Service">
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={isAz ? 'Yeni Xidmət Əlavə Et' : 'Add Service'}
+      >
         <form onSubmit={handleCreate}>
           <div className="form-group">
-            <label className="form-label">Service Name</label>
+            <label className="form-label">{isAz ? 'Xidmətin Adı' : 'Service Name'}</label>
             <input
               type="text"
               className="form-control"
               required
-              placeholder="e.g. Haircut & Styling"
+              placeholder={isAz ? 'məs: Saç kəsimi və fen' : 'e.g. Haircut & Styling'}
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Description (for AI Assistant)</label>
+            <label className="form-label">{isAz ? 'Təsvir (AI Köməkçi üçün)' : 'Description (for AI Assistant)'}</label>
             <input
               type="text"
               className="form-control"
-              placeholder="Optional details about this service"
+              placeholder={isAz ? 'Xidmət haqqında əlavə məlumat' : 'Optional details about this service'}
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="form-group">
-              <label className="form-label">Duration (minutes)</label>
+              <label className="form-label">{isAz ? 'Müddət (dəqiqə)' : 'Duration (minutes)'}</label>
               <input
                 type="number"
                 min="5"
@@ -114,7 +133,7 @@ const Services = () => {
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Price (AZN)</label>
+              <label className="form-label">{isAz ? 'Qiymət (AZN)' : 'Price (AZN)'}</label>
               <input
                 type="number"
                 step="0.01"
@@ -127,7 +146,9 @@ const Services = () => {
             </div>
           </div>
           <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-            <label className="form-label">Recommended Rebooking Interval (Days)</label>
+            <label className="form-label">
+              {isAz ? 'Tövsiyə Olunan Təkrar Randevu Müddəti (Gün)' : 'Recommended Rebooking Interval (Days)'}
+            </label>
             <input
               type="number"
               min="1"
@@ -138,10 +159,10 @@ const Services = () => {
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
             <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>
-              Cancel
+              {isAz ? 'Ləğv et' : 'Cancel'}
             </button>
             <button type="submit" className="btn btn-primary">
-              Create Service
+              {isAz ? 'Xidməti Yarat' : 'Create Service'}
             </button>
           </div>
         </form>

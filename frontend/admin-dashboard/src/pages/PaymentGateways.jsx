@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useDataStore } from '../store/dataStore';
+import { useAuthStore } from '../store/authStore';
 import { CreditCard, Banknote, ShieldCheck, CheckCircle2, XCircle } from 'lucide-react';
 
 const GATEWAY_ICONS = {
@@ -11,6 +12,8 @@ const GATEWAY_ICONS = {
 
 const PaymentGateways = () => {
   const { paymentGateways, fetchPaymentGateways, togglePaymentGateway } = useDataStore();
+  const { language } = useAuthStore();
+  const isAz = (language || 'az') !== 'en';
 
   useEffect(() => {
     fetchPaymentGateways();
@@ -20,9 +23,11 @@ const PaymentGateways = () => {
     <div className="page-container">
       <div className="flex-between" style={{ marginBottom: '2rem' }}>
         <div>
-          <h1>Payment Gateways Control</h1>
+          <h1>{isAz ? 'Ödəniş Şlüzlərinin İdarə Edilməsi' : 'Payment Gateways Control'}</h1>
           <p style={{ color: 'var(--text-secondary)' }}>
-            Enable or disable payment gateways platform-wide across all businesses on Randevu.vip.
+            {isAz
+              ? 'Randevu.vip platformasındakı bütün bizneslər üçün ödəniş şlüzlərini (Nağd, Payriff, Paymegate) aktiv və ya deaktiv edin.'
+              : 'Enable or disable payment gateways platform-wide across all businesses on Randevu.vip.'}
           </p>
         </div>
       </div>
@@ -60,7 +65,7 @@ const PaymentGateways = () => {
                   </div>
                   <div>
                     <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary-start)', textTransform: 'uppercase' }}>
-                      Gateway #{idx + 1} • {gw.provider}
+                      {isAz ? `Şlüz #${idx + 1}` : `Gateway #${idx + 1}`} • {gw.provider}
                     </div>
                     <h2 style={{ fontSize: '1.3rem', margin: '0.15rem 0 0' }}>{gw.name}</h2>
                   </div>
@@ -80,7 +85,7 @@ const PaymentGateways = () => {
                   }}
                 >
                   {isEnabled ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                  {isEnabled ? 'Enabled' : 'Disabled'}
+                  {isEnabled ? (isAz ? 'Aktiv' : 'Enabled') : isAz ? 'Deaktiv' : 'Disabled'}
                 </span>
               </div>
 
@@ -98,7 +103,13 @@ const PaymentGateways = () => {
                 }}
               >
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  {gw.requires_credentials ? 'Requires Merchant API Keys in Business Settings' : 'Built-in Ledger Method'}
+                  {gw.requires_credentials
+                    ? isAz
+                      ? 'Biznes Tənzimləmələrində API Açar tələb edir'
+                      : 'Requires Merchant API Keys in Business Settings'
+                    : isAz
+                    ? 'Daxili kassa / nağd ödəniş üsulu'
+                    : 'Built-in Ledger Method'}
                 </span>
 
                 <button
@@ -107,7 +118,13 @@ const PaymentGateways = () => {
                   onClick={() => togglePaymentGateway(gw.provider, !isEnabled)}
                   style={{ minWidth: '150px', justifyContent: 'center' }}
                 >
-                  {isEnabled ? 'Disable Gateway' : 'Enable Gateway'}
+                  {isEnabled
+                    ? isAz
+                      ? 'Şlüzü Söndür'
+                      : 'Disable Gateway'
+                    : isAz
+                    ? 'Şlüzü Aktivləşdir'
+                    : 'Enable Gateway'}
                 </button>
               </div>
             </div>

@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { DataTable } from '../components/common/DataTable';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { Modal } from '../components/common/Modal';
+import { useAuthStore } from '../store/authStore';
 import api from '../api/client';
 import { Plus } from 'lucide-react';
 
 const Payments = () => {
+  const { language } = useAuthStore();
+  const isAz = (language || 'az') !== 'en';
   const [payments, setPayments] = useState([]);
   const [summary, setSummary] = useState({ total_revenue: 0, count: 0 });
   const [gateways, setGateways] = useState([
@@ -60,20 +63,38 @@ const Payments = () => {
   };
 
   const columns = [
-    { header: 'Transaction ID', cell: (row) => String(row.id).slice(0, 8).toUpperCase() },
-    { header: 'Customer / Note', accessor: 'customer' },
-    { header: 'Method / Gateway', accessor: 'gateway' },
-    { header: 'Amount', accessor: 'amount' },
-    { header: 'Status', cell: (row) => <StatusBadge status={row.status === 'paid' ? 'confirmed' : row.status} /> },
+    { header: isAz ? 'Əməliyyat ID' : 'Transaction ID', cell: (row) => String(row.id).slice(0, 8).toUpperCase() },
+    { header: isAz ? 'Müştəri / Qeyd' : 'Customer / Note', accessor: 'customer' },
+    { header: isAz ? 'Ödəniş Üsulu / Şlüz' : 'Method / Gateway', accessor: 'gateway' },
+    { header: isAz ? 'Məbləğ' : 'Amount', accessor: 'amount' },
+    {
+      header: isAz ? 'Status' : 'Status',
+      cell: (row) => <StatusBadge status={row.status === 'paid' ? 'confirmed' : row.status} />,
+    },
   ];
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '2rem',
+          flexWrap: 'wrap',
+          gap: '1rem',
+        }}
+      >
         <div>
-          <h2>Payments, Deposits & Transaction Ledger</h2>
+          <h2>
+            {isAz
+              ? 'Ödənişlər, Beh (Depozit) və Gəlir Jurnalı'
+              : 'Payments, Deposits & Transaction Ledger'}
+          </h2>
           <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-            Total Settled Revenue: <strong>{Number(summary.total_revenue || 0).toFixed(2)} AZN</strong> ({summary.count || 0} transactions)
+            {isAz ? 'Ümumi Təsdiqlənmiş Gəlir:' : 'Total Settled Revenue:'}{' '}
+            <strong>{Number(summary.total_revenue || 0).toFixed(2)} AZN</strong> (
+            {summary.count || 0} {isAz ? 'əməliyyat' : 'transactions'})
           </p>
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
             {gateways.map((gw) => (
@@ -82,7 +103,7 @@ const Payments = () => {
                 className={gw.enabled ? 'badge badge-success' : 'badge badge-warning'}
                 style={{ fontSize: '0.75rem' }}
               >
-                {gw.name}: {gw.enabled ? 'Enabled' : 'Disabled'}
+                {gw.name}: {gw.enabled ? (isAz ? 'Aktiv' : 'Enabled') : isAz ? 'Deaktiv' : 'Disabled'}
               </span>
             ))}
           </div>
@@ -94,43 +115,51 @@ const Payments = () => {
           disabled={enabledGateways.length === 0}
         >
           <Plus size={16} />
-          Record Payment
+          {isAz ? 'Ödəniş Qeydə Al' : 'Record Payment'}
         </button>
       </div>
 
       <DataTable
         columns={columns}
         data={payments}
-        emptyMessage="No payments recorded yet. Cash, Payriff, and PaymenGate transactions will appear here."
+        emptyMessage={
+          isAz
+            ? 'Hələ ödəniş qeydə alınmayıb. Nağd, Payriff və Paymegate əməliyyatları burada görünəcək.'
+            : 'No payments recorded yet. Cash, Payriff, and Paymegate transactions will appear here.'
+        }
       />
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Record Payment">
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={isAz ? 'Yeni Ödəniş Qeydə Al' : 'Record Payment'}
+      >
         <form onSubmit={handleCreate}>
           <div className="form-group">
-            <label className="form-label">Amount (AZN)</label>
+            <label className="form-label">{isAz ? 'Məbləğ (AZN)' : 'Amount (AZN)'}</label>
             <input
               type="number"
               step="0.01"
               min="0.01"
               className="form-control"
               required
-              placeholder="e.g. 45.00"
+              placeholder="məs: 45.00"
               value={form.amount}
               onChange={(e) => setForm({ ...form, amount: e.target.value })}
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Customer / Note (Optional)</label>
+            <label className="form-label">{isAz ? 'Müştəri / Qeyd (İstəyə bağlı)' : 'Customer / Note (Optional)'}</label>
             <input
               type="text"
               className="form-control"
-              placeholder="e.g. Leyla M. - Haircut Deposit"
+              placeholder={isAz ? 'məs: Leyla M. - Saç kəsimi beh' : 'e.g. Leyla M. - Haircut Deposit'}
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
             />
           </div>
           <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-            <label className="form-label">Payment Gateway / Method</label>
+            <label className="form-label">{isAz ? 'Ödəniş Şlüzü / Üsulu' : 'Payment Gateway / Method'}</label>
             <select
               className="form-control"
               value={form.method}
@@ -145,10 +174,10 @@ const Payments = () => {
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
             <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>
-              Cancel
+              {isAz ? 'Ləğv et' : 'Cancel'}
             </button>
             <button type="submit" className="btn btn-primary">
-              Record Payment
+              {isAz ? 'Ödənişi Yadda Saxla' : 'Record Payment'}
             </button>
           </div>
         </form>

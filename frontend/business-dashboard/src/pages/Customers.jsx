@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { DataTable } from '../components/common/DataTable';
 import { Modal } from '../components/common/Modal';
+import { useAuthStore } from '../store/authStore';
 import api from '../api/client';
 import { Award, Plus } from 'lucide-react';
 
 const Customers = () => {
+  const { language } = useAuthStore();
+  const isAz = (language || 'az') !== 'en';
   const [customers, setCustomers] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', email: '' });
@@ -35,12 +38,12 @@ const Customers = () => {
   };
 
   const columns = [
-    { header: 'Customer Name', accessor: 'name' },
-    { header: 'WhatsApp Phone', accessor: 'phone' },
-    { header: 'Email', cell: (row) => row.email || '—' },
-    { header: 'Total Visits', accessor: 'visits' },
+    { header: isAz ? 'Müştəri Adı' : 'Customer Name', accessor: 'name' },
+    { header: isAz ? 'Telefon / WhatsApp' : 'WhatsApp Phone', accessor: 'phone' },
+    { header: isAz ? 'E-poçt' : 'Email', cell: (row) => row.email || '—' },
+    { header: isAz ? 'Gəliş Sayı' : 'Total Visits', accessor: 'visits' },
     {
-      header: 'Loyalty Tier',
+      header: isAz ? 'Loyallıq Statusu' : 'Loyalty Tier',
       cell: (row) => (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--warning)' }}>
           <Award size={14} /> {row.tier || 'Standard'}
@@ -53,38 +56,48 @@ const Customers = () => {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
-          <h2>Customers & Loyalty Profiles</h2>
+          <h2>{isAz ? 'Müştərilər və Loyallıq Bazası' : 'Customers & Loyalty Profiles'}</h2>
           <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-            Customer profiles are created automatically when they message on WhatsApp/Instagram, or you can add them manually.
+            {isAz
+              ? 'WhatsApp, Instagram və ya Telegram-dan yazan müştərilər avtomatik qeydə alınır, həmçinin əllə əlavə edə bilərsiniz.'
+              : 'Customer profiles are created automatically when they message on WhatsApp/Instagram/Telegram, or you can add them manually.'}
           </p>
         </div>
         <button type="button" className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
           <Plus size={16} />
-          Add Customer
+          {isAz ? 'Müştəri Əlavə Et' : 'Add Customer'}
         </button>
       </div>
 
       <DataTable
         columns={columns}
         data={customers}
-        emptyMessage="No customers yet. Add your first customer or connect WhatsApp in Settings."
+        emptyMessage={
+          isAz
+            ? 'Hələ müştəri yoxdur. İlk müştərinizi əlavə edin və ya Tənzimləmələrdən WhatsApp qoşun.'
+            : 'No customers yet. Add your first customer or connect WhatsApp in Settings.'
+        }
       />
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Customer">
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={isAz ? 'Yeni Müştəri Əlavə Et' : 'Add Customer'}
+      >
         <form onSubmit={handleCreate}>
           <div className="form-group">
-            <label className="form-label">Full Name</label>
+            <label className="form-label">{isAz ? 'Tam Adı' : 'Full Name'}</label>
             <input
               type="text"
               className="form-control"
               required
-              placeholder="Customer full name"
+              placeholder={isAz ? 'Müştərinin adı və soyadı' : 'Customer full name'}
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
           </div>
           <div className="form-group">
-            <label className="form-label">WhatsApp Phone Number</label>
+            <label className="form-label">{isAz ? 'WhatsApp Telefon Nömrəsi' : 'WhatsApp Phone Number'}</label>
             <input
               type="text"
               className="form-control"
@@ -95,7 +108,7 @@ const Customers = () => {
             />
           </div>
           <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-            <label className="form-label">Email Address (Optional)</label>
+            <label className="form-label">{isAz ? 'E-poçt Ünvanı (İstəyə bağlı)' : 'Email Address (Optional)'}</label>
             <input
               type="email"
               className="form-control"
@@ -106,10 +119,10 @@ const Customers = () => {
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
             <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>
-              Cancel
+              {isAz ? 'Ləğv et' : 'Cancel'}
             </button>
             <button type="submit" className="btn btn-primary">
-              Save Customer
+              {isAz ? 'Yadda Saxla' : 'Save Customer'}
             </button>
           </div>
         </form>

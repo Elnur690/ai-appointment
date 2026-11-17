@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { UI_TEXT, getPlanFeatureItems } from '../i18n/translations';
 import api from '../api/client';
-import { Sparkles, MessageSquare, Calendar, ShieldCheck, Globe, Check } from 'lucide-react';
+import { Sparkles, MessageSquare, Calendar, ShieldCheck, Globe, Check, X } from 'lucide-react';
 
 const Login = ({ initialMode = 'login' }) => {
   const [searchParams] = useSearchParams();
@@ -11,14 +12,17 @@ const Login = ({ initialMode = 'login' }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [businessName, setBusinessName] = useState('');
+  const [ownerName, setOwnerName] = useState('');
   const [phone, setPhone] = useState('');
   const [referralCode, setReferralCode] = useState(refParam);
   const [plans, setPlans] = useState([]);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const { login, fetchBusinessProfile } = useAuthStore();
+  const { login, fetchBusinessProfile, language, setLanguage } = useAuthStore();
   const navigate = useNavigate();
+  const lang = language || 'az';
+  const t = (UI_TEXT[lang] || UI_TEXT.az).auth;
 
   useEffect(() => {
     api
@@ -43,7 +47,10 @@ const Login = ({ initialMode = 'login' }) => {
       await fetchBusinessProfile();
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Invalid email or password.');
+      setError(
+        err.response?.data?.detail ||
+          (lang === 'en' ? 'Invalid email or password.' : 'E-poçt və ya şifrə yanlışdır.')
+      );
     } finally {
       setSubmitting(false);
     }
@@ -56,6 +63,7 @@ const Login = ({ initialMode = 'login' }) => {
     try {
       const res = await api.post('/auth/register', {
         business_name: businessName,
+        owner_name: ownerName || businessName,
         email,
         password,
         phone: phone || null,
@@ -71,110 +79,216 @@ const Login = ({ initialMode = 'login' }) => {
       await fetchBusinessProfile();
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Registration failed. Please check your details.');
+      setError(
+        err.response?.data?.detail ||
+          (lang === 'en'
+            ? 'Registration failed. Please check your details.'
+            : 'Qeydiyyat zamanı xəta baş verdi. Məlumatları yoxlayın.')
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', padding: '2rem 1.5rem', maxWidth: '1240px', margin: '0 auto' }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '2rem 1.5rem',
+        maxWidth: '1280px',
+        margin: '0 auto',
+      }}
+    >
       {/* Top Navbar */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
+      <header
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '3rem',
+          flexWrap: 'wrap',
+          gap: '1rem',
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <Sparkles size={28} color="var(--primary)" />
-          <span className="text-gradient" style={{ fontSize: '1.6rem', fontWeight: 700 }}>Randevu.vip</span>
+          <span className="text-gradient" style={{ fontSize: '1.6rem', fontWeight: 700 }}>
+            Randevu.vip
+          </span>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {/* Language Switcher (AZ default | EN) */}
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid var(--border)',
+              borderRadius: '999px',
+              padding: '0.2rem',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setLanguage('az')}
+              style={{
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.35rem 0.7rem',
+                borderRadius: '999px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                background: lang === 'az' ? 'var(--primary)' : 'transparent',
+                color: lang === 'az' ? '#fff' : 'var(--text-secondary)',
+              }}
+            >
+              AZ
+            </button>
+            <button
+              type="button"
+              onClick={() => setLanguage('en')}
+              style={{
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.35rem 0.7rem',
+                borderRadius: '999px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                background: lang === 'en' ? 'var(--primary)' : 'transparent',
+                color: lang === 'en' ? '#fff' : 'var(--text-secondary)',
+              }}
+            >
+              EN
+            </button>
+          </div>
+
           <button
             type="button"
             className={`btn ${mode === 'login' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => { setMode('login'); setError(''); }}
+            onClick={() => {
+              setMode('login');
+              setError('');
+            }}
           >
-            Sign In
+            {t.signInTab}
           </button>
           <button
             type="button"
             className={`btn ${mode === 'register' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => { setMode('register'); setError(''); }}
+            onClick={() => {
+              setMode('register');
+              setError('');
+            }}
           >
-            Start Free Trial / Register
+            {t.registerTab}
           </button>
         </div>
       </header>
 
       {/* Main Split Grid: Value Proposition + Auth Form */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '3rem', alignItems: 'start', marginBottom: '4rem' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+          gap: '3rem',
+          alignItems: 'start',
+          marginBottom: '4rem',
+        }}
+      >
         <div>
           <span className="badge badge-info" style={{ marginBottom: '1rem', display: 'inline-block' }}>
-            24/7 AI Receptionist for Salons, Clinics & Studios
+            {t.heroBadge}
           </span>
-          <h1 style={{ fontSize: '2.5rem', lineHeight: 1.2, marginBottom: '1.25rem' }}>
-            Automate Every Booking on WhatsApp, Instagram & Web
-          </h1>
+          <h1 style={{ fontSize: '2.4rem', lineHeight: 1.2, marginBottom: '1.25rem' }}>{t.heroTitle}</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', lineHeight: 1.6, marginBottom: '2rem' }}>
-            Randevu.vip turns your WhatsApp and Instagram DMs into an intelligent booking engine in Azerbaijani, Russian, Turkish, and English — with shift-aware scheduling, Payriff/EPoint deposits, and white-label custom domains.
+            {t.heroDesc}
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="glass-card" style={{ padding: '1rem' }}>
               <MessageSquare size={22} color="var(--primary)" style={{ marginBottom: '0.5rem' }} />
-              <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>WhatsApp & IG AI</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Instant text & voice note replies with human takeover anytime.</div>
+              <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{t.card1Title}</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t.card1Desc}</div>
             </div>
             <div className="glass-card" style={{ padding: '1rem' }}>
               <Calendar size={22} color="var(--secondary)" style={{ marginBottom: '0.5rem' }} />
-              <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>Zero Double-Bookings</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Real-time staff availability, buffers, and 24h/2h reminders.</div>
+              <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{t.card2Title}</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t.card2Desc}</div>
             </div>
             <div className="glass-card" style={{ padding: '1rem' }}>
               <ShieldCheck size={22} color="var(--success)" style={{ marginBottom: '0.5rem' }} />
-              <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>No-Show Protection</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Automated Payriff & EPoint deposit links for high-risk slots.</div>
+              <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{t.card3Title}</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t.card3Desc}</div>
             </div>
             <div className="glass-card" style={{ padding: '1rem' }}>
               <Globe size={22} color="var(--warning)" style={{ marginBottom: '0.5rem' }} />
-              <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>White-Label Domain</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Connect your own domain via CNAME to cname.randevu.vip.</div>
+              <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{t.card4Title}</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t.card4Desc}</div>
             </div>
           </div>
         </div>
 
         {/* Auth Card */}
         <div className="glass-card" style={{ padding: '2.5rem' }}>
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: '0.5rem',
+              marginBottom: '1.5rem',
+              borderBottom: '1px solid var(--border-color)',
+              paddingBottom: '1rem',
+            }}
+          >
             <button
               type="button"
               className={`btn ${mode === 'login' ? 'btn-primary' : 'btn-secondary'}`}
               style={{ flex: 1, justifyContent: 'center' }}
-              onClick={() => { setMode('login'); setError(''); }}
+              onClick={() => {
+                setMode('login');
+                setError('');
+              }}
             >
-              Sign In
+              {t.signInTab}
             </button>
             <button
               type="button"
               className={`btn ${mode === 'register' ? 'btn-primary' : 'btn-secondary'}`}
               style={{ flex: 1, justifyContent: 'center' }}
-              onClick={() => { setMode('register'); setError(''); }}
+              onClick={() => {
+                setMode('register');
+                setError('');
+              }}
             >
-              Register Business
+              {t.registerBusinessBtn}
             </button>
           </div>
 
           {error && (
-            <div style={{ padding: '0.75rem 1rem', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid var(--error)', borderRadius: '8px', color: 'var(--error)', marginBottom: '1.25rem', fontSize: '0.9rem' }}>
+            <div
+              style={{
+                padding: '0.75rem 1rem',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid var(--error)',
+                borderRadius: '8px',
+                color: 'var(--error)',
+                marginBottom: '1.25rem',
+                fontSize: '0.9rem',
+              }}
+            >
               {error}
             </div>
           )}
 
           {mode === 'login' ? (
             <form onSubmit={handleLogin}>
-              <h2 style={{ marginBottom: '0.5rem' }}>Welcome Back</h2>
+              <h2 style={{ marginBottom: '0.5rem' }}>{t.welcomeBack}</h2>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-                Sign in to manage your appointments, staff, and AI assistant.
+                {t.signInSubtitle}
               </p>
               <div className="form-group">
-                <label className="form-label">Email Address</label>
+                <label className="form-label">{t.emailLabel}</label>
                 <input
                   type="email"
                   className="form-control"
@@ -185,7 +299,7 @@ const Login = ({ initialMode = 'login' }) => {
                 />
               </div>
               <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                <label className="form-label">Password</label>
+                <label className="form-label">{t.passwordLabel}</label>
                 <input
                   type="password"
                   className="form-control"
@@ -195,29 +309,44 @@ const Login = ({ initialMode = 'login' }) => {
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
-              <button type="submit" disabled={submitting} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-                {submitting ? 'Signing in...' : 'Sign In to Workspace'}
+              <button
+                type="submit"
+                disabled={submitting}
+                className="btn btn-primary"
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                {submitting ? t.signingIn : t.signInSubmit}
               </button>
             </form>
           ) : (
             <form onSubmit={handleRegister}>
-              <h2 style={{ marginBottom: '0.5rem' }}>Create Your Business Account</h2>
+              <h2 style={{ marginBottom: '0.5rem' }}>{t.createAccountTitle}</h2>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-                Launch your AI booking workspace in under 60 seconds.
+                {t.createAccountSubtitle}
               </p>
               <div className="form-group">
-                <label className="form-label">Business / Salon / Clinic Name</label>
+                <label className="form-label">{t.businessNameLabel}</label>
                 <input
                   type="text"
                   className="form-control"
                   required
-                  placeholder="e.g. Bella Aesthetics Baku"
+                  placeholder={t.businessNamePlaceholder}
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Owner Email Address</label>
+                <label className="form-label">{t.ownerNameLabel}</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder={t.ownerNamePlaceholder}
+                  value={ownerName}
+                  onChange={(e) => setOwnerName(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">{t.ownerEmailLabel}</label>
                 <input
                   type="email"
                   className="form-control"
@@ -228,7 +357,7 @@ const Login = ({ initialMode = 'login' }) => {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">WhatsApp / Phone Number</label>
+                <label className="form-label">{t.phoneLabel}</label>
                 <input
                   type="text"
                   className="form-control"
@@ -238,67 +367,96 @@ const Login = ({ initialMode = 'login' }) => {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Password</label>
+                <label className="form-label">{t.passwordLabel}</label>
                 <input
                   type="password"
                   className="form-control"
                   required
                   minLength={6}
-                  placeholder="At least 6 characters"
+                  placeholder={t.passwordHint}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
               <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                <label className="form-label">Partner / Reseller Code (Optional)</label>
+                <label className="form-label">{t.referralLabel}</label>
                 <input
                   type="text"
                   className="form-control"
-                  placeholder="Optional referral code"
+                  placeholder={t.referralPlaceholder}
                   value={referralCode}
                   onChange={(e) => setReferralCode(e.target.value)}
                 />
               </div>
-              <button type="submit" disabled={submitting} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-                {submitting ? 'Creating Workspace...' : 'Create Business Account'}
+              <button
+                type="submit"
+                disabled={submitting}
+                className="btn btn-primary"
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                {submitting ? t.creatingWorkspace : t.createAccountSubmit}
               </button>
             </form>
           )}
         </div>
       </div>
 
-      {/* Live Subscription Plans from PostgreSQL */}
+      {/* Live Subscription Plans with ALL Platform Features */}
       {plans.length > 0 && (
         <section style={{ marginBottom: '3rem' }}>
-          <h2 style={{ textAlign: 'center', marginBottom: '0.5rem' }}>Transparent Subscription Plans</h2>
+          <h2 style={{ textAlign: 'center', marginBottom: '0.5rem' }}>{t.plansTitle}</h2>
           <p style={{ textAlign: 'center', color: 'var(--text-secondary)', marginBottom: '2rem' }}>
-            Every new business starts on the Starter tier and can upgrade anytime.
+            {t.plansSubtitle}
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
-            {plans.map((p) => (
-              <div key={p.id} className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column' }}>
-                <h3 style={{ fontSize: '1.35rem', marginBottom: '0.5rem' }}>{p.name}</h3>
-                <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>
-                  {p.price} AZN<span style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', fontWeight: 400 }}>/month</span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem' }}>
+            {plans.map((p) => {
+              const allFeatures = getPlanFeatureItems(p, lang);
+              return (
+                <div key={p.id} className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column' }}>
+                  <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem' }}>{p.name}</h3>
+                  <div style={{ fontSize: '2.1rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '1.25rem' }}>
+                    {p.price} AZN
+                    <span style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', fontWeight: 400 }}>
+                      {t.perMonth}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginBottom: '1.75rem', flex: 1 }}>
+                    {allFeatures.map((item) => (
+                      <div
+                        key={item.key}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '0.55rem',
+                          fontSize: '0.86rem',
+                          opacity: item.included ? 1 : 0.45,
+                        }}
+                      >
+                        {item.included ? (
+                          <Check size={16} color="var(--success)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                        ) : (
+                          <X size={16} color="var(--text-secondary)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                        )}
+                        <span>{item.label}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    style={{ marginTop: 'auto', justifyContent: 'center', width: '100%' }}
+                    onClick={() => {
+                      setMode('register');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                  >
+                    {t.selectPlanCta(p.name)}
+                  </button>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                  <Check size={16} color="var(--success)" />
-                  <span>{p.message_limit >= 100000 ? 'Unlimited AI messages' : `${Number(p.message_limit).toLocaleString()} AI messages/mo`}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                  <Check size={16} color="var(--success)" />
-                  <span>WhatsApp, Instagram & Web Booking</span>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ marginTop: 'auto', justifyContent: 'center' }}
-                  onClick={() => { setMode('register'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                >
-                  Get Started with {p.name}
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}

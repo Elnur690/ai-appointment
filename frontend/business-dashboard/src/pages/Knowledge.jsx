@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { DataTable } from '../components/common/DataTable';
 import { Modal } from '../components/common/Modal';
+import { useAuthStore } from '../store/authStore';
 import api from '../api/client';
 import { Plus, Trash2 } from 'lucide-react';
 
 const Knowledge = () => {
+  const { language } = useAuthStore();
+  const isAz = (language || 'az') !== 'en';
   const [entries, setEntries] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState({ title: '', type: 'faq', content: '' });
@@ -36,12 +39,12 @@ const Knowledge = () => {
   };
 
   const columns = [
-    { header: 'Knowledge Title', accessor: 'title' },
-    { header: 'Type', accessor: 'type' },
-    { header: 'Vectorized Content', accessor: 'content' },
-    { header: 'RAG Status', accessor: 'status' },
+    { header: isAz ? 'Mövzu / Başlıq' : 'Knowledge Title', accessor: 'title' },
+    { header: isAz ? 'Kateqoriya' : 'Type', accessor: 'type' },
+    { header: isAz ? 'Məzmun (Vektor Yaddaş)' : 'Vectorized Content', accessor: 'content' },
+    { header: isAz ? 'RAG Statusu' : 'RAG Status', accessor: 'status' },
     {
-      header: 'Actions',
+      header: isAz ? 'Sil' : 'Actions',
       cell: (row) => (
         <button
           type="button"
@@ -59,66 +62,84 @@ const Knowledge = () => {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
-          <h2>RAG Knowledge Base & "Learn from Mistakes"</h2>
+          <h2>
+            {isAz
+              ? 'RAG Bilik Bazası və "Səhvlərdən Öyrənmə"'
+              : 'RAG Knowledge Base & "Learn from Mistakes"'}
+          </h2>
           <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-            PostgreSQL pgvector knowledge entries used by your AI receptionist to answer business-specific questions accurately.
+            {isAz
+              ? 'Süni intellekt resepşnin müştəri suallarına dəqiq cavab verməsi üçün PostgreSQL pgvector yaddaş qeydləri.'
+              : 'PostgreSQL pgvector knowledge entries used by your AI receptionist to answer business-specific questions accurately.'}
           </p>
         </div>
         <button type="button" className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
           <Plus size={16} />
-          Add Knowledge Entry
+          {isAz ? 'Yeni Qeyd Əlavə Et' : 'Add Knowledge Entry'}
         </button>
       </div>
 
       <DataTable
         columns={columns}
         data={entries}
-        emptyMessage="No knowledge base entries yet. Add FAQs, parking instructions, or policies for your AI assistant."
+        emptyMessage={
+          isAz
+            ? 'Hələ bilik bazası qeydi yoxdur. AI köməkçiniz üçün tez-tez verilən sualları, parkinq və daxili qaydaları əlavə edin.'
+            : 'No knowledge base entries yet. Add FAQs, parking instructions, or policies for your AI assistant.'
+        }
       />
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Knowledge Base Entry">
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={isAz ? 'Bilik Bazasına Qeyd Əlavə Et' : 'Add Knowledge Base Entry'}
+      >
         <form onSubmit={handleCreate}>
           <div className="form-group">
-            <label className="form-label">Title / Topic</label>
+            <label className="form-label">{isAz ? 'Başlıq / Mövzu' : 'Title / Topic'}</label>
             <input
               type="text"
               className="form-control"
               required
-              placeholder="e.g. Parking Instructions, Cancellation Policy"
+              placeholder={isAz ? 'məs: Parkinq məlumatı, Ləğvetmə qaydası' : 'e.g. Parking Instructions, Cancellation Policy'}
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Category</label>
+            <label className="form-label">{isAz ? 'Kateqoriya' : 'Category'}</label>
             <select
               className="form-control"
               value={form.type}
               onChange={(e) => setForm({ ...form, type: e.target.value })}
             >
-              <option value="faq">FAQ</option>
-              <option value="policy">Policy</option>
-              <option value="service_info">Service Information</option>
-              <option value="correction">Learned Correction</option>
+              <option value="faq">{isAz ? 'Tez-tez verilən sual (FAQ)' : 'FAQ'}</option>
+              <option value="policy">{isAz ? 'Daxili Qayda / Siyasət' : 'Policy'}</option>
+              <option value="service_info">{isAz ? 'Xidmət Məlumatı' : 'Service Information'}</option>
+              <option value="correction">{isAz ? 'Öyrədilmiş Düzəliş' : 'Learned Correction'}</option>
             </select>
           </div>
           <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-            <label className="form-label">Knowledge Content</label>
+            <label className="form-label">{isAz ? 'Məzmun / AI Təlimatı' : 'Knowledge Content'}</label>
             <textarea
               className="form-control"
               rows={4}
               required
-              placeholder="Write the exact answer or rule the AI should follow..."
+              placeholder={
+                isAz
+                  ? 'AI köməkçinin müştəriyə verməli olduğu dəqiq cavabı və ya qaydanı yazın...'
+                  : 'Write the exact answer or rule the AI should follow...'
+              }
               value={form.content}
               onChange={(e) => setForm({ ...form, content: e.target.value })}
             />
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
             <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>
-              Cancel
+              {isAz ? 'Ləğv et' : 'Cancel'}
             </button>
             <button type="submit" className="btn btn-primary">
-              Save to Knowledge Base
+              {isAz ? 'Yaddaşa Əlavə Et' : 'Save to Knowledge Base'}
             </button>
           </div>
         </form>

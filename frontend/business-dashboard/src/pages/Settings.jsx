@@ -16,7 +16,8 @@ import {
 } from 'lucide-react';
 
 const Settings = () => {
-  const { fetchBusinessProfile } = useAuthStore();
+  const { fetchBusinessProfile, language } = useAuthStore();
+  const isAz = (language || 'az') !== 'en';
   const [businessId, setBusinessId] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [planName, setPlanName] = useState('Starter');
@@ -124,7 +125,11 @@ const Settings = () => {
       settings: aiTone,
     });
     await fetchBusinessProfile();
-    setSaveMessage('Settings & payment gateway credentials saved successfully.');
+    setSaveMessage(
+      isAz
+        ? 'Tənzimləmələr və ödəniş şlüzü məlumatları uğurla yadda saxlanıldı.'
+        : 'Settings & payment gateway credentials saved successfully.'
+    );
     setTimeout(() => setSaveMessage(''), 3500);
   };
 
@@ -161,7 +166,11 @@ const Settings = () => {
         instagram_verify_token: aiTone.instagram_verify_token,
       });
       setAiTone((prev) => ({ ...prev, instagram_connected: res.data?.status === 'connected' }));
-      setChannelStatusMsg('Instagram Direct credentials saved! Configure the Webhook URL below in Meta App Dashboard.');
+      setChannelStatusMsg(
+        isAz
+          ? 'Instagram Direct məlumatları yadda saxlanıldı! Aşağıdakı Webhook URL-i Meta App Dashboard-a əlavə edin.'
+          : 'Instagram Direct credentials saved! Configure the Webhook URL below in Meta App Dashboard.'
+      );
     } catch (err) {
       setChannelStatusMsg(err.response?.data?.detail || 'Could not save Instagram credentials.');
     }
@@ -179,7 +188,9 @@ const Settings = () => {
         telegram_bot_username: res.data?.bot_username || prev.telegram_bot_username,
       }));
       setChannelStatusMsg(
-        `Telegram Bot @${res.data?.bot_username || 'bot'} connected and webhook automatically registered!`
+        isAz
+          ? `Telegram Bot @${res.data?.bot_username || 'bot'} qoşuldu və Webhook avtomatik qeydiyyatdan keçirildi!`
+          : `Telegram Bot @${res.data?.bot_username || 'bot'} connected and webhook automatically registered!`
       );
     } catch (err) {
       setChannelStatusMsg(err.response?.data?.detail || 'Telegram Bot connection failed.');
@@ -200,15 +211,20 @@ const Settings = () => {
       >
         <div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>
-            Business Settings, Channels & Payment Gateways
+            {isAz
+              ? 'Biznes Tənzimləmələri, Kanallar və Ödəniş Şlüzləri'
+              : 'Business Settings, Channels & Payment Gateways'}
           </h1>
           <p style={{ color: 'var(--text-secondary)' }}>
-            Active Plan: <strong>{planName}</strong> • Configure WhatsApp, Instagram Direct, Telegram Bot, and Payment Gateways (Cash, Payriff, PaymenGate).
+            {isAz ? 'Aktiv Paket:' : 'Active Plan:'} <strong>{planName}</strong> •{' '}
+            {isAz
+              ? 'WhatsApp, Instagram Direct, Telegram Bot və Ödəniş Şlüzlərini (Nağd, Payriff, Paymegate) tənzimləyin.'
+              : 'Configure WhatsApp, Instagram Direct, Telegram Bot, and Payment Gateways (Cash, Payriff, Paymegate).'}
           </p>
         </div>
         <button type="button" className="btn btn-primary" onClick={handleSaveSettings}>
           <Save size={16} />
-          Save All Changes
+          {isAz ? 'Bütün Dəyişiklikləri Yadda Saxla' : 'Save All Changes'}
         </button>
       </div>
 
@@ -247,11 +263,13 @@ const Settings = () => {
         <div className="glass-card" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
             <Bot color="var(--primary)" size={24} />
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Business Profile & AI Receptionist</h2>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+              {isAz ? 'Biznes Profili və AI Resepşn' : 'Business Profile & AI Receptionist'}
+            </h2>
           </div>
 
           <div className="form-group">
-            <label className="form-label">Business Name</label>
+            <label className="form-label">{isAz ? 'Biznesin Adı' : 'Business Name'}</label>
             <input
               type="text"
               className="form-control"
@@ -261,36 +279,44 @@ const Settings = () => {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Default AI Language</label>
+            <label className="form-label">{isAz ? 'Əsas AI Ünsiyyət Dili' : 'Default AI Language'}</label>
             <select
               className="form-control"
               value={aiTone.language}
               onChange={(e) => setAiTone({ ...aiTone, language: e.target.value })}
             >
-              <option value="az">Azerbaijani (Azərbaycan dili)</option>
+              <option value="az">Azərbaycan dili (Azerbaijani)</option>
               <option value="en">English</option>
-              <option value="ru">Russian (Русский)</option>
-              <option value="tr">Turkish (Türkçe)</option>
+              <option value="ru">Русский (Russian)</option>
+              <option value="tr">Türkçe (Turkish)</option>
             </select>
           </div>
 
           <div className="form-group">
-            <label className="form-label">Custom AI Instructions / Greeting</label>
+            <label className="form-label">
+              {isAz ? 'Xüsusi AI Təlimatları və Salamlama' : 'Custom AI Instructions / Greeting'}
+            </label>
             <textarea
               className="form-control"
               rows={3}
-              placeholder="Optional instructions for how the AI should greet and assist customers..."
+              placeholder={
+                isAz
+                  ? 'AI köməkçinin müştəriləri necə qarşılaması və cavablandırması üçün əlavə təlimatlar...'
+                  : 'Optional instructions for how the AI should greet and assist customers...'
+              }
               value={aiTone.custom_instructions}
               onChange={(e) => setAiTone({ ...aiTone, custom_instructions: e.target.value })}
             />
           </div>
         </div>
 
-        {/* 2. Payment Gateways (Cash, Payriff, PaymenGate) */}
+        {/* 2. Payment Gateways (Cash, Payriff, Paymegate) */}
         <div className="glass-card" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
             <CreditCard color="var(--primary)" size={24} />
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Payment Gateways</h2>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+              {isAz ? 'Ödəniş Şlüzləri (Payment Gateways)' : 'Payment Gateways'}
+            </h2>
           </div>
 
           <div
@@ -304,21 +330,29 @@ const Settings = () => {
               justifyContent: 'space-between',
             }}
           >
-            <span>1. Cash Payment (At Venue)</span>
+            <span>{isAz ? '1. Nağd Ödəniş (Salonda)' : '1. Cash Payment (At Venue)'}</span>
             <strong style={{ color: isGatewayEnabled('cash') ? 'var(--success)' : 'var(--error)' }}>
-              {isGatewayEnabled('cash') ? 'Active' : 'Disabled by Admin'}
+              {isGatewayEnabled('cash')
+                ? isAz
+                  ? 'Aktiv'
+                  : 'Active'
+                : isAz
+                ? 'Admin tərəfindən deaktiv edilib'
+                : 'Disabled by Admin'}
             </strong>
           </div>
 
           {isGatewayEnabled('payriff') ? (
             <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ fontWeight: 600, fontSize: '0.92rem', marginBottom: '0.5rem' }}>2. Payriff Payment Gateway</div>
+              <div style={{ fontWeight: 600, fontSize: '0.92rem', marginBottom: '0.5rem' }}>
+                2. Payriff Payment Gateway
+              </div>
               <div className="form-group" style={{ marginBottom: '0.6rem' }}>
                 <label className="form-label">Payriff Merchant ID</label>
                 <input
                   type="text"
                   className="form-control"
-                  placeholder="Enter your Payriff Merchant ID"
+                  placeholder="Payriff Merchant ID"
                   value={aiTone.payriff_merchant_id}
                   onChange={(e) => setAiTone({ ...aiTone, payriff_merchant_id: e.target.value })}
                 />
@@ -328,7 +362,7 @@ const Settings = () => {
                 <input
                   type="password"
                   className="form-control"
-                  placeholder="Enter your Payriff Secret Key"
+                  placeholder="Payriff Secret Key"
                   value={aiTone.payriff_secret_key}
                   onChange={(e) => setAiTone({ ...aiTone, payriff_secret_key: e.target.value })}
                 />
@@ -336,7 +370,9 @@ const Settings = () => {
             </div>
           ) : (
             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-              2. Payriff Gateway is currently disabled by Platform Admin.
+              {isAz
+                ? '2. Payriff şlüzü hazırda Platforma Admini tərəfindən deaktiv edilib.'
+                : '2. Payriff Gateway is currently disabled by Platform Admin.'}
             </div>
           )}
 
@@ -346,24 +382,36 @@ const Settings = () => {
                 3. Paymegate Payment Gateway (paymegate.com)
               </div>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.6rem' }}>
-                Uses tenant-isolated <code>X-API-Key</code> authentication via <code>https://api.paymegate.com/v1/orders</code> and auto-registers your <code>order.paid</code> webhook.
+                {isAz ? (
+                  <>
+                    Rəsmi <code>https://api.paymegate.com/v1/orders</code> üzərindən <code>X-API-Key</code> ilə işləyir və{' '}
+                    <code>order.paid</code> webhook-unu avtomatik qeydiyyata alır.
+                  </>
+                ) : (
+                  <>
+                    Uses tenant-isolated <code>X-API-Key</code> authentication via{' '}
+                    <code>https://api.paymegate.com/v1/orders</code> and auto-registers your <code>order.paid</code> webhook.
+                  </>
+                )}
               </p>
               <div className="form-group" style={{ marginBottom: '0.6rem' }}>
                 <label className="form-label">Paymegate Merchant API Key (X-API-Key)</label>
                 <input
                   type="password"
                   className="form-control"
-                  placeholder="Enter your live Paymegate X-API-Key"
+                  placeholder="Paymegate X-API-Key"
                   value={aiTone.paymegate_api_key}
                   onChange={(e) => setAiTone({ ...aiTone, paymegate_api_key: e.target.value })}
                 />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Paymegate Webhook Secret (Optional)</label>
+                <label className="form-label">
+                  {isAz ? 'Paymegate Webhook Secret (İstəyə bağlı)' : 'Paymegate Webhook Secret (Optional)'}
+                </label>
                 <input
                   type="password"
                   className="form-control"
-                  placeholder="Optional HMAC signing secret for webhook verification"
+                  placeholder="HMAC webhook secret"
                   value={aiTone.paymegate_webhook_secret}
                   onChange={(e) => setAiTone({ ...aiTone, paymegate_webhook_secret: e.target.value })}
                 />
@@ -371,7 +419,9 @@ const Settings = () => {
             </div>
           ) : (
             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              3. Paymegate Gateway is currently disabled by Platform Admin.
+              {isAz
+                ? '3. Paymegate şlüzü hazırda Platforma Admini tərəfindən deaktiv edilib.'
+                : '3. Paymegate Gateway is currently disabled by Platform Admin.'}
             </div>
           )}
         </div>
@@ -381,17 +431,44 @@ const Settings = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <QrCode color="var(--success)" size={24} />
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>1. WhatsApp Onboarding</h2>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+                {isAz ? '1. WhatsApp Qoşulması' : '1. WhatsApp Onboarding'}
+              </h2>
             </div>
-            <span className="badge badge-success">Default Package</span>
+            <span className="badge badge-success">{isAz ? 'Standart Paket' : 'Default Package'}</span>
           </div>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-            Included in all plans. Pair your business WhatsApp number in 1 scan via our internal Evolution API engine.
+            {isAz
+              ? 'Bütün paketlərə daxildir. Biznes WhatsApp nömrənizi 1 QR skanla birbaşa AI resepşnə qoşun.'
+              : 'Included in all plans. Pair your business WhatsApp number in 1 scan via our internal Evolution API engine.'}
           </p>
-          <ol style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', paddingLeft: '1.2rem', marginBottom: '1.25rem', lineHeight: 1.6 }}>
-            <li>Click the button below to generate your live pairing QR code.</li>
-            <li>Open WhatsApp on your phone ➔ <strong>Linked Devices</strong> ➔ <strong>Link a Device</strong>.</li>
-            <li>Scan the QR code — your AI receptionist immediately starts answering texts & voice notes.</li>
+          <ol
+            style={{
+              color: 'var(--text-secondary)',
+              fontSize: '0.85rem',
+              paddingLeft: '1.2rem',
+              marginBottom: '1.25rem',
+              lineHeight: 1.6,
+            }}
+          >
+            <li>{isAz ? 'Aşağıdakı düyməyə klikləyərək canlı QR kodu yaradın.' : 'Click the button below to generate your live pairing QR code.'}</li>
+            <li>
+              {isAz ? (
+                <>
+                  Telefonunuzda WhatsApp-ı açın ➔ <strong>Bağlı Cihazlar (Linked Devices)</strong> ➔{' '}
+                  <strong>Cihaz Əlavə Et</strong>.
+                </>
+              ) : (
+                <>
+                  Open WhatsApp on your phone ➔ <strong>Linked Devices</strong> ➔ <strong>Link a Device</strong>.
+                </>
+              )}
+            </li>
+            <li>
+              {isAz
+                ? 'QR kodu skan edin — AI köməkçiniz dərhal mətn və səsli mesajlara cavab verməyə başlayacaq.'
+                : 'Scan the QR code — your AI receptionist immediately starts answering texts & voice notes.'}
+            </li>
           </ol>
           <button
             type="button"
@@ -400,7 +477,9 @@ const Settings = () => {
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', justifyContent: 'center' }}
           >
             <QrCode size={18} />
-            <span>Check Status / Generate WhatsApp QR Code</span>
+            <span>
+              {isAz ? 'Statusu Yoxla / WhatsApp QR Kodu Yarat' : 'Check Status / Generate WhatsApp QR Code'}
+            </span>
           </button>
         </div>
 
@@ -409,24 +488,56 @@ const Settings = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <Instagram color="var(--primary)" size={24} />
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>2. Instagram Direct Onboarding</h2>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+                {isAz ? '2. Instagram Direct Qoşulması' : '2. Instagram Direct Onboarding'}
+              </h2>
             </div>
             <span className={entitlements.allows_instagram ? 'badge badge-success' : 'badge badge-warning'}>
-              {entitlements.allows_instagram ? 'Enabled on Plan' : 'Disabled on Plan'}
+              {entitlements.allows_instagram
+                ? isAz
+                  ? 'Paketdə Aktivdir'
+                  : 'Enabled on Plan'
+                : isAz
+                ? 'Paketdə Deaktivdir'
+                : 'Disabled on Plan'}
             </span>
           </div>
 
           {!entitlements.allows_instagram ? (
-            <div style={{ padding: '1rem', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: 'var(--warning)', fontWeight: 600 }}>
-                <Lock size={16} /> Instagram Direct is disabled on your current ({planName}) plan.
+            <div
+              style={{
+                padding: '1rem',
+                borderRadius: '8px',
+                background: 'rgba(255,255,255,0.03)',
+                color: 'var(--text-secondary)',
+                fontSize: '0.9rem',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  marginBottom: '0.5rem',
+                  color: 'var(--warning)',
+                  fontWeight: 600,
+                }}
+              >
+                <Lock size={16} />{' '}
+                {isAz
+                  ? `Instagram Direct cari (${planName}) paketinizdə aktiv deyil.`
+                  : `Instagram Direct is disabled on your current (${planName}) plan.`}
               </div>
-              Upgrade to Pro/Enterprise or enable Instagram Direct in the Admin Dashboard ➔ Plans & Channels.
+              {isAz
+                ? 'Pro/Enterprise paketinə keçin və ya Admin Panel ➔ Paketlər və Kanallar bölməsindən Instagram Direct-i aktivləşdirin.'
+                : 'Upgrade to Pro/Enterprise or enable Instagram Direct in the Admin Dashboard ➔ Plans & Channels.'}
             </div>
           ) : (
             <>
               <div className="form-group">
-                <label className="form-label">Instagram Page / Business Account ID</label>
+                <label className="form-label">
+                  {isAz ? 'Instagram Səhifə / Biznes Hesab ID' : 'Instagram Page / Business Account ID'}
+                </label>
                 <input
                   type="text"
                   className="form-control"
@@ -445,7 +556,14 @@ const Settings = () => {
                   onChange={(e) => setAiTone({ ...aiTone, instagram_access_token: e.target.value })}
                 />
               </div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.85rem', wordBreak: 'break-all' }}>
+              <div
+                style={{
+                  fontSize: '0.8rem',
+                  color: 'var(--text-secondary)',
+                  marginBottom: '0.85rem',
+                  wordBreak: 'break-all',
+                }}
+              >
                 <div>
                   <strong>Meta Webhook URL:</strong> <code>{webhookUrls.instagram}</code>
                 </div>
@@ -460,7 +578,13 @@ const Settings = () => {
                 style={{ width: '100%', justifyContent: 'center' }}
               >
                 <Instagram size={16} />
-                {aiTone.instagram_connected ? 'Update Instagram Direct Connection' : 'Connect Instagram Direct'}
+                {aiTone.instagram_connected
+                  ? isAz
+                    ? 'Instagram Direct Bağlantısını Yenilə'
+                    : 'Update Instagram Direct Connection'
+                  : isAz
+                  ? 'Instagram Direct-i Qoş'
+                  : 'Connect Instagram Direct'}
               </button>
             </>
           )}
@@ -471,24 +595,62 @@ const Settings = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <Send color="var(--secondary)" size={24} />
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>3. Telegram Bot Onboarding</h2>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+                {isAz ? '3. Telegram Bot Qoşulması' : '3. Telegram Bot Onboarding'}
+              </h2>
             </div>
             <span className={entitlements.allows_telegram ? 'badge badge-success' : 'badge badge-warning'}>
-              {entitlements.allows_telegram ? 'Enabled on Plan' : 'Disabled on Plan'}
+              {entitlements.allows_telegram
+                ? isAz
+                  ? 'Paketdə Aktivdir'
+                  : 'Enabled on Plan'
+                : isAz
+                ? 'Paketdə Deaktivdir'
+                : 'Disabled on Plan'}
             </span>
           </div>
 
           {!entitlements.allows_telegram ? (
-            <div style={{ padding: '1rem', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: 'var(--warning)', fontWeight: 600 }}>
-                <Lock size={16} /> Telegram Bot is disabled on your current ({planName}) plan.
+            <div
+              style={{
+                padding: '1rem',
+                borderRadius: '8px',
+                background: 'rgba(255,255,255,0.03)',
+                color: 'var(--text-secondary)',
+                fontSize: '0.9rem',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  marginBottom: '0.5rem',
+                  color: 'var(--warning)',
+                  fontWeight: 600,
+                }}
+              >
+                <Lock size={16} />{' '}
+                {isAz
+                  ? `Telegram Bot cari (${planName}) paketinizdə aktiv deyil.`
+                  : `Telegram Bot is disabled on your current (${planName}) plan.`}
               </div>
-              Upgrade to Pro/Enterprise or enable Telegram Bot in the Admin Dashboard ➔ Plans & Channels.
+              {isAz
+                ? 'Pro/Enterprise paketinə keçin və ya Admin Panel ➔ Paketlər və Kanallar bölməsindən Telegram Botu aktivləşdirin.'
+                : 'Upgrade to Pro/Enterprise or enable Telegram Bot in the Admin Dashboard ➔ Plans & Channels.'}
             </div>
           ) : (
             <>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', marginBottom: '0.75rem' }}>
-                Open <strong>@BotFather</strong> on Telegram, send <code>/newbot</code>, and paste the HTTP API Token below. We automatically register the webhook for you.
+                {isAz ? (
+                  <>
+                    Telegram-da <strong>@BotFather</strong> açın, <code>/newbot</code> göndərin və aldığınız HTTP API Tokeni aşağıya yapışdırın. Sistem Webhook-u avtomatik qeydiyyata alır.
+                  </>
+                ) : (
+                  <>
+                    Open <strong>@BotFather</strong> on Telegram, send <code>/newbot</code>, and paste the HTTP API Token below. We automatically register the webhook for you.
+                  </>
+                )}
               </p>
               <div className="form-group">
                 <label className="form-label">Telegram Bot Token (@BotFather)</label>
@@ -502,11 +664,19 @@ const Settings = () => {
               </div>
               {aiTone.telegram_bot_username && (
                 <div style={{ fontSize: '0.85rem', color: 'var(--success)', marginBottom: '0.6rem' }}>
-                  Connected Bot: <strong>@{aiTone.telegram_bot_username}</strong>
+                  {isAz ? 'Qoşulmuş Bot:' : 'Connected Bot:'} <strong>@{aiTone.telegram_bot_username}</strong>
                 </div>
               )}
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '0.85rem', wordBreak: 'break-all' }}>
-                <strong>Webhook:</strong> <code>{webhookUrls.telegram || `https://api.randevu.vip/api/v1/webhooks/telegram/${businessId}`}</code>
+              <div
+                style={{
+                  fontSize: '0.78rem',
+                  color: 'var(--text-secondary)',
+                  marginBottom: '0.85rem',
+                  wordBreak: 'break-all',
+                }}
+              >
+                <strong>Webhook:</strong>{' '}
+                <code>{webhookUrls.telegram || `https://api.randevu.vip/api/v1/webhooks/telegram/${businessId}`}</code>
               </div>
               <button
                 type="button"
@@ -515,7 +685,13 @@ const Settings = () => {
                 style={{ width: '100%', justifyContent: 'center' }}
               >
                 <Send size={16} />
-                {aiTone.telegram_connected ? 'Reconnect & Refresh Telegram Webhook' : 'Connect & Register Telegram Webhook'}
+                {aiTone.telegram_connected
+                  ? isAz
+                    ? 'Telegram Webhook-u Yenilə'
+                    : 'Reconnect & Refresh Telegram Webhook'
+                  : isAz
+                  ? 'Telegram Botu Qoş və Webhook-u Aktivləşdir'
+                  : 'Connect & Register Telegram Webhook'}
               </button>
             </>
           )}
@@ -525,14 +701,24 @@ const Settings = () => {
         <div className="glass-card" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
             <Globe color="var(--primary)" size={24} />
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>White-Label Custom Domain</h2>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+              {isAz ? 'Şəxsi Domen (White-Label CNAME)' : 'White-Label Custom Domain'}
+            </h2>
           </div>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-            Point your custom domain or subdomain via CNAME to <code>cname.randevu.vip</code>.
+            {isAz ? (
+              <>
+                Şəxsi domeninizi və ya subdomeninizi DNS CNAME vasitəsilə <code>cname.randevu.vip</code> ünvanına yönləndirin.
+              </>
+            ) : (
+              <>
+                Point your custom domain or subdomain via CNAME to <code>cname.randevu.vip</code>.
+              </>
+            )}
           </p>
 
           <div className="form-group" style={{ marginBottom: '1rem' }}>
-            <label className="form-label">Custom Domain</label>
+            <label className="form-label">{isAz ? 'Şəxsi Domen' : 'Custom Domain'}</label>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <input
                 type="text"
@@ -542,7 +728,7 @@ const Settings = () => {
                 placeholder="booking.yourdomain.az"
               />
               <button type="button" className="btn btn-secondary" onClick={handleVerifyDomain}>
-                Verify DNS
+                {isAz ? 'DNS Yoxla' : 'Verify DNS'}
               </button>
             </div>
           </div>
@@ -599,20 +785,26 @@ const Settings = () => {
             >
               <X size={24} />
             </button>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>WhatsApp Connection</h2>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+              {isAz ? 'WhatsApp Bağlantısı' : 'WhatsApp Connection'}
+            </h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-              Open WhatsApp on your phone ➔ Linked Devices ➔ Link a Device.
+              {isAz
+                ? 'Telefonunuzda WhatsApp-ı açın ➔ Bağlı Cihazlar ➔ Cihaz Əlavə Et.'
+                : 'Open WhatsApp on your phone ➔ Linked Devices ➔ Link a Device.'}
             </p>
 
             {isQrLoading ? (
               <div style={{ padding: '2.5rem 0' }}>
                 <RefreshCw size={32} color="var(--primary)" style={{ marginBottom: '1rem' }} />
-                <p>Connecting to Evolution API...</p>
+                <p>{isAz ? 'Evolution API ilə əlaqə qurulur...' : 'Connecting to Evolution API...'}</p>
               </div>
             ) : whatsappState.status === 'connected' ? (
               <div style={{ padding: '2rem 0', color: 'var(--success)' }}>
                 <CheckCircle2 size={42} style={{ marginBottom: '0.75rem' }} />
-                <div style={{ fontWeight: 600 }}>WhatsApp Instance Connected</div>
+                <div style={{ fontWeight: 600 }}>
+                  {isAz ? 'WhatsApp Nömrəsi Qoşulub' : 'WhatsApp Instance Connected'}
+                </div>
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                   Instance: {whatsappState.instance_name}
                 </div>
@@ -632,7 +824,9 @@ const Settings = () => {
                   }}
                 />
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  Scan with WhatsApp to pair ({whatsappState.instance_name})
+                  {isAz
+                    ? `WhatsApp ilə skan edin (${whatsappState.instance_name})`
+                    : `Scan with WhatsApp to pair (${whatsappState.instance_name})`}
                 </div>
               </div>
             ) : (

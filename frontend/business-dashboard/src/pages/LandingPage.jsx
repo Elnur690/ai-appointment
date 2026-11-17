@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../api/client';
+import { getPlanFeatureItems } from '../i18n/translations';
 import {
   Sparkles,
   MessageSquare,
@@ -8,6 +9,7 @@ import {
   ShieldCheck,
   Globe,
   Check,
+  X,
   Mic,
   RefreshCw,
   Zap,
@@ -475,73 +477,49 @@ const LandingPage = () => {
           {t.pricingSubtitle}
         </p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-          {plans.map((p) => (
-            <div key={p.id} className="glass-card" style={{ padding: '2.25rem', display: 'flex', flexDirection: 'column' }}>
-              <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem' }}>{p.name}</h3>
-              <div style={{ fontSize: '2.25rem', fontWeight: 800, color: 'var(--primary)', marginBottom: '1.5rem' }}>
-                {p.price} AZN
-                <span style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', fontWeight: 400 }}>{t.perMonth}</span>
-              </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem' }}>
+          {plans.map((p) => {
+            const allFeatures = getPlanFeatureItems(p, lang);
+            return (
+              <div key={p.id} className="glass-card" style={{ padding: '2.25rem', display: 'flex', flexDirection: 'column' }}>
+                <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem' }}>{p.name}</h3>
+                <div style={{ fontSize: '2.25rem', fontWeight: 800, color: 'var(--primary)', marginBottom: '1.5rem' }}>
+                  {p.price} AZN
+                  <span style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', fontWeight: 400 }}>{t.perMonth}</span>
+                </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '2rem', flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <Check size={16} color="var(--success)" />
-                  <span>
-                    {p.message_limit >= 100000
-                      ? t.unlimitedMessages
-                      : t.messagesPerMonth(p.message_limit)}
-                  </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '2rem', flex: 1 }}>
+                  {allFeatures.map((item) => (
+                    <div
+                      key={item.key}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '0.6rem',
+                        fontSize: '0.88rem',
+                        opacity: item.included ? 1 : 0.45,
+                      }}
+                    >
+                      {item.included ? (
+                        <Check size={16} color="var(--success)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                      ) : (
+                        <X size={16} color="var(--text-secondary)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                      )}
+                      <span>{item.label}</span>
+                    </div>
+                  ))}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <Check size={16} color="var(--success)" />
-                  <span>{t.upToBranches(p.max_branches)}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <Check size={16} color="var(--success)" />
-                  <span>{t.omniBooking}</span>
-                </div>
-                {p.allows_instagram && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <Check size={16} color="var(--success)" />
-                    <span>{t.instagramBooking}</span>
-                  </div>
-                )}
-                {p.allows_telegram && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <Check size={16} color="var(--success)" />
-                    <span>{t.telegramBooking}</span>
-                  </div>
-                )}
-                {p.allows_voice_messages && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <Check size={16} color="var(--success)" />
-                    <span>{t.voiceBooking}</span>
-                  </div>
-                )}
-                {p.allows_online_payments && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <Check size={16} color="var(--success)" />
-                    <span>{t.onlinePayments}</span>
-                  </div>
-                )}
-                {p.allows_custom_domain && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <Check size={16} color="var(--success)" />
-                    <span>{t.customDomain}</span>
-                  </div>
-                )}
-              </div>
 
-              <a
-                href={registerUrl}
-                className="btn btn-primary"
-                style={{ justifyContent: 'center', textDecoration: 'none', width: '100%' }}
-              >
-                {t.planCta(p.name)}
-              </a>
-            </div>
-          ))}
+                <a
+                  href={registerUrl}
+                  className="btn btn-primary"
+                  style={{ justifyContent: 'center', textDecoration: 'none', width: '100%' }}
+                >
+                  {t.planCta(p.name)}
+                </a>
+              </div>
+            );
+          })}
         </div>
       </section>
 

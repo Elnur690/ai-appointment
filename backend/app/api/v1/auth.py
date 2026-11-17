@@ -28,7 +28,7 @@ class LoginRequest(BaseModel):
 
 class RegisterBusinessRequest(BaseModel):
     business_name: str
-    owner_name: str
+    owner_name: Optional[str] = None
     email: EmailStr
     phone: Optional[str] = None
     password: str
@@ -199,7 +199,7 @@ async def register_business(
 
     owner = BusinessOwner(
         business_id=business.id,
-        name=request.owner_name.strip(),
+        name=(request.owner_name or request.business_name).strip(),
         phone=request.phone,
         email=email_clean,
         password_hash=hash_password(request.password),
@@ -272,7 +272,7 @@ async def verify_customer_otp(req: OtpVerifyRequest):
 async def get_public_plans(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Public endpoint returning active subscription plans for randevu.vip landing & registration."""
+    """Public endpoint returning active subscription plans with all entitlement flags for randevu.vip & app.randevu.vip."""
     plans = (
         await db.execute(select(Plan).where(Plan.is_active == True).order_by(Plan.price.asc()))
     ).scalars().all()
@@ -290,9 +290,25 @@ async def get_public_plans(
             "allows_telegram": bool(getattr(p, "allows_telegram", False) or p.allows_omnichannel_messaging),
             "allows_voice_messages": bool(p.allows_voice_messages),
             "allows_online_payments": bool(p.allows_online_payments),
+            "allows_no_show_deposits": bool(p.allows_no_show_deposits),
+            "allows_shift_management": bool(p.allows_shift_management),
             "allows_cadence_engine": bool(p.allows_cadence_engine),
-            "allows_gift_vouchers": bool(p.allows_gift_vouchers),
             "allows_flash_drops": bool(p.allows_flash_drops),
+            "allows_gift_vouchers": bool(p.allows_gift_vouchers),
+            "allows_loyalty_program": bool(p.allows_loyalty_program),
+            "allows_combo_packages": bool(p.allows_combo_packages),
+            "allows_group_bookings": bool(p.allows_group_bookings),
+            "allows_product_upsells": bool(p.allows_product_upsells),
+            "allows_dynamic_pricing": bool(p.allows_dynamic_pricing),
+            "allows_winback_campaigns": bool(p.allows_winback_campaigns),
+            "allows_gcal_sync": bool(p.allows_gcal_sync),
+            "allows_apple_cal_sync": bool(p.allows_apple_cal_sync),
+            "allows_geo_routing": bool(p.allows_geo_routing),
+            "allows_emergency_reassignment": bool(p.allows_emergency_reassignment),
+            "allows_omnichannel_messaging": bool(p.allows_omnichannel_messaging),
+            "allows_growth_advisor": bool(p.allows_growth_advisor),
+            "allows_branch_level_ai_tone": bool(p.allows_branch_level_ai_tone),
+            "allows_discovery": bool(p.allows_discovery),
             "allows_custom_domain": bool(p.allows_custom_domain),
             "features": p.features or {},
         }

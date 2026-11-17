@@ -10,13 +10,30 @@ const getSavedUser = () => {
   }
 };
 
+const getSavedLang = () => {
+  try {
+    const saved = localStorage.getItem('randevu_lang');
+    return saved === 'en' ? 'en' : 'az';
+  } catch {
+    return 'az';
+  }
+};
+
 export const useAuthStore = create((set) => ({
   user: getSavedUser(),
   businessContext: null,
   branches: [],
-  language: 'az',
+  language: getSavedLang(),
   isAuthenticated: Boolean(localStorage.getItem('access_token')),
-  setLanguage: (language) => set({ language }),
+  setLanguage: (language) => {
+    const next = language === 'en' ? 'en' : 'az';
+    try {
+      localStorage.setItem('randevu_lang', next);
+    } catch {
+      // ignore storage error
+    }
+    set({ language: next });
+  },
 
   login: (user) => {
     localStorage.setItem('business_user', JSON.stringify(user));

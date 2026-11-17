@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { DataTable } from '../components/common/DataTable';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { Modal } from '../components/common/Modal';
+import { useAuthStore } from '../store/authStore';
 import api from '../api/client';
 import { Plus } from 'lucide-react';
 
 const AppointmentsPage = () => {
+  const { language } = useAuthStore();
+  const isAz = (language || 'az') !== 'en';
   const [appointments, setAppointments] = useState([]);
   const [services, setServices] = useState([]);
   const [staffList, setStaffList] = useState([]);
@@ -54,16 +57,16 @@ const AppointmentsPage = () => {
   };
 
   const cols = [
-    { header: 'Customer', accessor: 'customer_name' },
-    { header: 'Service', accessor: 'service_name' },
-    { header: 'Staff', accessor: 'staff_name' },
+    { header: isAz ? 'Müştəri' : 'Customer', accessor: 'customer_name' },
+    { header: isAz ? 'Xidmət' : 'Service', accessor: 'service_name' },
+    { header: isAz ? 'Usta' : 'Staff', accessor: 'staff_name' },
     {
-      header: 'Date & Time',
+      header: isAz ? 'Tarix və Saat' : 'Date & Time',
       cell: (row) => (row.start_time ? new Date(row.start_time).toLocaleString() : '—'),
     },
-    { header: 'Status', cell: (row) => <StatusBadge status={row.status} /> },
+    { header: isAz ? 'Status' : 'Status', cell: (row) => <StatusBadge status={row.status} /> },
     {
-      header: 'Actions',
+      header: isAz ? 'Əməliyyatlar' : 'Actions',
       cell: (row) => (
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           {row.status !== 'completed' && (
@@ -73,7 +76,7 @@ const AppointmentsPage = () => {
               style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
               onClick={() => handleStatusChange(row.id, 'completed')}
             >
-              Complete
+              {isAz ? 'Tamamla' : 'Complete'}
             </button>
           )}
           {row.status !== 'cancelled' && (
@@ -83,7 +86,7 @@ const AppointmentsPage = () => {
               style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
               onClick={() => handleStatusChange(row.id, 'cancelled')}
             >
-              Cancel
+              {isAz ? 'Ləğv et' : 'Cancel'}
             </button>
           )}
         </div>
@@ -95,33 +98,43 @@ const AppointmentsPage = () => {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
-          <h2>Appointments</h2>
+          <h2>{isAz ? 'Randevular' : 'Appointments'}</h2>
           <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-            View and manage all customer bookings across WhatsApp, Instagram, and walk-ins.
+            {isAz
+              ? 'WhatsApp, Instagram, Telegram və birbaşa müraciətlərdən gələn bütün randevuları idarə edin.'
+              : 'View and manage all customer bookings across WhatsApp, Instagram, Telegram, and walk-ins.'}
           </p>
         </div>
         <button type="button" className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
           <Plus size={16} />
-          New Appointment
+          {isAz ? 'Yeni Randevu' : 'New Appointment'}
         </button>
       </div>
 
       <DataTable
         columns={cols}
         data={appointments}
-        emptyMessage="No appointments booked yet. Click 'New Appointment' to schedule one."
+        emptyMessage={
+          isAz
+            ? "Hələ randevu yoxdur. Yeni randevu yaratmaq üçün 'Yeni Randevu' düyməsinə klikləyin."
+            : "No appointments booked yet. Click 'New Appointment' to schedule one."
+        }
       />
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create New Appointment">
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={isAz ? 'Yeni Randevu Yarat' : 'Create New Appointment'}
+      >
         <form onSubmit={handleCreate}>
           <div className="form-group">
-            <label className="form-label">Customer</label>
+            <label className="form-label">{isAz ? 'Müştəri' : 'Customer'}</label>
             <select
               className="form-control"
               value={form.customer_id}
               onChange={(e) => setForm({ ...form, customer_id: e.target.value })}
             >
-              <option value="">Select customer (or create walk-in)</option>
+              <option value="">{isAz ? 'Müştəri seçin (və ya birbaşa qonaq)' : 'Select customer (or create walk-in)'}</option>
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name} ({c.phone})
@@ -130,28 +143,28 @@ const AppointmentsPage = () => {
             </select>
           </div>
           <div className="form-group">
-            <label className="form-label">Service</label>
+            <label className="form-label">{isAz ? 'Xidmət' : 'Service'}</label>
             <select
               className="form-control"
               value={form.service_id}
               onChange={(e) => setForm({ ...form, service_id: e.target.value })}
             >
-              <option value="">Select service</option>
+              <option value="">{isAz ? 'Xidmət seçin' : 'Select service'}</option>
               {services.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.name} ({s.duration_minutes} min — {s.price} {s.currency})
+                  {s.name} ({s.duration_minutes} dəq — {s.price} {s.currency})
                 </option>
               ))}
             </select>
           </div>
           <div className="form-group">
-            <label className="form-label">Staff Member</label>
+            <label className="form-label">{isAz ? 'Usta / Mütəxəssis' : 'Staff Member'}</label>
             <select
               className="form-control"
               value={form.staff_id}
               onChange={(e) => setForm({ ...form, staff_id: e.target.value })}
             >
-              <option value="">Select staff member</option>
+              <option value="">{isAz ? 'Usta seçin' : 'Select staff member'}</option>
               {staffList.map((st) => (
                 <option key={st.id} value={st.id}>
                   {st.name} ({st.role_title})
@@ -160,7 +173,7 @@ const AppointmentsPage = () => {
             </select>
           </div>
           <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-            <label className="form-label">Start Date & Time</label>
+            <label className="form-label">{isAz ? 'Başlama Tarixi və Saatı' : 'Start Date & Time'}</label>
             <input
               type="datetime-local"
               className="form-control"
@@ -171,10 +184,10 @@ const AppointmentsPage = () => {
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
             <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>
-              Cancel
+              {isAz ? 'Ləğv et' : 'Cancel'}
             </button>
             <button type="submit" className="btn btn-primary">
-              Schedule Appointment
+              {isAz ? 'Randevunu Təsdiqlə' : 'Schedule Appointment'}
             </button>
           </div>
         </form>

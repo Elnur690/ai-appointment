@@ -15,7 +15,8 @@ import { useAuthStore } from '../../store/authStore';
 
 const Sidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
-  const { user, logout } = useAuthStore();
+  const { user, logout, language, setLanguage } = useAuthStore();
+  const isAz = (language || 'az') !== 'en';
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -24,12 +25,12 @@ const Sidebar = () => {
   };
 
   const navItems = [
-    { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/businesses', icon: Building2, label: 'Businesses' },
-    { path: '/plans', icon: Layers, label: 'Plans & Channels' },
-    { path: '/payment-gateways', icon: Wallet, label: 'Payment Gateways' },
-    { path: '/resellers', icon: Handshake, label: 'Resellers & Partners' },
-    { path: '/subscriptions', icon: CreditCard, label: 'Subscriptions' },
+    { path: '/', icon: LayoutDashboard, label: isAz ? 'İdarə Paneli' : 'Dashboard' },
+    { path: '/businesses', icon: Building2, label: isAz ? 'Bizneslər' : 'Businesses' },
+    { path: '/plans', icon: Layers, label: isAz ? 'Paketlər və Kanallar' : 'Plans & Channels' },
+    { path: '/payment-gateways', icon: Wallet, label: isAz ? 'Ödəniş Şlüzləri' : 'Payment Gateways' },
+    { path: '/resellers', icon: Handshake, label: isAz ? 'Partnyorlar (Resellers)' : 'Resellers & Partners' },
+    { path: '/subscriptions', icon: CreditCard, label: isAz ? 'Abunəliklər' : 'Subscriptions' },
   ];
 
   return (
@@ -48,11 +49,12 @@ const Sidebar = () => {
     >
       <div
         style={{
-          padding: '1.5rem',
+          padding: '1.25rem 1.5rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: collapsed ? 'center' : 'space-between',
           borderBottom: '1px solid var(--border-color)',
+          gap: '0.5rem',
         }}
       >
         {!collapsed && (
@@ -65,7 +67,57 @@ const Sidebar = () => {
         </button>
       </div>
 
-      <nav style={{ flex: 1, padding: '1.5rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      {!collapsed && (
+        <div style={{ padding: '0.75rem 1.25rem 0', display: 'flex', justifyContent: 'center' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              width: '100%',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '999px',
+              padding: '0.18rem',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setLanguage('az')}
+              style={{
+                flex: 1,
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.3rem 0.5rem',
+                borderRadius: '999px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                background: isAz ? 'var(--primary-start)' : 'transparent',
+                color: isAz ? '#fff' : 'var(--text-secondary)',
+              }}
+            >
+              AZ
+            </button>
+            <button
+              type="button"
+              onClick={() => setLanguage('en')}
+              style={{
+                flex: 1,
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.3rem 0.5rem',
+                borderRadius: '999px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                background: !isAz ? 'var(--primary-start)' : 'transparent',
+                color: !isAz ? '#fff' : 'var(--text-secondary)',
+              }}
+            >
+              EN
+            </button>
+          </div>
+        </div>
+      )}
+
+      <nav style={{ flex: 1, padding: '1.25rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {navItems.map((item) => (
           <NavLink
             key={item.path}
@@ -103,7 +155,7 @@ const Sidebar = () => {
           style={{ width: '100%', justifyContent: collapsed ? 'center' : 'flex-start', color: 'var(--error)' }}
         >
           <LogOut size={20} />
-          {!collapsed && 'Logout'}
+          {!collapsed && (isAz ? 'Çıxış' : 'Logout')}
         </button>
       </div>
     </div>
