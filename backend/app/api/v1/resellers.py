@@ -1,3 +1,4 @@
+import secrets
 from typing import Annotated, Any, List, Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -15,6 +16,15 @@ from app.services.reseller_service import ResellerService
 
 router = APIRouter()
 reseller_service = ResellerService()
+
+
+class ResellerPublicApplyRequest(BaseModel):
+    name: str
+    company_name: Optional[str] = None
+    email: EmailStr
+    phone: str
+    preferred_referral_code: Optional[str] = None
+    website_honeypot: Optional[str] = None
 
 
 class ResellerCreate(BaseModel):
@@ -108,6 +118,56 @@ async def _build_reseller_response(reseller: Reseller, db: AsyncSession) -> Rese
         pending_payout_azn=summary.pending_payout_azn,
         is_active=reseller.is_active,
     )
+
+
+@router.post("/apply", status_code=status.HTTP_201_CREATED)
+async def apply_as_reseller_public(
+    data: ResellerPublicApplyRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Public endpoint allowing agencies and sales partners on randevu.vip to apply as Resellers."""
+    # Honeypot spam check
+    if data.website_honeypot:
+        return {"status": "submitted"}
+
+    email_clean = data.email.strip().lower()
+    existing_email = (
+        await db.execute(select(Reseller).where(Reseller.email == email_clean))
+    ).scalar_one_or_none()
+    if existing_email:
+        return {
+            "status": "already_registered",
+            "referral_code": existing_email.referral_code,
+            "referral_url": f"https://randevu.vip/?ref={existing_email.referral_code}",
+            "commission_rate_percent": float(existing_email.commission_rate_percent or 20.0),
+        }
+
+    base_code = data.preferred_referral_code or data.company_name or data.name or "PARTNER"
+    norm_code = reseller_service.normalize_referral_code(base_code)
+    code_taken = (
+        await db.execute(select(Reseller).where(Reseller.referral_code == norm_code))
+    ).scalar_one_or_none()
+    if code_taken:
+        norm_code = f"{norm_code[:12]}-{secrets.token_hex(2).upper()}"
+
+    reseller = Reseller(
+        name=data.name.strip(),
+        company_name=data.company_name.strip() if data.company_name else None,
+        email=email_clean,
+        phone=data.phone.strip(),
+        password_hash=hash_password(secrets.token_urlsafe(12)),
+        referral_code=norm_code,
+        commission_rate_percent=20.0,
+        is_active=True,
+    )
+    db.add(reseller)
+    await db.flush()
+    return {
+        "status": "approved",
+        "referral_code": norm_code,
+        "referral_url": f"https://randevu.vip/?ref={norm_code}",
+        "commission_rate_percent": 20.0,
+    }
 
 
 @router.get("/", response_model=List[ResellerResponse])

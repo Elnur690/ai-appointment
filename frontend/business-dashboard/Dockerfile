@@ -37,6 +37,8 @@ RUN printf 'server {\n\
     add_header X-Content-Type-Options "nosniff" always;\n\
     add_header X-Frame-Options "SAMEORIGIN" always;\n\
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;\n\
+    add_header Cross-Origin-Opener-Policy "same-origin-allow-popups" always;\n\
+    add_header Permissions-Policy "camera=(), geolocation=(), microphone=(), focus-without-user-activation=()" always;\n\
     location /api/ {\n\
         resolver 127.0.0.11 valid=30s ipv6=off;\n\
         set $backend_upstream http://backend:22800;\n\
