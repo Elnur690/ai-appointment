@@ -26,8 +26,10 @@ const Settings = () => {
     allows_instagram: false,
     allows_telegram: false,
     allows_online_payments: true,
+    allows_no_show_deposits: false,
     allows_custom_domain: false,
   });
+  const [services, setServices] = useState([]);
   const [webhookUrls, setWebhookUrls] = useState({
     whatsapp: 'https://api.randevu.vip/api/v1/webhooks/whatsapp',
     instagram: 'https://api.randevu.vip/api/v1/webhooks/instagram',
@@ -57,9 +59,25 @@ const Settings = () => {
     telegram_bot_token: '',
     telegram_bot_username: '',
     telegram_connected: false,
+    deposit_rule_mode: 'high_risk_only',
+    deposit_min_service_price: 50,
+    deposit_service_ids: [],
+    deposit_calc_type: 'percentage',
+    deposit_percentage: 20,
+    deposit_fixed_amount: 10,
+    deposit_skip_regular_customers: true,
+    deposit_regular_min_visits: 2,
+    deposit_no_show_threshold: 2,
   });
 
   useEffect(() => {
+    api
+      .get('/services/')
+      .then((res) => {
+        if (Array.isArray(res.data)) setServices(res.data);
+      })
+      .catch(() => {});
+
     api
       .get('/businesses/')
       .then((res) => {
@@ -82,10 +100,30 @@ const Settings = () => {
           telegram_bot_token: s.telegram_bot_token || '',
           telegram_bot_username: s.telegram_bot_username || '',
           telegram_connected: Boolean(s.telegram_connected),
+          deposit_rule_mode: s.deposit_rule_mode || 'high_risk_only',
+          deposit_min_service_price: s.deposit_min_service_price ?? 50,
+          deposit_service_ids: Array.isArray(s.deposit_service_ids) ? s.deposit_service_ids : [],
+          deposit_calc_type: s.deposit_calc_type || 'percentage',
+          deposit_percentage: s.deposit_percentage ?? 20,
+          deposit_fixed_amount: s.deposit_fixed_amount ?? 10,
+          deposit_skip_regular_customers: s.deposit_skip_regular_customers !== false,
+          deposit_regular_min_visits: s.deposit_regular_min_visits ?? 2,
+          deposit_no_show_threshold: s.deposit_no_show_threshold ?? 2,
         });
       })
       .catch(() => {});
   }, []);
+
+  const toggleDepositService = (svcId) => {
+    setAiTone((prev) => {
+      const current = prev.deposit_service_ids || [];
+      const exists = current.includes(svcId);
+      return {
+        ...prev,
+        deposit_service_ids: exists ? current.filter((id) => id !== svcId) : [...current, svcId],
+      };
+    });
+  };
 
   const handleSaveSettings = async (e) => {
     if (e) e.preventDefault();
@@ -337,6 +375,244 @@ const Settings = () => {
               ? 'Bütün nağd və onlayn kart əməliyyatları avtomatik olaraq "Ödənişlər və Gəlir" jurnalında qeydə alınır.'
               : 'All cash and online card transactions are automatically recorded in your Payments & Revenue ledger.'}
           </div>
+        </div>
+
+        {/* 2b. Beh (Pre-Payment / Deposit) Rules — Master toggle stays with Admin */}
+        <div className="glass-card" style={{ padding: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <CreditCard color="var(--primary)" size={24} />
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', margin: 0 }}>
+                {isAz ? 'Beh (Ön Ödəniş) Qaydaları' : 'Deposit (Beh) Rules'}
+              </h2>
+            </div>
+            <span className={entitlements.allows_no_show_deposits ? 'badge badge-success' : 'badge badge-warning'}>
+              {entitlements.allows_no_show_deposits
+                ? isAz
+                  ? 'Admin tərəfindən Aktivdir'
+                  : 'Enabled by Admin'
+                : isAz
+                ? 'Admin tərəfindən Deaktivdir'
+                : 'Disabled by Admin'}
+            </span>
+          </div>
+
+          {!entitlements.allows_no_show_deposits ? (
+            <div
+              style={{
+                padding: '1rem',
+                borderRadius: '8px',
+                background: 'rgba(255,255,255,0.03)',
+                color: 'var(--text-secondary)',
+                fontSize: '0.9rem',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  marginBottom: '0.5rem',
+                  color: 'var(--warning)',
+                  fontWeight: 600,
+                }}
+              >
+                <Lock size={16} />
+                {isAz
+                  ? `Beh (ön ödəniş) funksiyası hazırda (${planName}) paketinizdə və ya Admin tərəfindən aktiv edilməyib.`
+                  : `Deposit (Beh) collection is currently disabled by Platform Admin for your (${planName}) plan.`}
+              </div>
+              {isAz
+                ? 'Beh funksiyası aktivləşdirildikdə kimlərdən və hansı xidmətlərdən ön ödəniş alınacağını burada tənzimləyə biləcəksiniz.'
+                : 'Once enabled by the platform administrator, you can configure which bookings and services require a deposit here.'}
+            </div>
+          ) : (
+            <>
+              <div className="form-group">
+                <label className="form-label">
+                  {isAz ? 'Kimlərdən Beh Tələb Olunsun?' : 'Who Should Pay a Deposit (Beh)?'}
+                </label>
+                <select
+                  className="form-control"
+                  value={aiTone.deposit_rule_mode}
+                  onChange={(e) => setAiTone({ ...aiTone, deposit_rule_mode: e.target.value })}
+                >
+                  <option value="high_risk_only">
+                    {isAz
+                      ? 'Yalnız əvvəl gəlməyən (No-Show) müştərilər'
+                      : 'Only customers with past no-shows'}
+                  </option>
+                  <option value="above_amount">
+                    {isAz
+                      ? 'Müəyyən məbləğdən yuxarı xidmətlər'
+                      : 'Services above a minimum price'}
+                  </option>
+                  <option value="selected_services">
+                    {isAz
+                      ? 'Yalnız seçilmiş yüksək dəyərli xidmətlər'
+                      : 'Selected high-value services only'}
+                  </option>
+                  <option value="all">
+                    {isAz ? 'Bütün randevular' : 'All bookings'}
+                  </option>
+                </select>
+              </div>
+
+              {aiTone.deposit_rule_mode === 'above_amount' && (
+                <div className="form-group">
+                  <label className="form-label">
+                    {isAz ? 'Minimum Xidmət Məbləği (AZN)' : 'Minimum Service Price (AZN)'}
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    className="form-control"
+                    value={aiTone.deposit_min_service_price}
+                    onChange={(e) =>
+                      setAiTone({ ...aiTone, deposit_min_service_price: Number(e.target.value) || 0 })
+                    }
+                  />
+                </div>
+              )}
+
+              {aiTone.deposit_rule_mode === 'selected_services' && (
+                <div className="form-group">
+                  <label className="form-label">
+                    {isAz ? 'Beh Tələb Olunan Xidmətlər' : 'Services Requiring Deposit'}
+                  </label>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.45rem',
+                      maxHeight: '150px',
+                      overflowY: 'auto',
+                      padding: '0.65rem',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border)',
+                      background: 'rgba(255,255,255,0.02)',
+                    }}
+                  >
+                    {services.length === 0 ? (
+                      <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
+                        {isAz ? 'Hələ xidmət əlavə edilməyib.' : 'No services created yet.'}
+                      </span>
+                    ) : (
+                      services.map((svc) => (
+                        <label
+                          key={svc.id}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.86rem', cursor: 'pointer' }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={(aiTone.deposit_service_ids || []).includes(svc.id)}
+                            onChange={() => toggleDepositService(svc.id)}
+                          />
+                          <span>
+                            {svc.name} ({Number(svc.price).toFixed(2)} {svc.currency || 'AZN'})
+                          </span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="form-group">
+                  <label className="form-label">{isAz ? 'Beh Hesablanması' : 'Deposit Type'}</label>
+                  <select
+                    className="form-control"
+                    value={aiTone.deposit_calc_type}
+                    onChange={(e) => setAiTone({ ...aiTone, deposit_calc_type: e.target.value })}
+                  >
+                    <option value="percentage">{isAz ? 'Xidmət qiymətinin %' : 'Percentage (%)'}</option>
+                    <option value="fixed">{isAz ? 'Sabit məbləğ (AZN)' : 'Fixed amount (AZN)'}</option>
+                  </select>
+                </div>
+
+                {aiTone.deposit_calc_type === 'fixed' ? (
+                  <div className="form-group">
+                    <label className="form-label">{isAz ? 'Sabit Beh (AZN)' : 'Fixed Deposit (AZN)'}</label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="0.5"
+                      className="form-control"
+                      value={aiTone.deposit_fixed_amount}
+                      onChange={(e) =>
+                        setAiTone({ ...aiTone, deposit_fixed_amount: Number(e.target.value) || 0 })
+                      }
+                    />
+                  </div>
+                ) : (
+                  <div className="form-group">
+                    <label className="form-label">{isAz ? 'Beh Faizi (%)' : 'Deposit Percentage (%)'}</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      step="1"
+                      className="form-control"
+                      value={aiTone.deposit_percentage}
+                      onChange={(e) =>
+                        setAiTone({ ...aiTone, deposit_percentage: Number(e.target.value) || 0 })
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div
+                style={{
+                  padding: '0.75rem',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border)',
+                  background: 'rgba(16, 185, 129, 0.06)',
+                  marginTop: '0.25rem',
+                }}
+              >
+                <label
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: 600 }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={Boolean(aiTone.deposit_skip_regular_customers)}
+                    onChange={(e) =>
+                      setAiTone({ ...aiTone, deposit_skip_regular_customers: e.target.checked })
+                    }
+                  />
+                  <span>
+                    {isAz
+                      ? 'Daimi müştəriləri behdən azad et (Qaydaları keç)'
+                      : 'Skip deposit rules for regular customers'}
+                  </span>
+                </label>
+                {aiTone.deposit_skip_regular_customers && (
+                  <div style={{ marginTop: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                      {isAz ? 'Minimum tamamlanmış ziyarət:' : 'Min completed visits:'}
+                    </span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="50"
+                      className="form-control"
+                      style={{ width: '84px', padding: '0.3rem 0.5rem' }}
+                      value={aiTone.deposit_regular_min_visits}
+                      onChange={(e) =>
+                        setAiTone({
+                          ...aiTone,
+                          deposit_regular_min_visits: Math.max(1, Number(e.target.value) || 1),
+                        })
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* 3. WhatsApp Onboarding (Default Package) */}

@@ -87,6 +87,7 @@ def _build_business_response(biz: Business) -> BusinessResponse:
         if plan
         else False,
         "allows_online_payments": bool(getattr(plan, "allows_online_payments", True)) if plan else True,
+        "allows_no_show_deposits": bool(getattr(plan, "allows_no_show_deposits", False)) if plan else False,
         "allows_custom_domain": bool(getattr(plan, "allows_custom_domain", False)) if plan else False,
     }
     now_utc = datetime.now(timezone.utc)
