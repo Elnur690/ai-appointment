@@ -1,27 +1,25 @@
 # Randevu.vip — AI Appointment & Revenue SaaS Platform (AZ / EN)
 
-> Randevu.vip is an AI-powered omnichannel appointment booking, shift-aware staff scheduling, and revenue management platform built for salons, clinics, dental practices, barbershops, beauty studios, and service businesses in Azerbaijan and globally.
+> Randevu.vip is an AI-powered omnichannel appointment booking, shift-aware staff scheduling, and revenue management platform built for medical clinics, dental centers, aesthetic & SPA studios, legal & consulting firms, service centers, and multi-branch businesses in Azerbaijan and globally.
 
-## Official Domains & Architecture
+## Official Portals
 - **Marketing & Plans Portal**: https://randevu.vip (Default language: Azerbaijani `az`, secondary language: English `en`)
 - **Business Workspace & Onboarding**: https://app.randevu.vip (`/login`, `/register`, `/settings`, `/calendar`, `/appointments`, `/payments`)
-- **White-Label Custom CNAME Target**: `cname.randevu.vip`
 
 ## Omnichannel AI Receptionist Channels
 1. **WhatsApp Business (Default Included in All Plans)**:
-   - Instant 1-scan QR pairing inside `app.randevu.vip/settings` powered by Evolution API.
+   - Instant 1-scan QR pairing inside `app.randevu.vip/settings`.
    - Understands both text messages and WhatsApp voice notes in Azerbaijani (`az`), English (`en`), Russian (`ru`), and Turkish (`tr`).
 2. **Instagram Direct AI (Configurable per Plan)**:
-   - Connects via Meta Graph API (`https://api.randevu.vip/api/v1/webhooks/instagram`) to answer DMs and book appointments 24/7.
+   - Connects directly in Settings to answer Instagram DMs and book appointments 24/7.
 3. **Telegram Bot AI (Configurable per Plan)**:
-   - 1-click `@BotFather` token connection (`POST /api/v1/businesses/telegram/connect`) that auto-registers `https://api.randevu.vip/api/v1/webhooks/telegram/{business_id}`.
+   - 1-click Telegram Bot token connection in Settings that automatically registers the live booking bot.
 
-## Supported Payment Gateways
-1. **Cash Payment (`cash`)**: Built-in salon/clinic cash & POS transaction ledger.
-2. **Payriff Payment Gateway (`payriff`)**: Online card checkout and automated no-show deposit collection in AZN.
-3. **Paymegate Payment Gateway (`paymegate`)**: Official Paymegate Merchant API v1 (`https://api.paymegate.com/v1/orders`) using `X-API-Key` authentication and `order.paid` webhook settlement.
+## Payments & Deposits (Enabled Across All Plans)
+1. **Cash Payments**: Built-in on-site cash and POS transaction ledger.
+2. **Online Card & Deposit Payments**: Instant online card checkout and automated no-show deposit collection in AZN enabled across all plans.
 
 ## Subscription Tiers & Dynamic Free Trial
-- **Starter (29 AZN/month)**: 1 branch, 1 WhatsApp number, 1,000 AI messages/month, Cash payments, Dynamic Free Trial.
-- **Pro (79 AZN/month)**: Up to 3 branches, 3 WhatsApp numbers, 5,000 AI messages/month, WhatsApp + Instagram Direct + Telegram Bot, Voice Notes, Payriff & Paymegate Online Deposits, Shift & Overtime Scheduling, Predictive Cadence Rebooking, Flash Drops, Gift Vouchers, VIP Loyalty, Dynamic Free Trial.
-- **Enterprise (199 AZN/month)**: Up to 20 branches, 20 WhatsApp numbers, 50,000 AI messages/month, White-Label Custom CNAME Domain (`cname.randevu.vip`), Emergency Staff Reassignment, Multi-Branch AI Personas, Weekly AI Growth Advisor, Dynamic Free Trial.
+- **Starter (29 AZN/month)**: 1 branch, 1 WhatsApp number, 1,000 AI messages/month, Cash & Online Card Payments, Dynamic Free Trial.
+- **Pro (79 AZN/month)**: Up to 3 branches, 3 WhatsApp numbers, 5,000 AI messages/month, WhatsApp + Instagram Direct + Telegram Bot, Voice Notes, Cash & Online Card Deposits, Shift & Overtime Scheduling, Predictive Cadence Rebooking, Flash Drops, Gift Vouchers, VIP Loyalty, Dynamic Free Trial.
+- **Enterprise (199 AZN/month)**: Up to 20 branches, 20 WhatsApp numbers, 50,000 AI messages/month, White-Label Custom Domain, Emergency Staff Reassignment, Multi-Branch AI Personas, Weekly AI Growth Advisor, Cash & Online Card Payments, Dynamic Free Trial.

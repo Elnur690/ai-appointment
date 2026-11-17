@@ -11,36 +11,34 @@ const Payments = () => {
   const isAz = (language || 'az') !== 'en';
   const [payments, setPayments] = useState([]);
   const [summary, setSummary] = useState({ total_revenue: 0, count: 0 });
-  const [gateways, setGateways] = useState([
-    { provider: 'cash', name: 'Cash Payment (At Venue)', enabled: true },
-    { provider: 'payriff', name: 'Payriff Payment Gateway', enabled: true },
-    { provider: 'paymegate', name: 'Paymegate Payment Gateway', enabled: true },
-  ]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState({ amount: '', currency: 'AZN', method: 'cash', status: 'paid', notes: '' });
 
+  const paymentMethods = [
+    {
+      provider: 'cash',
+      name: isAz ? 'Nağd Ödəniş (Yerində)' : 'Cash Payment (On-Site)',
+      enabled: true,
+    },
+    {
+      provider: 'card',
+      name: isAz ? 'Onlayn Kart / Beh Ödənişi' : 'Online Card / Deposit Payment',
+      enabled: true,
+    },
+  ];
+
   const loadPayments = async () => {
-    const [payRes, sumRes, gwRes] = await Promise.all([
+    const [payRes, sumRes] = await Promise.all([
       api.get('/payments/').catch(() => ({ data: [] })),
       api.get('/payments/summary').catch(() => ({ data: { total_revenue: 0, count: 0 } })),
-      api.get('/payments/gateways').catch(() => ({ data: [] })),
     ]);
     setPayments(payRes.data || []);
     setSummary(sumRes.data || { total_revenue: 0, count: 0 });
-    if (Array.isArray(gwRes.data) && gwRes.data.length > 0) {
-      setGateways(gwRes.data);
-      const firstEnabled = gwRes.data.find((g) => g.enabled);
-      if (firstEnabled) {
-        setForm((prev) => ({ ...prev, method: firstEnabled.provider }));
-      }
-    }
   };
 
   useEffect(() => {
     loadPayments();
   }, []);
-
-  const enabledGateways = gateways.filter((g) => g.enabled);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -55,17 +53,25 @@ const Payments = () => {
     setForm({
       amount: '',
       currency: 'AZN',
-      method: enabledGateways[0]?.provider || 'cash',
+      method: 'cash',
       status: 'paid',
       notes: '',
     });
     await loadPayments();
   };
 
+  const formatGatewayLabel = (gw) => {
+    const raw = String(gw || '').toLowerCase();
+    if (raw.includes('cash') || raw.includes('nağd')) {
+      return isAz ? 'Nağd Ödəniş' : 'Cash Payment';
+    }
+    return isAz ? 'Onlayn Kart / Beh Ödənişi' : 'Online Card / Deposit';
+  };
+
   const columns = [
     { header: isAz ? 'Əməliyyat ID' : 'Transaction ID', cell: (row) => String(row.id).slice(0, 8).toUpperCase() },
     { header: isAz ? 'Müştəri / Qeyd' : 'Customer / Note', accessor: 'customer' },
-    { header: isAz ? 'Ödəniş Üsulu / Şlüz' : 'Method / Gateway', accessor: 'gateway' },
+    { header: isAz ? 'Ödəniş Üsulu' : 'Payment Method', cell: (row) => formatGatewayLabel(row.gateway) },
     { header: isAz ? 'Məbləğ' : 'Amount', accessor: 'amount' },
     {
       header: isAz ? 'Status' : 'Status',
@@ -97,13 +103,13 @@ const Payments = () => {
             {summary.count || 0} {isAz ? 'əməliyyat' : 'transactions'})
           </p>
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-            {gateways.map((gw) => (
+            {paymentMethods.map((pm) => (
               <span
-                key={gw.provider}
-                className={gw.enabled ? 'badge badge-success' : 'badge badge-warning'}
+                key={pm.provider}
+                className="badge badge-success"
                 style={{ fontSize: '0.75rem' }}
               >
-                {gw.name}: {gw.enabled ? (isAz ? 'Aktiv' : 'Enabled') : isAz ? 'Deaktiv' : 'Disabled'}
+                {pm.name}: {isAz ? 'Aktiv' : 'Active'}
               </span>
             ))}
           </div>
@@ -112,7 +118,6 @@ const Payments = () => {
           type="button"
           className="btn btn-primary"
           onClick={() => setIsModalOpen(true)}
-          disabled={enabledGateways.length === 0}
         >
           <Plus size={16} />
           {isAz ? 'Ödəniş Qeydə Al' : 'Record Payment'}
@@ -124,8 +129,8 @@ const Payments = () => {
         data={payments}
         emptyMessage={
           isAz
-            ? 'Hələ ödəniş qeydə alınmayıb. Nağd, Payriff və Paymegate əməliyyatları burada görünəcək.'
-            : 'No payments recorded yet. Cash, Payriff, and Paymegate transactions will appear here.'
+            ? 'Hələ ödəniş qeydə alınmayıb. Nağd və onlayn kart / beh ödənişləri burada görünəcək.'
+            : 'No payments recorded yet. Cash and online card / deposit transactions will appear here.'
         }
       />
 
@@ -153,21 +158,21 @@ const Payments = () => {
             <input
               type="text"
               className="form-control"
-              placeholder={isAz ? 'məs: Leyla M. - Saç kəsimi beh' : 'e.g. Leyla M. - Haircut Deposit'}
+              placeholder={isAz ? 'məs: Leyla M. - Konsultasiya behi' : 'e.g. Leyla M. - Consultation Deposit'}
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
             />
           </div>
           <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-            <label className="form-label">{isAz ? 'Ödəniş Şlüzü / Üsulu' : 'Payment Gateway / Method'}</label>
+            <label className="form-label">{isAz ? 'Ödəniş Üsulu' : 'Payment Method'}</label>
             <select
               className="form-control"
               value={form.method}
               onChange={(e) => setForm({ ...form, method: e.target.value })}
             >
-              {enabledGateways.map((gw) => (
-                <option key={gw.provider} value={gw.provider}>
-                  {gw.name}
+              {paymentMethods.map((pm) => (
+                <option key={pm.provider} value={pm.provider}>
+                  {pm.name}
                 </option>
               ))}
             </select>

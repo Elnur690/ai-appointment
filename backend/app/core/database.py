@@ -122,6 +122,7 @@ async def init_db() -> None:
                         allows_whatsapp=True,
                         allows_instagram=False,
                         allows_telegram=False,
+                        allows_online_payments=True,
                         allowed_ai_providers=["gemini"],
                         features={"assigned_model": "gemini-3.5-flash"},
                         is_active=True,
@@ -150,8 +151,8 @@ async def init_db() -> None:
                         allows_cadence_engine=True,
                         allows_gift_vouchers=True,
                         allows_flash_drops=True,
-                        allowed_ai_providers=["gemini", "claude"],
-                        features={"assigned_model": "claude-3-7-sonnet"},
+                        allowed_ai_providers=["gemini"],
+                        features={"assigned_model": "gemini-3.5-flash"},
                         is_active=True,
                     ),
                     Plan(
@@ -185,14 +186,17 @@ async def init_db() -> None:
                         allows_cadence_engine=True,
                         allows_gift_vouchers=True,
                         allows_flash_drops=True,
-                        allowed_ai_providers=["gemini", "claude", "openai"],
-                        features={"assigned_model": "gpt-4o"},
+                        allowed_ai_providers=["gemini"],
+                        features={"assigned_model": "gemini-3.5-flash"},
                         is_active=True,
                     ),
                 ])
             else:
                 for ep in existing_plans:
                     p_name = (ep.name or "").strip().lower()
+                    ep.allows_online_payments = True
+                    ep.allowed_ai_providers = ["gemini"]
+                    ep.features = {"assigned_model": "gemini-3.5-flash"}
                     if p_name == "starter":
                         ep.allows_whatsapp = True
                         if not ep.trial_days:
@@ -219,8 +223,6 @@ async def init_db() -> None:
                         ep.allows_cadence_engine = True
                         ep.allows_gift_vouchers = True
                         ep.allows_flash_drops = True
-                        if not ep.features or not ep.features.get("assigned_model"):
-                            ep.features = {"assigned_model": "claude-3-7-sonnet"}
                     elif p_name == "enterprise":
                         ep.max_branches = max(ep.max_branches or 1, 20)
                         ep.max_whatsapp_numbers = max(ep.max_whatsapp_numbers or 1, 20)
@@ -250,8 +252,6 @@ async def init_db() -> None:
                         ep.allows_cadence_engine = True
                         ep.allows_gift_vouchers = True
                         ep.allows_flash_drops = True
-                        if not ep.features or not ep.features.get("assigned_model"):
-                            ep.features = {"assigned_model": "gpt-4o"}
             await session.commit()
     except Exception as exc:
         logger.warning(f"Initial seed skipped or failed: {exc}")

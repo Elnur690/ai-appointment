@@ -33,11 +33,6 @@ const Settings = () => {
     instagram: 'https://api.randevu.vip/api/v1/webhooks/instagram',
     telegram: 'https://api.randevu.vip/api/v1/webhooks/telegram',
   });
-  const [platformGateways, setPlatformGateways] = useState([
-    { provider: 'cash', name: 'Cash Payment', enabled: true },
-    { provider: 'payriff', name: 'Payriff Payment Gateway', enabled: true },
-    { provider: 'paymegate', name: 'Paymegate Payment Gateway', enabled: true },
-  ]);
 
   const [customDomain, setCustomDomain] = useState('');
   const [domainVerifyResult, setDomainVerifyResult] = useState(null);
@@ -55,10 +50,6 @@ const Settings = () => {
     language: 'az',
     tone: 'professional',
     custom_instructions: '',
-    payriff_merchant_id: '',
-    payriff_secret_key: '',
-    paymegate_api_key: '',
-    paymegate_webhook_secret: '',
     instagram_page_id: '',
     instagram_access_token: '',
     instagram_verify_token: 'randevu_ig_verify',
@@ -69,15 +60,6 @@ const Settings = () => {
   });
 
   useEffect(() => {
-    api
-      .get('/payments/gateways')
-      .then((res) => {
-        if (Array.isArray(res.data) && res.data.length > 0) {
-          setPlatformGateways(res.data);
-        }
-      })
-      .catch(() => {});
-
     api
       .get('/businesses/')
       .then((res) => {
@@ -93,10 +75,6 @@ const Settings = () => {
           language: s.language || 'az',
           tone: s.tone || 'professional',
           custom_instructions: s.custom_instructions || '',
-          payriff_merchant_id: s.payriff_merchant_id || '',
-          payriff_secret_key: s.payriff_secret_key || '',
-          paymegate_api_key: s.paymegate_api_key || s.paymengate_api_key || '',
-          paymegate_webhook_secret: s.paymegate_webhook_secret || s.paymengate_secret_key || '',
           instagram_page_id: s.instagram_page_id || '',
           instagram_access_token: s.instagram_access_token || '',
           instagram_verify_token: s.instagram_verify_token || 'randevu_ig_verify',
@@ -109,13 +87,6 @@ const Settings = () => {
       .catch(() => {});
   }, []);
 
-  const isGatewayEnabled = (provider) => {
-    const found = platformGateways.find(
-      (g) => g.provider === provider || (provider === 'paymegate' && g.provider === 'paymengate')
-    );
-    return found ? Boolean(found.enabled) : true;
-  };
-
   const handleSaveSettings = async (e) => {
     if (e) e.preventDefault();
     setSaveMessage('');
@@ -127,8 +98,8 @@ const Settings = () => {
     await fetchBusinessProfile();
     setSaveMessage(
       isAz
-        ? 'Tənzimləmələr və ödəniş şlüzü məlumatları uğurla yadda saxlanıldı.'
-        : 'Settings & payment gateway credentials saved successfully.'
+        ? 'Biznes tənzimləmələri uğurla yadda saxlanıldı.'
+        : 'Business settings saved successfully.'
     );
     setTimeout(() => setSaveMessage(''), 3500);
   };
@@ -212,14 +183,14 @@ const Settings = () => {
         <div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>
             {isAz
-              ? 'Biznes Tənzimləmələri, Kanallar və Ödəniş Şlüzləri'
-              : 'Business Settings, Channels & Payment Gateways'}
+              ? 'Biznes Tənzimləmələri, Kanallar və Ödəniş Üsulları'
+              : 'Business Settings, Channels & Payment Methods'}
           </h1>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isAz ? 'Aktiv Paket:' : 'Active Plan:'} <strong>{planName}</strong> •{' '}
             {isAz
-              ? 'WhatsApp, Instagram Direct, Telegram Bot və Ödəniş Şlüzlərini (Nağd, Payriff, Paymegate) tənzimləyin.'
-              : 'Configure WhatsApp, Instagram Direct, Telegram Bot, and Payment Gateways (Cash, Payriff, Paymegate).'}
+              ? 'WhatsApp, Instagram Direct, Telegram Bot və Nağd / Onlayn Kart ödənişlərini tənzimləyin.'
+              : 'Configure WhatsApp, Instagram Direct, Telegram Bot, and Cash / Online Card payments.'}
           </p>
         </div>
         <button type="button" className="btn btn-primary" onClick={handleSaveSettings}>
@@ -310,120 +281,62 @@ const Settings = () => {
           </div>
         </div>
 
-        {/* 2. Payment Gateways (Cash, Payriff, Paymegate) */}
+        {/* 2. Payment Methods (Enabled for All Plans) */}
         <div className="glass-card" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
             <CreditCard color="var(--primary)" size={24} />
             <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
-              {isAz ? 'Ödəniş Şlüzləri (Payment Gateways)' : 'Payment Gateways'}
+              {isAz ? 'Ödəniş Üsulları (Bütün Paketlərdə Aktiv)' : 'Payment Methods (Enabled for All)'}
             </h2>
+          </div>
+
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>
+            {isAz
+              ? 'Biznesiniz üçün həm yerində nağd, həm də onlayn kart / beh ödənişləri tam aktivdir və bütün ödənişlər maneəsiz icra olunur.'
+              : 'Both on-site cash payments and online card / deposit payments are fully enabled and processed seamlessly for your business.'}
+          </p>
+
+          <div
+            style={{
+              padding: '0.75rem 1rem',
+              borderRadius: '8px',
+              background: 'rgba(16, 185, 129, 0.12)',
+              marginBottom: '0.75rem',
+              fontSize: '0.9rem',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <span>{isAz ? '1. Nağd Ödəniş (Yerində / Kassada)' : '1. Cash Payment (On-Site / Register)'}</span>
+            <strong style={{ color: 'var(--success)' }}>{isAz ? 'Aktiv' : 'Active'}</strong>
           </div>
 
           <div
             style={{
-              padding: '0.6rem 0.85rem',
+              padding: '0.75rem 1rem',
               borderRadius: '8px',
-              background: isGatewayEnabled('cash') ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
-              marginBottom: '1rem',
-              fontSize: '0.88rem',
+              background: 'rgba(16, 185, 129, 0.12)',
+              marginBottom: '0.75rem',
+              fontSize: '0.9rem',
               display: 'flex',
               justifyContent: 'space-between',
+              alignItems: 'center',
             }}
           >
-            <span>{isAz ? '1. Nağd Ödəniş (Salonda)' : '1. Cash Payment (At Venue)'}</span>
-            <strong style={{ color: isGatewayEnabled('cash') ? 'var(--success)' : 'var(--error)' }}>
-              {isGatewayEnabled('cash')
-                ? isAz
-                  ? 'Aktiv'
-                  : 'Active'
-                : isAz
-                ? 'Admin tərəfindən deaktiv edilib'
-                : 'Disabled by Admin'}
-            </strong>
+            <span>
+              {isAz
+                ? '2. Onlayn Kart və Beh (Depozit) Ödənişləri'
+                : '2. Online Card & Deposit Payments'}
+            </span>
+            <strong style={{ color: 'var(--success)' }}>{isAz ? 'Aktiv' : 'Active'}</strong>
           </div>
 
-          {isGatewayEnabled('payriff') ? (
-            <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ fontWeight: 600, fontSize: '0.92rem', marginBottom: '0.5rem' }}>
-                2. Payriff Payment Gateway
-              </div>
-              <div className="form-group" style={{ marginBottom: '0.6rem' }}>
-                <label className="form-label">Payriff Merchant ID</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Payriff Merchant ID"
-                  value={aiTone.payriff_merchant_id}
-                  onChange={(e) => setAiTone({ ...aiTone, payriff_merchant_id: e.target.value })}
-                />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Payriff Secret Key</label>
-                <input
-                  type="password"
-                  className="form-control"
-                  placeholder="Payriff Secret Key"
-                  value={aiTone.payriff_secret_key}
-                  onChange={(e) => setAiTone({ ...aiTone, payriff_secret_key: e.target.value })}
-                />
-              </div>
-            </div>
-          ) : (
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-              {isAz
-                ? '2. Payriff şlüzü hazırda Platforma Admini tərəfindən deaktiv edilib.'
-                : '2. Payriff Gateway is currently disabled by Platform Admin.'}
-            </div>
-          )}
-
-          {isGatewayEnabled('paymegate') ? (
-            <div>
-              <div style={{ fontWeight: 600, fontSize: '0.92rem', marginBottom: '0.35rem' }}>
-                3. Paymegate Payment Gateway (paymegate.com)
-              </div>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.6rem' }}>
-                {isAz ? (
-                  <>
-                    Rəsmi <code>https://api.paymegate.com/v1/orders</code> üzərindən <code>X-API-Key</code> ilə işləyir və{' '}
-                    <code>order.paid</code> webhook-unu avtomatik qeydiyyata alır.
-                  </>
-                ) : (
-                  <>
-                    Uses tenant-isolated <code>X-API-Key</code> authentication via{' '}
-                    <code>https://api.paymegate.com/v1/orders</code> and auto-registers your <code>order.paid</code> webhook.
-                  </>
-                )}
-              </p>
-              <div className="form-group" style={{ marginBottom: '0.6rem' }}>
-                <label className="form-label">Paymegate Merchant API Key (X-API-Key)</label>
-                <input
-                  type="password"
-                  className="form-control"
-                  placeholder="Paymegate X-API-Key"
-                  value={aiTone.paymegate_api_key}
-                  onChange={(e) => setAiTone({ ...aiTone, paymegate_api_key: e.target.value })}
-                />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">
-                  {isAz ? 'Paymegate Webhook Secret (İstəyə bağlı)' : 'Paymegate Webhook Secret (Optional)'}
-                </label>
-                <input
-                  type="password"
-                  className="form-control"
-                  placeholder="HMAC webhook secret"
-                  value={aiTone.paymegate_webhook_secret}
-                  onChange={(e) => setAiTone({ ...aiTone, paymegate_webhook_secret: e.target.value })}
-                />
-              </div>
-            </div>
-          ) : (
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              {isAz
-                ? '3. Paymegate şlüzü hazırda Platforma Admini tərəfindən deaktiv edilib.'
-                : '3. Paymegate Gateway is currently disabled by Platform Admin.'}
-            </div>
-          )}
+          <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+            {isAz
+              ? 'Bütün nağd və onlayn kart əməliyyatları avtomatik olaraq "Ödənişlər və Gəlir" jurnalında qeydə alınır.'
+              : 'All cash and online card transactions are automatically recorded in your Payments & Revenue ledger.'}
+          </div>
         </div>
 
         {/* 3. WhatsApp Onboarding (Default Package) */}
@@ -440,7 +353,7 @@ const Settings = () => {
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>
             {isAz
               ? 'Bütün paketlərə daxildir. Biznes WhatsApp nömrənizi 1 QR skanla birbaşa AI resepşnə qoşun.'
-              : 'Included in all plans. Pair your business WhatsApp number in 1 scan via our internal Evolution API engine.'}
+              : 'Included in all plans. Pair your business WhatsApp number in 1 QR scan directly to your AI receptionist.'}
           </p>
           <ol
             style={{
@@ -642,18 +555,12 @@ const Settings = () => {
           ) : (
             <>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', marginBottom: '0.75rem' }}>
-                {isAz ? (
-                  <>
-                    Telegram-da <strong>@BotFather</strong> açın, <code>/newbot</code> göndərin və aldığınız HTTP API Tokeni aşağıya yapışdırın. Sistem Webhook-u avtomatik qeydiyyata alır.
-                  </>
-                ) : (
-                  <>
-                    Open <strong>@BotFather</strong> on Telegram, send <code>/newbot</code>, and paste the HTTP API Token below. We automatically register the webhook for you.
-                  </>
-                )}
+                {isAz
+                  ? 'Telegram botunuzun giriş açarını (Bot Token) aşağıya daxil edin. Sistem botunuzu avtomatik olaraq canlı randevu rejiminə qoşur.'
+                  : 'Paste your Telegram Bot token below. We automatically connect and activate your live booking bot.'}
               </p>
               <div className="form-group">
-                <label className="form-label">Telegram Bot Token (@BotFather)</label>
+                <label className="form-label">{isAz ? 'Telegram Bot Giriş Açarı (Token)' : 'Telegram Bot Token'}</label>
                 <input
                   type="password"
                   className="form-control"
@@ -797,16 +704,16 @@ const Settings = () => {
             {isQrLoading ? (
               <div style={{ padding: '2.5rem 0' }}>
                 <RefreshCw size={32} color="var(--primary)" style={{ marginBottom: '1rem' }} />
-                <p>{isAz ? 'Evolution API ilə əlaqə qurulur...' : 'Connecting to Evolution API...'}</p>
+                <p>{isAz ? 'WhatsApp bağlantısı yoxlanılır...' : 'Checking WhatsApp connection...'}</p>
               </div>
             ) : whatsappState.status === 'connected' ? (
               <div style={{ padding: '2rem 0', color: 'var(--success)' }}>
                 <CheckCircle2 size={42} style={{ marginBottom: '0.75rem' }} />
                 <div style={{ fontWeight: 600 }}>
-                  {isAz ? 'WhatsApp Nömrəsi Qoşulub' : 'WhatsApp Instance Connected'}
+                  {isAz ? 'WhatsApp Nömrəsi Qoşulub' : 'WhatsApp Number Connected'}
                 </div>
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                  Instance: {whatsappState.instance_name}
+                  {whatsappState.instance_name}
                 </div>
               </div>
             ) : whatsappState.qr_code_data_url ? (
@@ -832,7 +739,7 @@ const Settings = () => {
             ) : (
               <div style={{ padding: '1.5rem 0', color: 'var(--warning)' }}>
                 <p style={{ margin: 0 }}>
-                  Evolution API status: <strong>{whatsappState.status}</strong>
+                  {isAz ? 'WhatsApp statusu:' : 'WhatsApp status:'} <strong>{whatsappState.status}</strong>
                 </p>
                 {whatsappState.detail && (
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>

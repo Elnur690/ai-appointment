@@ -106,19 +106,12 @@ async def log_payment(
     user: Annotated[dict[str, Any], Depends(get_current_active_user)],
     business_id: Annotated[str, Depends(get_business_context)],
 ):
-    """Log a payment in PostgreSQL (validating against platform-enabled gateways)."""
+    """Log a payment in PostgreSQL (all payment methods enabled)."""
     method_str = (payment.method or "cash").lower().strip()
-    if method_str == "paymengate":
+    if method_str in {"paymengate", "online", "card"}:
         method_str = "paymegate"
     if method_str not in {"cash", "payriff", "paymegate", "epoint"}:
         method_str = "cash"
-
-    gateways = await _get_platform_gateways(db)
-    if method_str in gateways and not gateways[method_str].get("enabled", True):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Payment gateway '{method_str}' is currently disabled by platform administrator.",
-        )
 
     row = Payment(
         business_id=UUID(business_id),

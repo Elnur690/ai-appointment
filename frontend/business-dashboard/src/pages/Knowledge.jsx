@@ -41,8 +41,8 @@ const Knowledge = () => {
   const columns = [
     { header: isAz ? 'Mövzu / Başlıq' : 'Knowledge Title', accessor: 'title' },
     { header: isAz ? 'Kateqoriya' : 'Type', accessor: 'type' },
-    { header: isAz ? 'Məzmun (Vektor Yaddaş)' : 'Vectorized Content', accessor: 'content' },
-    { header: isAz ? 'RAG Statusu' : 'RAG Status', accessor: 'status' },
+    { header: isAz ? 'Məzmun / Cavab' : 'Knowledge Content', accessor: 'content' },
+    { header: isAz ? 'Status' : 'Status', accessor: 'status' },
     {
       header: isAz ? 'Sil' : 'Actions',
       cell: (row) => (
@@ -64,13 +64,13 @@ const Knowledge = () => {
         <div>
           <h2>
             {isAz
-              ? 'RAG Bilik Bazası və "Səhvlərdən Öyrənmə"'
-              : 'RAG Knowledge Base & "Learn from Mistakes"'}
+              ? 'Biznes Məlumat Bazası və AI Təlimatları'
+              : 'Business Knowledge Base & AI Instructions'}
           </h2>
           <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
             {isAz
-              ? 'Süni intellekt resepşnin müştəri suallarına dəqiq cavab verməsi üçün PostgreSQL pgvector yaddaş qeydləri.'
-              : 'PostgreSQL pgvector knowledge entries used by your AI receptionist to answer business-specific questions accurately.'}
+              ? 'Süni intellekt resepşnin müştəri suallarına dəqiq cavab verməsi üçün biznesinizə aid sual-cavab və qayda qeydləri.'
+              : 'Business-specific rules, FAQs, and answers used by your AI receptionist to assist clients accurately.'}
           </p>
         </div>
         <button type="button" className="btn btn-primary" onClick={() => setIsModalOpen(true)}>

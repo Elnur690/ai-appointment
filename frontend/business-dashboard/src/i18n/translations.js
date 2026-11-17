@@ -7,11 +7,18 @@ export const PLAN_FEATURE_KEYS = [
     en: 'WhatsApp Business AI Receptionist (1-Scan QR Pairing)',
   },
   {
+    key: 'allows_online_payments',
+    tier: 'starter',
+    defaultIncluded: true,
+    az: 'Nağd və Onlayn Kart Ödənişləri (Bütün Paketlərdə Aktiv)',
+    en: 'Cash & Online Card Payments (Enabled in All Plans)',
+  },
+  {
     key: 'allows_rag_knowledge',
     tier: 'starter',
     defaultIncluded: true,
-    az: 'PostgreSQL pgvector RAG Bilik Bazası və Avtomatik Xatırlatmalar (24s / 2s)',
-    en: 'PostgreSQL pgvector RAG Knowledge Base & Automated Reminders (24h / 2h)',
+    az: 'Ağıllı Biznes Yaddaşı, Daxili Qaydalar və Avtomatik Xatırlatmalar (24s / 2s)',
+    en: 'Smart Business Knowledge Base & Automated Reminders (24h / 2h)',
   },
   {
     key: 'allows_instagram',
@@ -22,26 +29,20 @@ export const PLAN_FEATURE_KEYS = [
   {
     key: 'allows_telegram',
     tier: 'pro',
-    az: 'Telegram Bot (@BotFather) AI Resepşn İnteqrasiyası',
-    en: 'Telegram Bot (@BotFather) AI Receptionist Integration',
+    az: 'Telegram AI Resepşn İnteqrasiyası',
+    en: 'Telegram AI Receptionist Integration',
   },
   {
     key: 'allows_voice_messages',
     tier: 'pro',
-    az: 'WhatsApp Səsli Mesajların Tanınması və Avtomatik Randevu',
-    en: 'WhatsApp Voice Note Transcription & Automated Booking',
-  },
-  {
-    key: 'allows_online_payments',
-    tier: 'pro',
-    az: 'Onlayn Ödəniş Şlüzləri (Payriff və Paymegate İnteqrasiyası)',
-    en: 'Online Payment Gateways (Payriff & Paymegate Integration)',
+    az: 'WhatsApp Səsli Mesajların Anlaşılması və Avtomatik Randevu',
+    en: 'WhatsApp Voice Note Understanding & Automated Booking',
   },
   {
     key: 'allows_no_show_deposits',
     tier: 'pro',
-    az: 'AI Gəlməmə (No-Show) Qorunması və Avtomatik Beh (Depozit)',
-    en: 'AI No-Show Protection & Automated Deposit Links',
+    az: 'Gəlməmə (No-Show) Qorunması və Avtomatik Beh (Depozit) Tələbi',
+    en: 'No-Show Protection & Automated Deposit Collection',
   },
   {
     key: 'allows_shift_management',
@@ -52,14 +53,14 @@ export const PLAN_FEATURE_KEYS = [
   {
     key: 'allows_cadence_engine',
     tier: 'pro',
-    az: 'Proqnozlaşdırıcı Təkrar Müraciət Mühərriki (Cadence Engine)',
-    en: 'Predictive Repeat-Visit Rebooking Engine (Cadence Engine)',
+    az: 'Proqnozlaşdırıcı Təkrar Müraciət Xatırlatması',
+    en: 'Predictive Repeat-Visit Rebooking Reminders',
   },
   {
     key: 'allows_flash_drops',
     tier: 'pro',
     az: 'Son Dəqiqə Endirimləri (Flash Drops) və Ağıllı Gözləmə Siyahısı',
-    en: 'Last-Minute Flash Drops & Smart Waitlist Monetization',
+    en: 'Last-Minute Flash Drops & Smart Waitlist',
   },
   {
     key: 'allows_gift_vouchers',
@@ -88,7 +89,7 @@ export const PLAN_FEATURE_KEYS = [
   {
     key: 'allows_winback_campaigns',
     tier: 'pro',
-    az: 'Avtomatik İtirilmiş Müştəriləri Qaytarma (Win-Back) Kampaniyası',
+    az: 'Avtomatik İtirilmiş Müştəriləri Qaytarma Kampaniyası',
     en: 'Automated Customer Win-Back Campaigns',
   },
   {
@@ -106,14 +107,14 @@ export const PLAN_FEATURE_KEYS = [
   {
     key: 'allows_geo_routing',
     tier: 'pro',
-    az: 'Konum (Geo-Location) ilə Ən Yaxın Filiala Avtomatik Yönləndirmə',
-    en: 'Geo-Location Nearest Branch Auto-Routing',
+    az: 'Konum ilə Ən Yaxın Filiala Avtomatik Yönləndirmə',
+    en: 'Location-Based Nearest Branch Auto-Routing',
   },
   {
     key: 'allows_custom_domain',
     tier: 'enterprise',
-    az: 'Şəxsi Domen (White-Label CNAME: cname.randevu.vip)',
-    en: 'White-Label Custom CNAME Domain (cname.randevu.vip)',
+    az: 'Şəxsi Domen (White-Label: Öz Brend Domeniniz)',
+    en: 'White-Label Custom Domain (Your Own Brand Domain)',
   },
   {
     key: 'allows_branch_level_ai_tone',
@@ -148,8 +149,8 @@ export const PLAN_FEATURE_KEYS = [
   {
     key: 'allows_discovery',
     tier: 'enterprise',
-    az: 'Ümumi Biznes Kəşfiyyat Kataloqunda (Marketplace) Öncəlik',
-    en: 'Priority Public Marketplace & Business Discovery Listing',
+    az: 'Ümumi Biznes Kataloqunda Öncəlikli Görünmə',
+    en: 'Priority Public Business Directory Listing',
   },
 ];
 
@@ -164,9 +165,6 @@ export const getPlanFeatureItems = (plan, lang = 'az', onlyIncluded = true) => {
   );
   const branches = Number(plan.max_branches || (isEnterprise ? 20 : isPro ? 3 : 1));
   const waNumbers = Number(plan.max_whatsapp_numbers || (isEnterprise ? 20 : isPro ? 3 : 1));
-  const assignedModel =
-    plan.features?.assigned_model ||
-    (isEnterprise ? 'gpt-4o' : isPro ? 'claude-3-7-sonnet' : 'gemini-3.5-flash');
 
   const limits = [
     {
@@ -193,24 +191,10 @@ export const getPlanFeatureItems = (plan, lang = 'az', onlyIncluded = true) => {
         ? `${waNumbers} WhatsApp Biznes xətti`
         : `Up to ${waNumbers} WhatsApp Business line(s)`,
     },
-    {
-      key: 'cash_payment',
-      included: true,
-      label: isAz
-        ? 'Nağd Ödəniş və Gəlir Uçotu Jurnalı (Standart)'
-        : 'Cash Payment & Revenue Ledger (Included)',
-    },
-    {
-      key: 'ai_model',
-      included: true,
-      label: isAz ? `AI Model Mühərriki: ${assignedModel}` : `AI Model Engine: ${assignedModel}`,
-    },
   ];
 
-  // Check if DB row had all false flags from an older schema seed
   const hasExplicitDbFlags =
     Boolean(plan.allows_voice_messages) ||
-    Boolean(plan.allows_online_payments) ||
     Boolean(plan.allows_custom_domain) ||
     Boolean(plan.allows_instagram) ||
     Boolean(plan.allows_telegram);
@@ -227,7 +211,6 @@ export const getPlanFeatureItems = (plan, lang = 'az', onlyIncluded = true) => {
           ? Boolean(plan.allows_telegram || plan.allows_omnichannel_messaging)
           : Boolean(plan[item.key]);
     } else {
-      // Fallback to tier defaults if DB row wasn't migrated yet
       if (isEnterprise) {
         val = true;
       } else if (isPro) {
@@ -259,7 +242,7 @@ export const UI_TEXT = {
       services: 'Xidmətlər',
       customers: 'Müştərilər',
       conversations: 'Mesajlar (AI Chat)',
-      knowledge: 'Bilik Bazası (RAG)',
+      knowledge: 'Biznes Məlumat Bazası',
       payments: 'Ödənişlər',
       settings: 'Tənzimləmələr',
       logout: 'Çıxış',
@@ -269,7 +252,7 @@ export const UI_TEXT = {
       signInTab: 'Daxil Ol',
       registerTab: 'Qeydiyyat / Pulsuz Sınaq',
       registerBusinessBtn: 'Biznes Qeydiyyatı',
-      heroBadge: 'İstənilən Xidmət və Randevu Biznesi üçün 24/7 AI Автоmatlaşdırma Platforması',
+      heroBadge: 'İstənilən Xidmət və Randevu Biznesi üçün 24/7 AI Avtomatlaşdırma Platforması',
       heroTitle: 'WhatsApp, Instagram və Telegram-da Bütün Randevuları Avtomatlaşdırın',
       heroDesc:
         'Randevu.vip tibb mərkəzləri, klinikalar, gözəllik və sağlamlıq mərkəzləri, tədris, konsaltinq, avtoservis və bütün randevu əsaslı bizneslər üçün WhatsApp, Instagram Direct və Telegram mesajlarını 24/7 ağıllı rezervasiya sisteminə çevirir.',
@@ -277,10 +260,10 @@ export const UI_TEXT = {
       card1Desc: 'Mətn və səsli mesajlara 4 dildə ani cavab və istənilən an canlı operatora keçid.',
       card2Title: 'Sıfır Üst-Üstə Düşmə',
       card2Desc: 'Canlı əməkdaş cədvəli, fasilələr və 24s / 2s avtomatik xatırlatmalar.',
-      card3Title: 'Nağd, Payriff və Paymegate',
-      card3Desc: 'Gəlməmə (No-Show) qorunması üçün avtomatlaşdırılmış onlayn beh və ödəniş uçotu.',
+      card3Title: 'Nağd və Onlayn Ödənişlər',
+      card3Desc: 'Gəlməmə (No-Show) qorunması üçün avtomatlaşdırılmış onlayn beh və gəlir uçotu.',
       card4Title: 'Şəxsi Domen (White-Label)',
-      card4Desc: 'Öz domeninizi CNAME ilə cname.randevu.vip ünvanına yönləndirin.',
+      card4Desc: 'Öz brend domeninizi birbaşa randevu səhifənizə qoşun.',
       welcomeBack: 'Xoş Gəlmisiniz',
       signInSubtitle: 'Randevuları, komandanızı və AI köməkçinizi idarə etmək üçün daxil olun.',
       emailLabel: 'E-poçt Ünvanı',
@@ -335,10 +318,10 @@ export const UI_TEXT = {
       card1Desc: 'Instant text & voice note replies in 4 languages with 1-click human takeover.',
       card2Title: 'Zero Double-Bookings',
       card2Desc: 'Real-time team availability, buffer times, and automated 24h/2h reminders.',
-      card3Title: 'Cash, Payriff & Paymegate',
+      card3Title: 'Cash & Online Payments',
       card3Desc: 'Automated online deposit links for no-show protection and full revenue tracking.',
       card4Title: 'White-Label Domain',
-      card4Desc: 'Connect your own domain via CNAME to cname.randevu.vip.',
+      card4Desc: 'Connect your own brand domain directly to your booking portal.',
       welcomeBack: 'Welcome Back',
       signInSubtitle: 'Sign in to manage your appointments, team schedules, and AI receptionist.',
       emailLabel: 'Email Address',
