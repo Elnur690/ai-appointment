@@ -53,6 +53,7 @@ async def init_db() -> None:
         logger.warning(f"create_all check skipped or completed by another worker: {exc}")
 
     alter_statements = [
+        "ALTER TYPE paymentmethod ADD VALUE IF NOT EXISTS 'paymegate';",
         "ALTER TYPE paymentmethod ADD VALUE IF NOT EXISTS 'paymengate';",
         "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminder_24h_sent_at TIMESTAMP WITH TIME ZONE;",
         "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminder_2h_sent_at TIMESTAMP WITH TIME ZONE;",

@@ -7,7 +7,7 @@ from sqlalchemy import select, and_
 from app.models.payment import Payment, PaymentGatewayConfig, PaymentMethod, PaymentStatus
 from app.models.appointment import Appointment, AppointmentStatus
 from app.integrations.payments.payriff import PayriffAdapter
-from app.integrations.payments.paymengate import PaymenGateAdapter
+from app.integrations.payments.paymegate import PaymegateAdapter
 from app.integrations.payments.epoint import EpointAdapter
 from app.integrations.payments.adapter import PaymentAdapter, PaymentLinkResult
 
@@ -15,33 +15,34 @@ logger = logging.getLogger(__name__)
 
 
 class PaymentService:
-    """Manages cash payments and online payment gateway processing (Payriff & PaymenGate)."""
+    """Manages cash payments and online payment gateway processing (Payriff & Paymegate)."""
 
     def __init__(self, db: AsyncSession, business_id: UUID):
         self.db = db
         self.business_id = business_id
         self.payriff_adapter = PayriffAdapter()
-        self.paymengate_adapter = PaymenGateAdapter()
+        self.paymegate_adapter = PaymegateAdapter()
         self.epoint_adapter = EpointAdapter()
 
     def _get_adapter(self, provider: str) -> PaymentAdapter:
         norm = provider.lower().strip()
         if norm == "payriff":
             return self.payriff_adapter
-        if norm == "paymengate":
-            return self.paymengate_adapter
+        if norm in {"paymegate", "paymengate"}:
+            return self.paymegate_adapter
         return self.epoint_adapter
 
     async def get_gateway_config(self, provider: str) -> PaymentGatewayConfig | None:
+        norm = "paymegate" if provider.lower().strip() in {"paymegate", "paymengate"} else provider.lower().strip()
         stmt = select(PaymentGatewayConfig).where(
             and_(
                 PaymentGatewayConfig.business_id == self.business_id,
-                PaymentGatewayConfig.provider == provider.lower(),
+                PaymentGatewayConfig.provider.in_([norm, "paymengate"] if norm == "paymegate" else [norm]),
                 PaymentGatewayConfig.is_active.is_(True),
             )
         )
         result = await self.db.execute(stmt)
-        return result.scalar_one_or_none()
+        return result.scalars().first()
 
     async def create_online_checkout(
         self,

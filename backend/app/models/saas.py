@@ -21,10 +21,10 @@ DEFAULT_PLATFORM_GATEWAYS = {
         "enabled": True,
         "requires_credentials": True,
     },
-    "paymengate": {
-        "provider": "paymengate",
-        "name": "PaymenGate Payment Gateway",
-        "description": "Online payment processing, deposits, and multi-currency card checkout via PaymenGate.",
+    "paymegate": {
+        "provider": "paymegate",
+        "name": "Paymegate Payment Gateway",
+        "description": "Online card & crypto checkout via official Paymegate Merchant API v1 (api.paymegate.com).",
         "enabled": True,
         "requires_credentials": True,
     },

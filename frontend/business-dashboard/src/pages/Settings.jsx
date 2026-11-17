@@ -35,7 +35,7 @@ const Settings = () => {
   const [platformGateways, setPlatformGateways] = useState([
     { provider: 'cash', name: 'Cash Payment', enabled: true },
     { provider: 'payriff', name: 'Payriff Payment Gateway', enabled: true },
-    { provider: 'paymengate', name: 'PaymenGate Payment Gateway', enabled: true },
+    { provider: 'paymegate', name: 'Paymegate Payment Gateway', enabled: true },
   ]);
 
   const [customDomain, setCustomDomain] = useState('');
@@ -56,9 +56,8 @@ const Settings = () => {
     custom_instructions: '',
     payriff_merchant_id: '',
     payriff_secret_key: '',
-    paymengate_merchant_id: '',
-    paymengate_api_key: '',
-    paymengate_secret_key: '',
+    paymegate_api_key: '',
+    paymegate_webhook_secret: '',
     instagram_page_id: '',
     instagram_access_token: '',
     instagram_verify_token: 'randevu_ig_verify',
@@ -95,9 +94,8 @@ const Settings = () => {
           custom_instructions: s.custom_instructions || '',
           payriff_merchant_id: s.payriff_merchant_id || '',
           payriff_secret_key: s.payriff_secret_key || '',
-          paymengate_merchant_id: s.paymengate_merchant_id || '',
-          paymengate_api_key: s.paymengate_api_key || '',
-          paymengate_secret_key: s.paymengate_secret_key || '',
+          paymegate_api_key: s.paymegate_api_key || s.paymengate_api_key || '',
+          paymegate_webhook_secret: s.paymegate_webhook_secret || s.paymengate_secret_key || '',
           instagram_page_id: s.instagram_page_id || '',
           instagram_access_token: s.instagram_access_token || '',
           instagram_verify_token: s.instagram_verify_token || 'randevu_ig_verify',
@@ -111,7 +109,9 @@ const Settings = () => {
   }, []);
 
   const isGatewayEnabled = (provider) => {
-    const found = platformGateways.find((g) => g.provider === provider);
+    const found = platformGateways.find(
+      (g) => g.provider === provider || (provider === 'paymegate' && g.provider === 'paymengate')
+    );
     return found ? Boolean(found.enabled) : true;
   };
 
@@ -340,45 +340,38 @@ const Settings = () => {
             </div>
           )}
 
-          {isGatewayEnabled('paymengate') ? (
+          {isGatewayEnabled('paymegate') ? (
             <div>
-              <div style={{ fontWeight: 600, fontSize: '0.92rem', marginBottom: '0.5rem' }}>
-                3. PaymenGate Payment Gateway
+              <div style={{ fontWeight: 600, fontSize: '0.92rem', marginBottom: '0.35rem' }}>
+                3. Paymegate Payment Gateway (paymegate.com)
               </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.6rem' }}>
+                Uses tenant-isolated <code>X-API-Key</code> authentication via <code>https://api.paymegate.com/v1/orders</code> and auto-registers your <code>order.paid</code> webhook.
+              </p>
               <div className="form-group" style={{ marginBottom: '0.6rem' }}>
-                <label className="form-label">PaymenGate Merchant ID</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Enter your PaymenGate Merchant ID"
-                  value={aiTone.paymengate_merchant_id}
-                  onChange={(e) => setAiTone({ ...aiTone, paymengate_merchant_id: e.target.value })}
-                />
-              </div>
-              <div className="form-group" style={{ marginBottom: '0.6rem' }}>
-                <label className="form-label">PaymenGate API Key</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Enter your PaymenGate API Key"
-                  value={aiTone.paymengate_api_key}
-                  onChange={(e) => setAiTone({ ...aiTone, paymengate_api_key: e.target.value })}
-                />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">PaymenGate Secret Key</label>
+                <label className="form-label">Paymegate Merchant API Key (X-API-Key)</label>
                 <input
                   type="password"
                   className="form-control"
-                  placeholder="Enter your PaymenGate Secret Key"
-                  value={aiTone.paymengate_secret_key}
-                  onChange={(e) => setAiTone({ ...aiTone, paymengate_secret_key: e.target.value })}
+                  placeholder="Enter your live Paymegate X-API-Key"
+                  value={aiTone.paymegate_api_key}
+                  onChange={(e) => setAiTone({ ...aiTone, paymegate_api_key: e.target.value })}
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Paymegate Webhook Secret (Optional)</label>
+                <input
+                  type="password"
+                  className="form-control"
+                  placeholder="Optional HMAC signing secret for webhook verification"
+                  value={aiTone.paymegate_webhook_secret}
+                  onChange={(e) => setAiTone({ ...aiTone, paymegate_webhook_secret: e.target.value })}
                 />
               </div>
             </div>
           ) : (
             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              3. PaymenGate Gateway is currently disabled by Platform Admin.
+              3. Paymegate Gateway is currently disabled by Platform Admin.
             </div>
           )}
         </div>

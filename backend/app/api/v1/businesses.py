@@ -99,7 +99,9 @@ def _build_business_response(biz: Business) -> BusinessResponse:
 
 
 async def _sync_gateway_configs(db: AsyncSession, biz_uuid: UUID, cfg: dict[str, Any]) -> None:
-    """Sync Payriff and PaymenGate credentials into PaymentGatewayConfig table."""
+    """Sync Payriff and Paymegate credentials into PaymentGatewayConfig table and register Paymegate webhook."""
+    from app.integrations.payments.paymegate import PaymegateAdapter
+
     payriff_mid = (cfg.get("payriff_merchant_id") or "").strip()
     payriff_sec = (cfg.get("payriff_secret_key") or "").strip()
     if payriff_mid:
@@ -125,19 +127,18 @@ async def _sync_gateway_configs(db: AsyncSession, biz_uuid: UUID, cfg: dict[str,
                 )
             )
 
-    pmg_mid = (cfg.get("paymengate_merchant_id") or "").strip()
-    pmg_key = (cfg.get("paymengate_api_key") or "").strip()
-    pmg_sec = (cfg.get("paymengate_secret_key") or "").strip()
-    if pmg_mid or pmg_key:
+    pmg_key = (cfg.get("paymegate_api_key") or cfg.get("paymengate_api_key") or "").strip()
+    pmg_sec = (cfg.get("paymegate_webhook_secret") or cfg.get("paymengate_secret_key") or "").strip()
+    if pmg_key:
         existing_pmg = (
             await db.execute(
                 select(PaymentGatewayConfig).where(
                     PaymentGatewayConfig.business_id == biz_uuid,
-                    PaymentGatewayConfig.provider == "paymengate",
+                    PaymentGatewayConfig.provider == "paymegate",
                 )
             )
         ).scalar_one_or_none()
-        creds = {"merchant_id": pmg_mid, "api_key": pmg_key, "secret_key": pmg_sec}
+        creds = {"api_key": pmg_key, "webhook_secret": pmg_sec}
         if existing_pmg:
             existing_pmg.merchant_credentials = creds
             existing_pmg.is_active = True
@@ -145,11 +146,16 @@ async def _sync_gateway_configs(db: AsyncSession, biz_uuid: UUID, cfg: dict[str,
             db.add(
                 PaymentGatewayConfig(
                     business_id=biz_uuid,
-                    provider="paymengate",
+                    provider="paymegate",
                     merchant_credentials=creds,
                     is_active=True,
                 )
             )
+        try:
+            webhook_url = f"https://api.{settings.PLATFORM_DOMAIN}/api/v1/webhooks/payments/paymegate/{biz_uuid}"
+            await PaymegateAdapter().register_webhook(api_key=pmg_key, webhook_url=webhook_url)
+        except Exception:
+            pass
 
 
 @router.get("/", response_model=BusinessResponse)

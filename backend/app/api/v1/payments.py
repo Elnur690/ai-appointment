@@ -47,7 +47,8 @@ class RevenueSummaryResponse(BaseModel):
 GATEWAY_LABELS = {
     "cash": "Cash",
     "payriff": "Payriff",
-    "paymengate": "PaymenGate",
+    "paymegate": "Paymegate",
+    "paymengate": "Paymegate",
     "epoint": "EPoint",
 }
 
@@ -59,8 +60,12 @@ async def _get_platform_gateways(db: AsyncSession) -> dict[str, Any]:
     merged = {k: dict(v) for k, v in DEFAULT_PLATFORM_GATEWAYS.items()}
     if cfg and isinstance(cfg.payment_gateways, dict):
         for k, v in cfg.payment_gateways.items():
-            if k in merged and isinstance(v, dict):
-                merged[k].update(v)
+            norm_k = "paymegate" if k == "paymengate" else k
+            if norm_k in merged and isinstance(v, dict):
+                merged[norm_k].update(v)
+                merged[norm_k]["provider"] = norm_k
+                if norm_k == "paymegate":
+                    merged[norm_k]["name"] = "Paymegate Payment Gateway"
     return merged
 
 
@@ -103,7 +108,9 @@ async def log_payment(
 ):
     """Log a payment in PostgreSQL (validating against platform-enabled gateways)."""
     method_str = (payment.method or "cash").lower().strip()
-    if method_str not in {"cash", "payriff", "paymengate", "epoint"}:
+    if method_str == "paymengate":
+        method_str = "paymegate"
+    if method_str not in {"cash", "payriff", "paymegate", "epoint"}:
         method_str = "cash"
 
     gateways = await _get_platform_gateways(db)

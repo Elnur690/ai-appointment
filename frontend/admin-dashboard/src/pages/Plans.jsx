@@ -225,7 +225,7 @@ const Plans = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
                 <CreditCard size={16} color="var(--primary-start)" />
                 <span>
-                  Online Gateways (Payriff & PaymenGate):{' '}
+                  Online Gateways (Payriff & Paymegate):{' '}
                   <strong>{plan.allows_online_payments ? 'Enabled' : 'Cash Only'}</strong>
                 </span>
               </div>
@@ -331,7 +331,7 @@ const Plans = () => {
                 checked={newPlan.allows_online_payments}
                 onChange={(e) => setNewPlan({ ...newPlan, allows_online_payments: e.target.checked })}
               />
-              <span>Allow Online Payment Gateways (Payriff & PaymenGate)</span>
+              <span>Allow Online Payment Gateways (Payriff & Paymegate)</span>
             </label>
 
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', cursor: 'pointer' }}>

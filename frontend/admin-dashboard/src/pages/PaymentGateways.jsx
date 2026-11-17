@@ -5,6 +5,7 @@ import { CreditCard, Banknote, ShieldCheck, CheckCircle2, XCircle } from 'lucide
 const GATEWAY_ICONS = {
   cash: Banknote,
   payriff: CreditCard,
+  paymegate: ShieldCheck,
   paymengate: ShieldCheck,
 };
 

@@ -11,7 +11,7 @@ const Payments = () => {
   const [gateways, setGateways] = useState([
     { provider: 'cash', name: 'Cash Payment (At Venue)', enabled: true },
     { provider: 'payriff', name: 'Payriff Payment Gateway', enabled: true },
-    { provider: 'paymengate', name: 'PaymenGate Payment Gateway', enabled: true },
+    { provider: 'paymegate', name: 'Paymegate Payment Gateway', enabled: true },
   ]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState({ amount: '', currency: 'AZN', method: 'cash', status: 'paid', notes: '' });

@@ -28,9 +28,9 @@ export const useDataStore = create((set, get) => ({
       requires_credentials: true,
     },
     {
-      provider: 'paymengate',
-      name: 'PaymenGate Payment Gateway',
-      description: 'Online payment processing, deposits, and multi-currency card checkout via PaymenGate.',
+      provider: 'paymegate',
+      name: 'Paymegate Payment Gateway',
+      description: 'Online card & crypto checkout via official Paymegate Merchant API v1 (api.paymegate.com).',
       enabled: true,
       requires_credentials: true,
     },

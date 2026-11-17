@@ -226,8 +226,12 @@ async def _get_or_create_platform_config(db: AsyncSession) -> PlatformConfig:
         merged = {k: dict(v) for k, v in DEFAULT_PLATFORM_GATEWAYS.items()}
         if isinstance(cfg.payment_gateways, dict):
             for k, v in cfg.payment_gateways.items():
-                if k in merged and isinstance(v, dict):
-                    merged[k].update(v)
+                norm_k = "paymegate" if k == "paymengate" else k
+                if norm_k in merged and isinstance(v, dict):
+                    merged[norm_k].update(v)
+                    merged[norm_k]["provider"] = norm_k
+                    if norm_k == "paymegate":
+                        merged[norm_k]["name"] = "Paymegate Payment Gateway"
         cfg.payment_gateways = merged
     return cfg
 
@@ -237,9 +241,9 @@ async def list_platform_payment_gateways(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
-    """List all platform payment gateways (1. Cash, 2. Payriff, 3. PaymenGate) and their enabled status."""
+    """List all platform payment gateways (1. Cash, 2. Payriff, 3. Paymegate) and their enabled status."""
     cfg = await _get_or_create_platform_config(db)
-    order = ["cash", "payriff", "paymengate"]
+    order = ["cash", "payriff", "paymegate"]
     return [cfg.payment_gateways[k] for k in order if k in cfg.payment_gateways]
 
 
@@ -250,8 +254,10 @@ async def toggle_platform_payment_gateway(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
-    """Enable or disable a payment gateway platform-wide (cash, payriff, paymengate)."""
+    """Enable or disable a payment gateway platform-wide (cash, payriff, paymegate)."""
     prov = provider.lower().strip()
+    if prov == "paymengate":
+        prov = "paymegate"
     if prov not in DEFAULT_PLATFORM_GATEWAYS:
         raise HTTPException(status_code=404, detail=f"Unknown payment gateway: {provider}")
 
