@@ -1,5 +1,5 @@
 from app.models.base import Base
-from app.models.saas import SaasOwner, Plan
+from app.models.saas import SaasOwner, Plan, PlatformConfig, DEFAULT_PLATFORM_GATEWAYS
 from app.models.business import Business, BusinessOwner, Branch
 from app.models.staff import Staff, StaffSchedule, StaffService
 from app.models.service import Service
@@ -17,6 +17,8 @@ __all__ = [
     "Base",
     "SaasOwner",
     "Plan",
+    "PlatformConfig",
+    "DEFAULT_PLATFORM_GATEWAYS",
     "Reseller",
     "ResellerPayout",
     "Business",
@@ -48,4 +50,3 @@ __all__ = [
     "WaitlistEntry",
     "WaitlistStatus",
 ]
-

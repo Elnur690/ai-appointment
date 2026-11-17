@@ -1,13 +1,18 @@
 import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, Request, Header, HTTPException, Depends
+from uuid import UUID
+from fastapi import APIRouter, Request, Header, HTTPException, Depends, Query
+from fastapi.responses import PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.integrations.whatsapp.webhook_handler import WebhookHandler
+from app.integrations.whatsapp.webhook_handler import WebhookHandler, ParsedWebhookMessage
+from app.integrations.omnichannel.channel_handler import OmnichannelHandler
 from app.services.guardrail_service import GuardrailService
+from app.services.payment_service import PaymentService
 from app.models.business import Business, Branch
 from app.models.customer import Customer
 from app.models.conversation import Conversation, Message, MessageDirection
@@ -15,7 +20,79 @@ from app.models.conversation import Conversation, Message, MessageDirection
 logger = logging.getLogger(__name__)
 router = APIRouter()
 webhook_handler = WebhookHandler()
+omnichannel_handler = OmnichannelHandler()
 guardrail_service = GuardrailService()
+
+
+async def _persist_incoming_message(
+    db: AsyncSession,
+    biz: Business,
+    parsed: ParsedWebhookMessage,
+    guardrail_out_of_scope: bool,
+) -> Conversation | None:
+    """Persist Customer, Conversation, and inbound Message for any channel (WhatsApp, Instagram, Telegram)."""
+    if not parsed.sender_phone or parsed.is_group:
+        return None
+
+    branch = (await db.execute(select(Branch).where(Branch.business_id == biz.id))).scalars().first()
+    if not branch:
+        branch = Branch(business_id=biz.id, name="Main Branch", timezone="Asia/Baku", is_active=True)
+        db.add(branch)
+        await db.flush()
+
+    cust = (
+        await db.execute(
+            select(Customer).where(
+                Customer.business_id == biz.id,
+                Customer.phone_number == parsed.sender_phone,
+            )
+        )
+    ).scalar_one_or_none()
+    if not cust:
+        cust = Customer(
+            business_id=biz.id,
+            phone_number=parsed.sender_phone,
+            name=parsed.sender_name or parsed.sender_phone,
+        )
+        db.add(cust)
+        await db.flush()
+
+    conv = (
+        await db.execute(
+            select(Conversation).where(
+                Conversation.business_id == biz.id,
+                Conversation.customer_id == cust.id,
+            )
+        )
+    ).scalars().first()
+    if not conv:
+        conv = Conversation(
+            business_id=biz.id,
+            branch_id=branch.id,
+            customer_id=cust.id,
+            whatsapp_chat_jid=parsed.remote_jid,
+            ai_active=True,
+        )
+        db.add(conv)
+        await db.flush()
+
+    if guardrail_out_of_scope:
+        conv.ai_active = False
+
+    conv.last_message_at = datetime.now(timezone.utc)
+    if parsed.message_text:
+        db.add(
+            Message(
+                conversation_id=conv.id,
+                direction=MessageDirection.inbound,
+                sender_role="customer",
+                content=parsed.message_text,
+                message_type=parsed.message_type or "text",
+                whatsapp_message_id=parsed.message_id,
+            )
+        )
+    await db.flush()
+    return conv
 
 
 @router.post("/whatsapp")
@@ -24,13 +101,7 @@ async def evolution_webhook(
     apikey: str | None = Header(default=None),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Receive Evolution API webhooks from internal container network:
-    - Validates optional apikey header when provided
-    - Parses message using WebhookHandler
-    - Persists Customer, Conversation, and Message to PostgreSQL
-    - Runs GuardrailService out-of-scope evaluation and updates conversation takeover state
-    """
+    """Receive Evolution API WhatsApp webhooks."""
     if apikey and settings.EVOLUTION_API_KEY and apikey != settings.EVOLUTION_API_KEY:
         if settings.ENVIRONMENT == "prod":
             raise HTTPException(status_code=401, detail="Invalid Evolution API webhook key")
@@ -48,75 +119,200 @@ async def evolution_webhook(
             is_solo_business=False,
         )
 
-    # Persist incoming customer & message if a matching business exists in PostgreSQL
     try:
-        biz = (await db.execute(select(Business).where(Business.is_active == True))).scalars().first()
-        if biz and parsed.sender_phone and not parsed.is_group:
-            branch = (await db.execute(select(Branch).where(Branch.business_id == biz.id))).scalars().first()
-            if not branch:
-                branch = Branch(business_id=biz.id, name="Main Branch", timezone="Asia/Baku", is_active=True)
-                db.add(branch)
-                await db.flush()
-
-            cust = (
-                await db.execute(
-                    select(Customer).where(
-                        Customer.business_id == biz.id,
-                        Customer.phone_number == parsed.sender_phone,
-                    )
-                )
+        biz = None
+        if parsed.instance_name:
+            branch_match = (
+                await db.execute(select(Branch).where(Branch.whatsapp_instance_id == parsed.instance_name))
             ).scalar_one_or_none()
-            if not cust:
-                cust = Customer(
-                    business_id=biz.id,
-                    phone_number=parsed.sender_phone,
-                    name=parsed.sender_name or parsed.sender_phone,
-                )
-                db.add(cust)
-                await db.flush()
+            if branch_match:
+                biz = (
+                    await db.execute(select(Business).where(Business.id == branch_match.business_id))
+                ).scalar_one_or_none()
+        if not biz:
+            biz = (await db.execute(select(Business).where(Business.is_active == True))).scalars().first()
 
-            conv = (
-                await db.execute(
-                    select(Conversation).where(
-                        Conversation.business_id == biz.id,
-                        Conversation.customer_id == cust.id,
-                    )
-                )
-            ).scalars().first()
-            if not conv:
-                conv = Conversation(
-                    business_id=biz.id,
-                    branch_id=branch.id,
-                    customer_id=cust.id,
-                    whatsapp_chat_jid=parsed.remote_jid,
-                    ai_active=True,
-                )
-                db.add(conv)
-                await db.flush()
-
-            if guardrail_result and guardrail_result.is_out_of_scope:
-                conv.ai_active = False
-
-            conv.last_message_at = datetime.now(timezone.utc)
-            if parsed.message_text:
-                db.add(
-                    Message(
-                        conversation_id=conv.id,
-                        direction=MessageDirection.inbound,
-                        sender_role="customer",
-                        content=parsed.message_text,
-                        message_type="text",
-                        whatsapp_message_id=parsed.message_id,
-                    )
-                )
-            await db.flush()
+        if biz:
+            await _persist_incoming_message(
+                db=db,
+                biz=biz,
+                parsed=parsed,
+                guardrail_out_of_scope=bool(guardrail_result and guardrail_result.is_out_of_scope),
+            )
     except Exception as exc:
-        logger.warning(f"Webhook persistence skipped: {exc}")
+        logger.warning(f"WhatsApp webhook persistence skipped: {exc}")
 
     return {
         "status": "ok",
+        "channel": "whatsapp",
         "instance": parsed.instance_name,
         "sender_phone": parsed.sender_phone,
         "is_group": parsed.is_group,
         "out_of_scope": guardrail_result.is_out_of_scope if guardrail_result else False,
     }
+
+
+@router.get("/instagram")
+async def verify_instagram_webhook(
+    hub_mode: str | None = Query(default=None, alias="hub.mode"),
+    hub_verify_token: str | None = Query(default=None, alias="hub.verify_token"),
+    hub_challenge: str | None = Query(default=None, alias="hub.challenge"),
+):
+    """Meta Graph API Webhook Verification endpoint for Instagram Direct."""
+    if hub_mode == "subscribe" and hub_challenge:
+        return PlainTextResponse(content=str(hub_challenge), status_code=200)
+    raise HTTPException(status_code=403, detail="Webhook verification failed")
+
+
+@router.post("/instagram")
+async def instagram_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Receive Instagram Direct Messages from Meta Graph API."""
+    payload = await request.json()
+    parsed = omnichannel_handler.parse_meta_webhook(payload, channel="instagram")
+    if not parsed:
+        return {"status": "ignored", "channel": "instagram"}
+
+    guardrail_result = None
+    if parsed.message_text:
+        guardrail_result = guardrail_service.evaluate_message(
+            message_text=parsed.message_text,
+            language="az",
+            is_solo_business=False,
+        )
+
+    try:
+        recipient_page_id = parsed.instance_name.replace("instagram_instance_", "")
+        stmt = select(Business).where(Business.is_active == True).options(selectinload(Business.plan))
+        businesses = (await db.execute(stmt)).scalars().all()
+        matched_biz = None
+        for b in businesses:
+            cfg = b.default_ai_tone_config or {}
+            if cfg.get("instagram_page_id") and str(cfg.get("instagram_page_id")) == recipient_page_id:
+                matched_biz = b
+                break
+        if not matched_biz and businesses:
+            matched_biz = businesses[0]
+
+        if matched_biz:
+            plan = matched_biz.plan
+            ig_allowed = bool(
+                not plan
+                or getattr(plan, "allows_instagram", False)
+                or getattr(plan, "allows_omnichannel_messaging", False)
+            )
+            if not ig_allowed:
+                return {"status": "plan_disabled", "channel": "instagram"}
+
+            await _persist_incoming_message(
+                db=db,
+                biz=matched_biz,
+                parsed=parsed,
+                guardrail_out_of_scope=bool(guardrail_result and guardrail_result.is_out_of_scope),
+            )
+    except Exception as exc:
+        logger.warning(f"Instagram webhook persistence skipped: {exc}")
+
+    return {"status": "ok", "channel": "instagram", "sender": parsed.sender_phone}
+
+
+@router.post("/telegram/{business_id}")
+@router.post("/telegram")
+async def telegram_webhook(
+    request: Request,
+    business_id: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Receive Telegram Bot updates for a specific business or default active business."""
+    payload = await request.json()
+    parsed = omnichannel_handler.parse_telegram_webhook(payload, business_id=business_id or "default")
+    if not parsed:
+        return {"status": "ignored", "channel": "telegram"}
+
+    guardrail_result = None
+    if parsed.message_text:
+        guardrail_result = guardrail_service.evaluate_message(
+            message_text=parsed.message_text,
+            language="az",
+            is_solo_business=False,
+        )
+
+    try:
+        matched_biz = None
+        if business_id:
+            try:
+                biz_uuid = UUID(str(business_id))
+                stmt = select(Business).where(Business.id == biz_uuid).options(selectinload(Business.plan))
+                matched_biz = (await db.execute(stmt)).scalar_one_or_none()
+            except ValueError:
+                matched_biz = None
+
+        if not matched_biz:
+            stmt = select(Business).where(Business.is_active == True).options(selectinload(Business.plan))
+            matched_biz = (await db.execute(stmt)).scalars().first()
+
+        if matched_biz:
+            plan = matched_biz.plan
+            tg_allowed = bool(
+                not plan
+                or getattr(plan, "allows_telegram", False)
+                or getattr(plan, "allows_omnichannel_messaging", False)
+            )
+            if not tg_allowed:
+                return {"status": "plan_disabled", "channel": "telegram"}
+
+            conv = await _persist_incoming_message(
+                db=db,
+                biz=matched_biz,
+                parsed=parsed,
+                guardrail_out_of_scope=bool(guardrail_result and guardrail_result.is_out_of_scope),
+            )
+            cfg = matched_biz.default_ai_tone_config or {}
+            bot_token = cfg.get("telegram_bot_token")
+            if bot_token and conv and conv.ai_active and parsed.message_text:
+                reply_text = (
+                    f"Salam! {matched_biz.name} AI köməkçisinə xoş gəlmisiniz. "
+                    f"Mesajınız qeydə alındı: '{parsed.message_text}'. Hansı xidmət və saat üçün randevu istərdiniz?"
+                )
+                sent = await omnichannel_handler.send_telegram_message(
+                    bot_token=bot_token,
+                    chat_id=parsed.sender_phone,
+                    text=reply_text,
+                )
+                if sent:
+                    db.add(
+                        Message(
+                            conversation_id=conv.id,
+                            direction=MessageDirection.outbound,
+                            sender_role="ai",
+                            content=reply_text,
+                            message_type="text",
+                        )
+                    )
+                    await db.flush()
+    except Exception as exc:
+        logger.warning(f"Telegram webhook persistence skipped: {exc}")
+
+    return {"status": "ok", "channel": "telegram", "sender": parsed.sender_phone}
+
+
+@router.post("/payments/{provider}/{business_id}")
+async def payment_gateway_webhook(
+    provider: str,
+    business_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Handle incoming payment gateway webhooks from Payriff or PaymenGate."""
+    try:
+        biz_uuid = UUID(str(business_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid business ID")
+
+    payload = await request.json()
+    headers = dict(request.headers)
+    service = PaymentService(db=db, business_id=biz_uuid)
+    verified = await service.handle_webhook_callback(provider=provider, payload=payload, headers=headers)
+    return {"status": "verified" if verified else "ignored", "provider": provider}

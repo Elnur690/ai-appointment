@@ -33,7 +33,7 @@ const TRANSLATIONS = {
     navSignIn: 'Daxil Ol',
     navStartTrial: 'Pulsuz Başla',
     heroBadge: 'Salonlar, Klinikalar və Studiyalar üçün Süni İntellekt Randevu və Gəlir Platforması',
-    heroTitlePrefix: 'WhatsApp və Instagram-ınızı ',
+    heroTitlePrefix: 'WhatsApp, Instagram və Telegram-ınızı ',
     heroTitleHighlight: '24/7 AI Resepşnə',
     heroTitleSuffix: ' Çevirin',
     heroSubtitle:
@@ -71,7 +71,7 @@ const TRANSLATIONS = {
       {
         icon: MessageSquare,
         color: 'var(--primary)',
-        title: 'WhatsApp və Instagram AI Resepşn',
+        title: 'WhatsApp, Instagram və Telegram AI Resepşn',
         desc: 'Azərbaycan, Rus, Türk və İngilis dillərində 24/7 cavab verir, boş saatları yoxlayır və avtomatik randevu yazır.',
       },
       {
@@ -90,7 +90,7 @@ const TRANSLATIONS = {
         icon: ShieldCheck,
         color: 'var(--warning)',
         title: 'Gəlməmə (No-Show) Qorunması və Ödənişlər',
-        desc: 'Payriff və EPoint vasitəsilə onlayn beh (depozit) qəbul edir və salonun bütün gəlir statistikasını izləyir.',
+        desc: 'Nağd, Payriff və PaymenGate vasitəsilə onlayn beh (depozit) qəbul edir və salonun bütün gəlir statistikasını izləyir.',
       },
       {
         icon: RefreshCw,
@@ -130,9 +130,11 @@ const TRANSLATIONS = {
     unlimitedMessages: 'Limitsiz AI mesaj',
     messagesPerMonth: (count) => `Ayda ${Number(count).toLocaleString()} AI mesaj`,
     upToBranches: (count) => `${count || 1} filiala qədər dəstək`,
-    omniBooking: 'WhatsApp, Instagram və Veb Randevu',
+    omniBooking: 'WhatsApp Biznes (Standart Paket)',
+    instagramBooking: 'Instagram Direct AI İnteqrasiyası',
+    telegramBooking: 'Telegram Bot AI İnteqrasiyası',
     voiceBooking: 'WhatsApp Səsli Mesajla Randevu',
-    onlinePayments: 'Payriff və EPoint Onlayn Beh (Depozit)',
+    onlinePayments: 'Nağd, Payriff və PaymenGate Ödənişlər',
     customDomain: 'Şəxsi Domen (White-Label CNAME)',
     planCta: (name) => `${name} ilə Başla`,
     footerTagline: 'AI Randevu və Biznes İdarəetmə Platforması',
@@ -146,7 +148,7 @@ const TRANSLATIONS = {
     navSignIn: 'Sign In',
     navStartTrial: 'Start Free Trial',
     heroBadge: 'AI Appointment & Revenue Platform for Salons, Clinics & Studios',
-    heroTitlePrefix: 'Turn Your WhatsApp & Instagram Into a ',
+    heroTitlePrefix: 'Turn Your WhatsApp, Instagram & Telegram Into a ',
     heroTitleHighlight: '24/7 AI Receptionist',
     heroTitleSuffix: '',
     heroSubtitle:
@@ -184,7 +186,7 @@ const TRANSLATIONS = {
       {
         icon: MessageSquare,
         color: 'var(--primary)',
-        title: 'WhatsApp & Instagram AI Receptionist',
+        title: 'WhatsApp, Instagram & Telegram AI Receptionist',
         desc: 'Replies 24/7 in Azerbaijani, Russian, Turkish, and English to check availability and book appointments automatically.',
       },
       {
@@ -202,8 +204,8 @@ const TRANSLATIONS = {
       {
         icon: ShieldCheck,
         color: 'var(--warning)',
-        title: 'No-Show Protection & Local Payments',
-        desc: 'Collects automated online deposits via Payriff and EPoint for high-risk bookings and tracks full salon revenue.',
+        title: 'No-Show Protection & Multi-Gateway Payments',
+        desc: 'Supports Cash payments, Payriff, and PaymenGate online deposits for high-risk bookings and tracks full salon revenue.',
       },
       {
         icon: RefreshCw,
@@ -243,9 +245,11 @@ const TRANSLATIONS = {
     unlimitedMessages: 'Unlimited AI messages',
     messagesPerMonth: (count) => `${Number(count).toLocaleString()} AI messages / month`,
     upToBranches: (count) => `Up to ${count || 1} branch(es)`,
-    omniBooking: 'WhatsApp, Instagram & Web Booking',
+    omniBooking: 'WhatsApp Business (Default Included)',
+    instagramBooking: 'Instagram Direct AI Integration',
+    telegramBooking: 'Telegram Bot AI Integration',
     voiceBooking: 'WhatsApp Voice Note Booking',
-    onlinePayments: 'Payriff & EPoint Online Deposits',
+    onlinePayments: 'Cash, Payriff & PaymenGate Gateways',
     customDomain: 'White-Label Custom CNAME Domain',
     planCta: (name) => `Get Started with ${name}`,
     footerTagline: 'AI Appointment & Booking Platform',
@@ -497,6 +501,18 @@ const LandingPage = () => {
                   <Check size={16} color="var(--success)" />
                   <span>{t.omniBooking}</span>
                 </div>
+                {p.allows_instagram && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <Check size={16} color="var(--success)" />
+                    <span>{t.instagramBooking}</span>
+                  </div>
+                )}
+                {p.allows_telegram && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <Check size={16} color="var(--success)" />
+                    <span>{t.telegramBooking}</span>
+                  </div>
+                )}
                 {p.allows_voice_messages && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                     <Check size={16} color="var(--success)" />

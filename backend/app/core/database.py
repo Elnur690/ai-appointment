@@ -32,10 +32,10 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    """Initialize database extensions, create all ORM tables, and seed initial SaaS Admin & Plans."""
+    """Initialize database extensions, create all ORM tables, and seed initial SaaS Admin, Plans & Payment Gateways."""
     import app.models  # noqa: F401 - register all ORM models on Base.metadata
     from app.models.base import Base
-    from app.models.saas import SaasOwner, Plan
+    from app.models.saas import SaasOwner, Plan, PlatformConfig, DEFAULT_PLATFORM_GATEWAYS
     from app.core.security import hash_password
 
     try:
@@ -53,6 +53,7 @@ async def init_db() -> None:
         logger.warning(f"create_all check skipped or completed by another worker: {exc}")
 
     alter_statements = [
+        "ALTER TYPE paymentmethod ADD VALUE IF NOT EXISTS 'paymengate';",
         "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminder_24h_sent_at TIMESTAMP WITH TIME ZONE;",
         "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminder_2h_sent_at TIMESTAMP WITH TIME ZONE;",
         "ALTER TABLE branches ADD COLUMN IF NOT EXISTS phone VARCHAR;",
@@ -64,6 +65,9 @@ async def init_db() -> None:
         "ALTER TABLE staff_schedules ADD COLUMN IF NOT EXISTS shift_type VARCHAR(50) DEFAULT 'full_day';",
         "ALTER TABLE staff_schedules ADD COLUMN IF NOT EXISTS allow_overtime BOOLEAN DEFAULT FALSE;",
         "ALTER TABLE staff_schedules ADD COLUMN IF NOT EXISTS max_overtime_minutes INTEGER DEFAULT 60;",
+        "ALTER TABLE plans ADD COLUMN IF NOT EXISTS allows_whatsapp BOOLEAN DEFAULT TRUE;",
+        "ALTER TABLE plans ADD COLUMN IF NOT EXISTS allows_instagram BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE plans ADD COLUMN IF NOT EXISTS allows_telegram BOOLEAN DEFAULT FALSE;",
     ]
     for stmt_sql in alter_statements:
         try:
@@ -73,7 +77,7 @@ async def init_db() -> None:
         except Exception as exc:
             logger.warning(f"Schema migration column check skipped ({stmt_sql}): {exc}")
 
-    # Seed initial SaaS Owner & default plans if database is fresh
+    # Seed initial SaaS Owner, Platform Payment Gateways, & default plans if database is fresh
     try:
         async with AsyncSessionLocal() as session:
             await session.execute(text("SELECT pg_advisory_xact_lock(2280099);"))
@@ -89,6 +93,17 @@ async def init_db() -> None:
                 )
                 session.add(admin)
 
+            existing_cfg = (
+                await session.execute(select(PlatformConfig).where(PlatformConfig.config_key == "global"))
+            ).scalar_one_or_none()
+            if not existing_cfg:
+                session.add(
+                    PlatformConfig(
+                        config_key="global",
+                        payment_gateways=dict(DEFAULT_PLATFORM_GATEWAYS),
+                    )
+                )
+
             existing_plans = (await session.execute(select(Plan))).scalars().all()
             if not existing_plans:
                 session.add_all([
@@ -98,6 +113,9 @@ async def init_db() -> None:
                         max_branches=1,
                         max_whatsapp_numbers=1,
                         ai_message_quota=1000,
+                        allows_whatsapp=True,
+                        allows_instagram=False,
+                        allows_telegram=False,
                         allowed_ai_providers=["gemini"],
                         features={"assigned_model": "gemini-3.5-flash"},
                         is_active=True,
@@ -108,6 +126,10 @@ async def init_db() -> None:
                         max_branches=3,
                         max_whatsapp_numbers=3,
                         ai_message_quota=5000,
+                        allows_whatsapp=True,
+                        allows_instagram=True,
+                        allows_telegram=True,
+                        allows_omnichannel_messaging=True,
                         allows_voice_messages=True,
                         allows_dynamic_pricing=True,
                         allows_winback_campaigns=True,
@@ -132,6 +154,9 @@ async def init_db() -> None:
                         max_branches=20,
                         max_whatsapp_numbers=20,
                         ai_message_quota=50000,
+                        allows_whatsapp=True,
+                        allows_instagram=True,
+                        allows_telegram=True,
                         allows_branch_level_ai_tone=True,
                         allows_voice_messages=True,
                         allows_dynamic_pricing=True,

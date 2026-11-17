@@ -14,6 +14,10 @@ class ParsedWebhookMessage:
     timestamp: int
     is_from_me: bool
 
+    @property
+    def remote_jid(self) -> str:
+        return self.group_jid or self.sender_jid
+
 class WebhookHandler:
     def parse_message(self, payload: dict) -> ParsedWebhookMessage | None:
         """Parse Evolution API MESSAGES_UPSERT webhook payload."""

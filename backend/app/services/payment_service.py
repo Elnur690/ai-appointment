@@ -7,20 +7,31 @@ from sqlalchemy import select, and_
 from app.models.payment import Payment, PaymentGatewayConfig, PaymentMethod, PaymentStatus
 from app.models.appointment import Appointment, AppointmentStatus
 from app.integrations.payments.payriff import PayriffAdapter
+from app.integrations.payments.paymengate import PaymenGateAdapter
 from app.integrations.payments.epoint import EpointAdapter
-from app.integrations.payments.adapter import PaymentLinkResult
+from app.integrations.payments.adapter import PaymentAdapter, PaymentLinkResult
 
 logger = logging.getLogger(__name__)
 
+
 class PaymentService:
-    """Manages cash payments and Azerbaijan online payment gateway processing."""
-    
+    """Manages cash payments and online payment gateway processing (Payriff & PaymenGate)."""
+
     def __init__(self, db: AsyncSession, business_id: UUID):
         self.db = db
         self.business_id = business_id
         self.payriff_adapter = PayriffAdapter()
+        self.paymengate_adapter = PaymenGateAdapter()
         self.epoint_adapter = EpointAdapter()
-    
+
+    def _get_adapter(self, provider: str) -> PaymentAdapter:
+        norm = provider.lower().strip()
+        if norm == "payriff":
+            return self.payriff_adapter
+        if norm == "paymengate":
+            return self.paymengate_adapter
+        return self.epoint_adapter
+
     async def get_gateway_config(self, provider: str) -> PaymentGatewayConfig | None:
         stmt = select(PaymentGatewayConfig).where(
             and_(
@@ -31,19 +42,18 @@ class PaymentService:
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
-    
+
     async def create_online_checkout(
         self,
         appointment_id: UUID,
         amount: Decimal,
-        provider: str,  # 'payriff' or 'epoint'
+        provider: str,  # 'payriff' or 'paymengate'
         return_url: str,
     ) -> PaymentLinkResult:
         config = await self.get_gateway_config(provider)
         if not config:
             raise ValueError(f"Gateway {provider} is not configured or inactive for this business.")
-        
-        # Create payment record
+
         payment = Payment(
             business_id=self.business_id,
             appointment_id=appointment_id,
@@ -54,8 +64,8 @@ class PaymentService:
         )
         self.db.add(payment)
         await self.db.flush()
-        
-        adapter = self.payriff_adapter if provider.lower() == "payriff" else self.epoint_adapter
+
+        adapter = self._get_adapter(provider)
         result = await adapter.create_payment_link(
             payment_id=payment.id,
             amount=amount,
@@ -64,20 +74,20 @@ class PaymentService:
             merchant_config=config.merchant_credentials,
             return_url=return_url,
         )
-        
+
         payment.gateway_transaction_id = result.transaction_id
         await self.db.commit()
         return result
-    
+
     async def handle_webhook_callback(self, provider: str, payload: dict, headers: dict) -> bool:
         config = await self.get_gateway_config(provider)
         if not config:
             logger.error(f"Cannot verify webhook: No active gateway config for {provider}")
             return False
-        
-        adapter = self.payriff_adapter if provider.lower() == "payriff" else self.epoint_adapter
+
+        adapter = self._get_adapter(provider)
         verify_res = await adapter.verify_webhook(payload, headers, config.merchant_credentials)
-        
+
         if verify_res.is_successful and verify_res.transaction_id:
             stmt = select(Payment).where(
                 and_(

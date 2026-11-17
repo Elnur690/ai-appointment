@@ -7,6 +7,7 @@ import Businesses from './pages/Businesses';
 import Plans from './pages/Plans';
 import Subscriptions from './pages/Subscriptions';
 import Resellers from './pages/Resellers';
+import PaymentGateways from './pages/PaymentGateways';
 
 const App = () => {
   return (
@@ -17,6 +18,7 @@ const App = () => {
         <Route path="businesses" element={<Businesses />} />
         <Route path="resellers" element={<Resellers />} />
         <Route path="plans" element={<Plans />} />
+        <Route path="payment-gateways" element={<PaymentGateways />} />
         <Route path="subscriptions" element={<Subscriptions />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

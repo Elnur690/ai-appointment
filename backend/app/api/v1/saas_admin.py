@@ -4,12 +4,13 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import flag_modified
 from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.core.dependencies import require_role
 from app.models.business import Business
-from app.models.saas import Plan
+from app.models.saas import Plan, PlatformConfig, DEFAULT_PLATFORM_GATEWAYS
 from app.models.subscription import Subscription
 from app.models.appointment import Appointment
 from app.models.conversation import Message
@@ -38,6 +39,9 @@ class PlanResponse(BaseModel):
     max_whatsapp_numbers: int = 1
     ai_message_quota: int = 1000
     message_limit: int = 1000
+    allows_whatsapp: bool = True
+    allows_instagram: bool = False
+    allows_telegram: bool = False
     allows_voice_messages: bool = False
     allows_dynamic_pricing: bool = False
     allows_winback_campaigns: bool = False
@@ -69,6 +73,9 @@ class PlanCreate(BaseModel):
     max_whatsapp_numbers: int = 1
     ai_message_quota: int = 1000
     message_limit: Optional[int] = None
+    allows_whatsapp: bool = True
+    allows_instagram: bool = False
+    allows_telegram: bool = False
     allows_voice_messages: bool = False
     allows_dynamic_pricing: bool = False
     allows_winback_campaigns: bool = False
@@ -96,6 +103,13 @@ class PlanCreate(BaseModel):
 class PlanUpdate(BaseModel):
     name: str | None = None
     price: float | None = None
+    max_branches: Optional[int] = None
+    max_whatsapp_numbers: Optional[int] = None
+    ai_message_quota: Optional[int] = None
+    message_limit: Optional[int] = None
+    allows_whatsapp: Optional[bool] = None
+    allows_instagram: Optional[bool] = None
+    allows_telegram: Optional[bool] = None
     allows_voice_messages: Optional[bool] = None
     allows_dynamic_pricing: Optional[bool] = None
     allows_winback_campaigns: Optional[bool] = None
@@ -126,6 +140,12 @@ class BusinessStatusUpdate(BaseModel):
     plan: Optional[str] = None
 
 
+class PaymentGatewayToggleRequest(BaseModel):
+    enabled: bool
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
 class AnalyticsResponse(BaseModel):
     total_businesses: int
     active_subscriptions: int = 0
@@ -146,6 +166,9 @@ def _plan_to_response(p: Plan) -> PlanResponse:
         max_whatsapp_numbers=p.max_whatsapp_numbers,
         ai_message_quota=quota,
         message_limit=quota,
+        allows_whatsapp=bool(getattr(p, "allows_whatsapp", True)),
+        allows_instagram=bool(getattr(p, "allows_instagram", False) or p.allows_omnichannel_messaging),
+        allows_telegram=bool(getattr(p, "allows_telegram", False) or p.allows_omnichannel_messaging),
         allows_voice_messages=bool(p.allows_voice_messages),
         allows_dynamic_pricing=bool(p.allows_dynamic_pricing),
         allows_winback_campaigns=bool(p.allows_winback_campaigns),
@@ -186,6 +209,65 @@ def _biz_to_response(b: Business) -> BusinessResponse:
         reseller_id=str(b.reseller_id) if b.reseller_id else None,
         created_at=b.created_at.strftime("%Y-%m-%d") if b.created_at else None,
     )
+
+
+async def _get_or_create_platform_config(db: AsyncSession) -> PlatformConfig:
+    cfg = (
+        await db.execute(select(PlatformConfig).where(PlatformConfig.config_key == "global"))
+    ).scalar_one_or_none()
+    if not cfg:
+        cfg = PlatformConfig(
+            config_key="global",
+            payment_gateways={k: dict(v) for k, v in DEFAULT_PLATFORM_GATEWAYS.items()},
+        )
+        db.add(cfg)
+        await db.flush()
+    else:
+        merged = {k: dict(v) for k, v in DEFAULT_PLATFORM_GATEWAYS.items()}
+        if isinstance(cfg.payment_gateways, dict):
+            for k, v in cfg.payment_gateways.items():
+                if k in merged and isinstance(v, dict):
+                    merged[k].update(v)
+        cfg.payment_gateways = merged
+    return cfg
+
+
+@router.get("/payment-gateways")
+async def list_platform_payment_gateways(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    """List all platform payment gateways (1. Cash, 2. Payriff, 3. PaymenGate) and their enabled status."""
+    cfg = await _get_or_create_platform_config(db)
+    order = ["cash", "payriff", "paymengate"]
+    return [cfg.payment_gateways[k] for k in order if k in cfg.payment_gateways]
+
+
+@router.put("/payment-gateways/{provider}")
+async def toggle_platform_payment_gateway(
+    provider: str,
+    req: PaymentGatewayToggleRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    """Enable or disable a payment gateway platform-wide (cash, payriff, paymengate)."""
+    prov = provider.lower().strip()
+    if prov not in DEFAULT_PLATFORM_GATEWAYS:
+        raise HTTPException(status_code=404, detail=f"Unknown payment gateway: {provider}")
+
+    cfg = await _get_or_create_platform_config(db)
+    updated_map = {k: dict(v) for k, v in cfg.payment_gateways.items()}
+    entry = dict(updated_map.get(prov, DEFAULT_PLATFORM_GATEWAYS[prov]))
+    entry["enabled"] = bool(req.enabled)
+    if req.name is not None:
+        entry["name"] = req.name
+    if req.description is not None:
+        entry["description"] = req.description
+    updated_map[prov] = entry
+    cfg.payment_gateways = updated_map
+    flag_modified(cfg, "payment_gateways")
+    await db.flush()
+    return entry
 
 
 @router.get("/businesses", response_model=List[BusinessResponse])
@@ -285,7 +367,7 @@ async def create_plan(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
-    """Create a new subscription plan with all 20 entitlement flags."""
+    """Create a new subscription plan with all entitlement flags."""
     dump = plan_in.model_dump()
     msg_limit = dump.pop("message_limit", None)
     if msg_limit is not None:
@@ -307,7 +389,11 @@ async def update_plan(
     plan = (await db.execute(select(Plan).where(Plan.id == UUID(id)))).scalar_one_or_none()
     if not plan:
         raise HTTPException(status_code=404, detail="Plan not found")
-    for k, v in plan_in.model_dump(exclude_unset=True).items():
+    updates = plan_in.model_dump(exclude_unset=True)
+    msg_limit = updates.pop("message_limit", None)
+    if msg_limit is not None:
+        updates["ai_message_quota"] = msg_limit
+    for k, v in updates.items():
         setattr(plan, k, v)
     await db.flush()
     return _plan_to_response(plan)

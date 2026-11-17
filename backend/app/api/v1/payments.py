@@ -1,7 +1,7 @@
 from datetime import date, datetime, time, timezone
 from typing import Annotated, Any, List
 from uuid import UUID
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from app.core.database import get_db
 from app.core.dependencies import get_current_active_user, get_business_context
 from app.models.payment import Payment, PaymentMethod, PaymentStatus
+from app.models.saas import PlatformConfig, DEFAULT_PLATFORM_GATEWAYS
 
 router = APIRouter()
 
@@ -43,6 +44,26 @@ class RevenueSummaryResponse(BaseModel):
     currency: str = "AZN"
 
 
+GATEWAY_LABELS = {
+    "cash": "Cash",
+    "payriff": "Payriff",
+    "paymengate": "PaymenGate",
+    "epoint": "EPoint",
+}
+
+
+async def _get_platform_gateways(db: AsyncSession) -> dict[str, Any]:
+    cfg = (
+        await db.execute(select(PlatformConfig).where(PlatformConfig.config_key == "global"))
+    ).scalar_one_or_none()
+    merged = {k: dict(v) for k, v in DEFAULT_PLATFORM_GATEWAYS.items()}
+    if cfg and isinstance(cfg.payment_gateways, dict):
+        for k, v in cfg.payment_gateways.items():
+            if k in merged and isinstance(v, dict):
+                merged[k].update(v)
+    return merged
+
+
 def _to_response(p: Payment) -> PaymentResponse:
     method_val = p.method.value if hasattr(p.method, "value") else str(p.method)
     status_val = p.status.value if hasattr(p.status, "value") else str(p.status)
@@ -53,7 +74,7 @@ def _to_response(p: Payment) -> PaymentResponse:
         business_id=str(p.business_id),
         appointment_id=str(p.appointment_id) if p.appointment_id else None,
         customer=p.notes or "Direct Checkout",
-        gateway=method_val.capitalize(),
+        gateway=GATEWAY_LABELS.get(method_val, method_val.capitalize()),
         amount=f"{amt_float:.2f} {curr}",
         amount_value=amt_float,
         currency=curr,
@@ -64,6 +85,15 @@ def _to_response(p: Payment) -> PaymentResponse:
     )
 
 
+@router.get("/gateways")
+async def list_enabled_payment_gateways(
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Return platform-wide payment gateways (cash, payriff, paymengate) and their active status."""
+    gateways = await _get_platform_gateways(db)
+    return list(gateways.values())
+
+
 @router.post("/", response_model=PaymentResponse)
 async def log_payment(
     payment: PaymentCreate,
@@ -71,10 +101,18 @@ async def log_payment(
     user: Annotated[dict[str, Any], Depends(get_current_active_user)],
     business_id: Annotated[str, Depends(get_business_context)],
 ):
-    """Log a payment in PostgreSQL."""
-    method_str = (payment.method or "cash").lower()
-    if method_str not in {"cash", "payriff", "epoint"}:
+    """Log a payment in PostgreSQL (validating against platform-enabled gateways)."""
+    method_str = (payment.method or "cash").lower().strip()
+    if method_str not in {"cash", "payriff", "paymengate", "epoint"}:
         method_str = "cash"
+
+    gateways = await _get_platform_gateways(db)
+    if method_str in gateways and not gateways[method_str].get("enabled", True):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Payment gateway '{method_str}' is currently disabled by platform administrator.",
+        )
+
     row = Payment(
         business_id=UUID(business_id),
         appointment_id=UUID(payment.appointment_id) if payment.appointment_id else None,

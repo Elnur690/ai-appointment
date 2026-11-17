@@ -10,6 +10,7 @@ from app.models.base import Base, TimestampMixin, generate_uuid7
 class PaymentMethod(str, enum.Enum):
     cash = "cash"
     payriff = "payriff"
+    paymengate = "paymengate"
     epoint = "epoint"
 
 class PaymentStatus(str, enum.Enum):

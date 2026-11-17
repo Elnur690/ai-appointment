@@ -6,6 +6,31 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, generate_uuid7
 
+DEFAULT_PLATFORM_GATEWAYS = {
+    "cash": {
+        "provider": "cash",
+        "name": "Cash Payment (At Venue)",
+        "description": "In-person cash & POS terminal payments recorded at the salon, clinic, or studio.",
+        "enabled": True,
+        "requires_credentials": False,
+    },
+    "payriff": {
+        "provider": "payriff",
+        "name": "Payriff Payment Gateway",
+        "description": "Online card checkout and automated no-show deposit links via Payriff API.",
+        "enabled": True,
+        "requires_credentials": True,
+    },
+    "paymengate": {
+        "provider": "paymengate",
+        "name": "PaymenGate Payment Gateway",
+        "description": "Online payment processing, deposits, and multi-currency card checkout via PaymenGate.",
+        "enabled": True,
+        "requires_credentials": True,
+    },
+}
+
+
 class SaasOwner(Base, TimestampMixin):
     __tablename__ = "saas_owners"
 
@@ -14,6 +39,14 @@ class SaasOwner(Base, TimestampMixin):
     password_hash: Mapped[str] = mapped_column(String, nullable=False)
     name: Mapped[str | None] = mapped_column(String, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class PlatformConfig(Base, TimestampMixin):
+    __tablename__ = "platform_configs"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=generate_uuid7)
+    config_key: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, default="global")
+    payment_gateways: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=DEFAULT_PLATFORM_GATEWAYS)
 
 
 class Plan(Base, TimestampMixin):
@@ -25,6 +58,9 @@ class Plan(Base, TimestampMixin):
     max_branches: Mapped[int] = mapped_column(default=1)
     max_whatsapp_numbers: Mapped[int] = mapped_column(default=1)
     ai_message_quota: Mapped[int] = mapped_column(default=1000)
+    allows_whatsapp: Mapped[bool] = mapped_column(Boolean, default=True)
+    allows_instagram: Mapped[bool] = mapped_column(Boolean, default=False)
+    allows_telegram: Mapped[bool] = mapped_column(Boolean, default=False)
     allows_branch_level_ai_tone: Mapped[bool] = mapped_column(Boolean, default=False)
     allows_voice_messages: Mapped[bool] = mapped_column(Boolean, default=False)
     allows_dynamic_pricing: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -47,7 +83,8 @@ class Plan(Base, TimestampMixin):
     allows_cadence_engine: Mapped[bool] = mapped_column(Boolean, default=False)
     allows_gift_vouchers: Mapped[bool] = mapped_column(Boolean, default=False)
     allows_flash_drops: Mapped[bool] = mapped_column(Boolean, default=False)
-    allowed_ai_providers: Mapped[dict[str, Any] | list[str] | None] = mapped_column(JSONB, nullable=True, default=["gemini", "claude", "openai"])
+    allowed_ai_providers: Mapped[dict[str, Any] | list[str] | None] = mapped_column(
+        JSONB, nullable=True, default=["gemini", "claude", "openai"]
+    )
     features: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-

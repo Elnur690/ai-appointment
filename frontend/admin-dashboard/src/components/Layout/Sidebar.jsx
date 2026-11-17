@@ -1,6 +1,16 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Building2, Layers, CreditCard, Handshake, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Building2,
+  Layers,
+  CreditCard,
+  Handshake,
+  Wallet,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
 const Sidebar = () => {
@@ -16,31 +26,40 @@ const Sidebar = () => {
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/businesses', icon: Building2, label: 'Businesses' },
+    { path: '/plans', icon: Layers, label: 'Plans & Channels' },
+    { path: '/payment-gateways', icon: Wallet, label: 'Payment Gateways' },
     { path: '/resellers', icon: Handshake, label: 'Resellers & Partners' },
-    { path: '/plans', icon: Layers, label: 'Plans' },
     { path: '/subscriptions', icon: CreditCard, label: 'Subscriptions' },
   ];
 
   return (
-    <div style={{
-      width: collapsed ? 'var(--sidebar-collapsed-width)' : 'var(--sidebar-width)',
-      background: 'var(--surface-color)',
-      borderRight: '1px solid var(--border-color)',
-      transition: 'width 0.3s ease',
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100vh',
-      position: 'sticky',
-      top: 0
-    }}>
-      <div style={{ 
-        padding: '1.5rem', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: collapsed ? 'center' : 'space-between',
-        borderBottom: '1px solid var(--border-color)'
-      }}>
-        {!collapsed && <h2 className="gradient-text" style={{ margin: 0, fontSize: '1.25rem' }}>Randevu.vip</h2>}
+    <div
+      style={{
+        width: collapsed ? 'var(--sidebar-collapsed-width)' : 'var(--sidebar-width)',
+        background: 'var(--surface-color)',
+        borderRight: '1px solid var(--border-color)',
+        transition: 'width 0.3s ease',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        position: 'sticky',
+        top: 0,
+      }}
+    >
+      <div
+        style={{
+          padding: '1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: collapsed ? 'center' : 'space-between',
+          borderBottom: '1px solid var(--border-color)',
+        }}
+      >
+        {!collapsed && (
+          <h2 className="gradient-text" style={{ margin: 0, fontSize: '1.25rem' }}>
+            Randevu.vip
+          </h2>
+        )}
         <button onClick={() => setCollapsed(!collapsed)} className="btn-ghost" style={{ padding: '0.25rem', border: 'none' }}>
           {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
         </button>
@@ -62,7 +81,7 @@ const Sidebar = () => {
               textDecoration: 'none',
               fontWeight: 500,
               transition: 'all 0.2s',
-              justifyContent: collapsed ? 'center' : 'flex-start'
+              justifyContent: collapsed ? 'center' : 'flex-start',
             })}
           >
             <item.icon size={20} />
@@ -78,7 +97,11 @@ const Sidebar = () => {
             <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>{user?.email}</p>
           </div>
         )}
-        <button onClick={handleLogout} className="btn btn-ghost" style={{ width: '100%', justifyContent: collapsed ? 'center' : 'flex-start', color: 'var(--error)' }}>
+        <button
+          onClick={handleLogout}
+          className="btn btn-ghost"
+          style={{ width: '100%', justifyContent: collapsed ? 'center' : 'flex-start', color: 'var(--error)' }}
+        >
           <LogOut size={20} />
           {!collapsed && 'Logout'}
         </button>
