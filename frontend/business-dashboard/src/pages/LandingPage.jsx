@@ -954,7 +954,7 @@ const LandingPage = () => {
           style={{
             padding: '2.5rem',
             border: '1px solid rgba(245, 158, 11, 0.4)',
-            background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 27, 75, 0.75))',
+            background: 'linear-gradient(135deg, rgba(13, 18, 26, 0.94), rgba(18, 24, 34, 0.88))',
           }}
         >
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>

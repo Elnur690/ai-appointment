@@ -247,7 +247,7 @@ const Settings = () => {
         <div
           style={{
             padding: '0.75rem 1rem',
-            background: 'rgba(99, 102, 241, 0.15)',
+            background: 'rgba(212, 175, 55, 0.14)',
             border: '1px solid var(--primary)',
             borderRadius: '8px',
             color: 'var(--text-primary)',

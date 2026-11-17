@@ -1,47 +1,38 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
   <defs>
-    <radialGradient id="bgGrad" cx="30%" cy="20%" r="85%">
-      <stop offset="0%" stop-color="#131B2E" />
-      <stop offset="55%" stop-color="#090D18" />
-      <stop offset="100%" stop-color="#05070D" />
-    </radialGradient>
-    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FEF08A" />
-      <stop offset="45%" stop-color="#F59E0B" />
-      <stop offset="100%" stop-color="#D97706" />
+    <linearGradient id="goldMain" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F7E9B7" />
+      <stop offset="45%" stop-color="#D4AF37" />
+      <stop offset="100%" stop-color="#9A7420" />
     </linearGradient>
-    <linearGradient id="cyanIndigoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#38BDF8" />
-      <stop offset="50%" stop-color="#6366F1" />
-      <stop offset="100%" stop-color="#A855F7" />
+    <linearGradient id="goldBevel" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFF3C8" />
+      <stop offset="55%" stop-color="#C89D32" />
+      <stop offset="100%" stop-color="#7E5D15" />
     </linearGradient>
-    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="12" result="blur" />
-      <feComposite in="SourceGraphic" in2="blur" operator="over" />
-    </filter>
   </defs>
-  <rect x="16" y="16" width="480" height="480" rx="116" fill="url(#bgGrad)" />
-  <rect x="20" y="20" width="472" height="472" rx="112" stroke="url(#goldGrad)" stroke-width="4" stroke-opacity="0.45" />
-  <path d="M 116 256 A 140 140 0 1 1 256 396" stroke="url(#cyanIndigoGrad)" stroke-width="18" stroke-linecap="round" stroke-opacity="0.32" />
+  <rect width="512" height="512" rx="108" fill="#070A0E" />
+  <polygon
+    points="256,64 418,140 418,354 256,448 94,354 94,140"
+    fill="none"
+    stroke="url(#goldMain)"
+    stroke-width="24"
+    stroke-linejoin="miter"
+  />
   <path
-    d="M 168 372 L 168 156 C 168 140 180 128 196 128 L 274 128 C 326 128 358 158 358 202 C 358 244 326 272 276 276 L 354 368"
-    stroke="url(#cyanIndigoGrad)"
+    d="M 178 352 L 178 164 L 296 164 L 328 196 L 328 244 L 296 276 L 178 276"
+    fill="none"
+    stroke="url(#goldMain)"
     stroke-width="38"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-    filter="url(#softGlow)"
+    stroke-linecap="square"
+    stroke-linejoin="miter"
   />
   <path
-    d="M 168 242 C 206 242 238 268 258 294 C 286 248 326 206 376 174"
-    stroke="url(#goldGrad)"
-    stroke-width="26"
-    stroke-linecap="round"
-    stroke-linejoin="round"
+    d="M 248 276 L 318 346 L 418 246"
+    fill="none"
+    stroke="url(#goldBevel)"
+    stroke-width="38"
+    stroke-linecap="square"
+    stroke-linejoin="miter"
   />
-  <path
-    d="M 384 86 C 384 114 394 124 422 124 C 394 124 384 134 384 162 C 384 134 374 124 346 124 C 374 124 384 114 384 86 Z"
-    fill="url(#goldGrad)"
-    filter="url(#softGlow)"
-  />
-  <circle cx="136" cy="136" r="10" fill="#38BDF8" fill-opacity="0.85" />
 </svg>

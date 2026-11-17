@@ -18,7 +18,7 @@ export const BrandLogo = ({
           height: `${size}px`,
           borderRadius: `${Math.round(size * 0.26)}px`,
           objectFit: 'cover',
-          boxShadow: '0 4px 14px rgba(56, 189, 248, 0.35), 0 0 0 1px rgba(245, 158, 11, 0.45)',
+          boxShadow: '0 4px 14px rgba(212, 175, 55, 0.25), 0 0 0 1px rgba(212, 175, 55, 0.45)',
           flexShrink: 0,
         }}
       />

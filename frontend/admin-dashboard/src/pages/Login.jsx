@@ -34,7 +34,7 @@ const Login = () => {
           left: '-10%',
           width: '50vw',
           height: '50vw',
-          background: 'radial-gradient(circle, rgba(6,182,212,0.1) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(212,175,55,0.08) 0%, transparent 70%)',
           filter: 'blur(60px)',
           zIndex: 0,
         }}
@@ -46,7 +46,7 @@ const Login = () => {
           right: '-10%',
           width: '50vw',
           height: '50vw',
-          background: 'radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 70%)',
           filter: 'blur(60px)',
           zIndex: 0,
         }}

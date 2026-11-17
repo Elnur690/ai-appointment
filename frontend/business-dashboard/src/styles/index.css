@@ -2,36 +2,36 @@
 
 :root {
   color-scheme: dark;
-  --bg-main: #06080f;
-  --bg-card: rgba(15, 20, 32, 0.72);
-  --bg-modal: rgba(12, 16, 26, 0.94);
+  --bg-main: #070a0f;
+  --bg-card: rgba(13, 18, 26, 0.78);
+  --bg-modal: rgba(10, 14, 20, 0.96);
 
-  --primary-accent: #38bdf8;
-  --secondary-accent: #818cf8;
-  --primary-start: #38bdf8;
-  --primary: #38bdf8;
-  --secondary: #a855f7;
-  --gold: #f59e0b;
+  --primary-accent: #d4af37;
+  --secondary-accent: #10b981;
+  --primary-start: #d4af37;
+  --primary: #d4af37;
+  --secondary: #10b981;
+  --gold: #d4af37;
   --emerald: #10b981;
 
-  --gradient-accent: linear-gradient(135deg, #0ea5e9 0%, #6366f1 55%, #a855f7 100%);
-  --gradient-gold: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
-  --gradient-emerald: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  --gradient-accent: linear-gradient(135deg, #f3e5ab 0%, #d4af37 50%, #b5892e 100%);
+  --gradient-gold: linear-gradient(135deg, #f3e5ab 0%, #d4af37 50%, #aa7c11 100%);
+  --gradient-emerald: linear-gradient(135deg, #34d399 0%, #10b981 55%, #059669 100%);
 
   --text-main: #f8fafc;
   --text-primary: #f8fafc;
   --text-muted: #94a3b8;
   --text-secondary: #cbd5e1;
 
-  --border-color: rgba(148, 163, 184, 0.22);
-  --border: rgba(148, 163, 184, 0.22);
+  --border-color: rgba(148, 163, 184, 0.2);
+  --border: rgba(148, 163, 184, 0.2);
   --border-glass: 1px solid var(--border-color);
 
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
   --error: #ef4444;
-  --info: #38bdf8;
+  --info: #0ea5e9;
 
   --radius-sm: 10px;
   --radius-md: 16px;
@@ -51,9 +51,9 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background-color: var(--bg-main);
   background-image:
-    radial-gradient(circle at 15% 10%, rgba(56, 189, 248, 0.11), transparent 42%),
-    radial-gradient(circle at 85% 15%, rgba(168, 85, 247, 0.11), transparent 42%),
-    radial-gradient(circle at 50% 80%, rgba(245, 158, 11, 0.06), transparent 48%);
+    radial-gradient(circle at 18% 12%, rgba(212, 175, 55, 0.08), transparent 42%),
+    radial-gradient(circle at 82% 18%, rgba(16, 185, 129, 0.07), transparent 42%),
+    radial-gradient(circle at 50% 85%, rgba(14, 165, 233, 0.05), transparent 48%);
   color: var(--text-main);
   min-height: 100vh;
   overflow-x: hidden;
@@ -68,13 +68,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .gradient-text,
-.text-gradient {
-  background: var(--gradient-accent);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  display: inline-block;
-}
-
+.text-gradient,
 .text-gradient-gold {
   background: var(--gradient-gold);
   -webkit-background-clip: text;
@@ -89,12 +83,12 @@ h1, h2, h3, h4, h5, h6 {
   -webkit-backdrop-filter: blur(16px);
   border: var(--border-glass);
   border-radius: var(--radius-md);
-  box-shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.5);
   transition: var(--transition);
 }
 
 .glass-card:hover {
-  border-color: rgba(56, 189, 248, 0.38);
+  border-color: rgba(212, 175, 55, 0.38);
 }
 
 /* Badges */
@@ -110,9 +104,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .badge-info {
-  background: rgba(56, 189, 248, 0.14);
-  color: #7dd3fc;
-  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: rgba(212, 175, 55, 0.12);
+  color: #f3e5ab;
+  border: 1px solid rgba(212, 175, 55, 0.35);
 }
 
 .badge-success {
@@ -128,9 +122,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .badge-gold {
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(217, 119, 6, 0.2));
-  color: #fde68a;
-  border: 1px solid rgba(251, 191, 36, 0.5);
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(181, 137, 46, 0.18));
+  color: #f3e5ab;
+  border: 1px solid rgba(212, 175, 55, 0.5);
 }
 
 /* Native Modal Dialog & Backdrop Scroll Containment */
@@ -138,9 +132,9 @@ dialog:modal {
   overscroll-behavior: contain;
   background: var(--bg-modal);
   color: var(--text-main);
-  border: 1px solid rgba(56, 189, 248, 0.35);
+  border: 1px solid rgba(212, 175, 55, 0.4);
   border-radius: var(--radius-lg);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.75);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8);
   padding: 2rem;
   max-width: 520px;
   width: calc(100% - 2rem);
@@ -150,7 +144,7 @@ dialog:modal {
 dialog::backdrop {
   overflow: hidden;
   overscroll-behavior: contain;
-  background: rgba(3, 6, 14, 0.82);
+  background: rgba(4, 7, 12, 0.84);
   backdrop-filter: blur(8px);
 }
 
@@ -182,8 +176,8 @@ dialog::backdrop {
 }
 
 .form-control {
-  background: rgba(2, 6, 14, 0.55);
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(4, 7, 12, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.32);
   border-radius: var(--radius-sm);
   padding: 0.7rem 0.9rem;
   min-height: 48px;
@@ -214,38 +208,29 @@ dialog::backdrop {
   border: 1px solid transparent;
 }
 
-.btn-primary {
-  background: var(--gradient-accent);
-  color: #ffffff;
-  box-shadow: 0 8px 24px -4px rgba(14, 165, 233, 0.45);
-}
-
-.btn-primary:hover {
-  box-shadow: 0 12px 28px -4px rgba(99, 102, 241, 0.65);
-  transform: translateY(-1px);
-}
-
+.btn-primary,
 .btn-gold {
   background: var(--gradient-gold);
-  color: #090d16;
+  color: #070a0f;
   font-weight: 700;
-  box-shadow: 0 8px 24px -4px rgba(245, 158, 11, 0.45);
+  box-shadow: 0 8px 24px -4px rgba(212, 175, 55, 0.35);
 }
 
+.btn-primary:hover,
 .btn-gold:hover {
-  box-shadow: 0 12px 30px -4px rgba(245, 158, 11, 0.65);
+  box-shadow: 0 12px 28px -4px rgba(212, 175, 55, 0.55);
   transform: translateY(-1px);
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text-main);
   border: 1px solid rgba(148, 163, 184, 0.28);
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(212, 175, 55, 0.45);
 }
 
 .btn-danger {
@@ -263,7 +248,7 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid var(--primary);
+  outline: 3px solid var(--gold);
   outline-offset: 2px;
 }
 

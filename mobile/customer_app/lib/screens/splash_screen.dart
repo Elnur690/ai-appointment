@@ -101,9 +101,9 @@ class _CustomerSplashScreenState extends State<CustomerSplashScreen>
                 ShaderMask(
                   shaderCallback: (bounds) => const LinearGradient(
                     colors: [
-                      Color(0xFF38BDF8),
-                      Color(0xFF818CF8),
-                      Color(0xFFFBBF24),
+                      Color(0xFFF3E5AB),
+                      Color(0xFFD4AF37),
+                      Color(0xFFAA7C11),
                     ],
                   ).createShader(bounds),
                   child: const Text(
