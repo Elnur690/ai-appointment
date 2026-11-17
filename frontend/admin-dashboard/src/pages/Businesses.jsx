@@ -4,7 +4,21 @@ import { useAuthStore } from '../store/authStore';
 import DataTable from '../components/common/DataTable';
 import StatusBadge from '../components/common/StatusBadge';
 import Modal from '../components/common/Modal';
-import { Globe } from 'lucide-react';
+import { Globe, Clock } from 'lucide-react';
+
+const TRIAL_FEATURE_OPTIONS = [
+  { key: 'allows_instagram', az: 'Instagram Direct AI', en: 'Instagram Direct AI' },
+  { key: 'allows_telegram', az: 'Telegram Bot AI', en: 'Telegram Bot AI' },
+  { key: 'allows_voice_messages', az: 'WhatsApp Səsli Mesajlar', en: 'WhatsApp Voice Notes' },
+  { key: 'allows_online_payments', az: 'Onlayn Ödənişlər (Payriff & Paymegate)', en: 'Online Gateways (Payriff & Paymegate)' },
+  { key: 'allows_no_show_deposits', az: 'No-Show Depozit Qorunması', en: 'No-Show Deposit Protection' },
+  { key: 'allows_shift_management', az: 'Növbəli İş Qrafiki (Overtime)', en: 'Shift & Overtime Scheduling' },
+  { key: 'allows_cadence_engine', az: 'Avtomatik Təkrar Randevu (Cadence)', en: 'Predictive Cadence Rebooking' },
+  { key: 'allows_flash_drops', az: 'Son Dəqiqə Endirimləri (Flash Drops)', en: 'Last-Minute Flash Drops' },
+  { key: 'allows_gift_vouchers', az: 'Rəqəmsal Hədiyyə Kartları', en: 'Digital Gift Vouchers' },
+  { key: 'allows_loyalty_program', az: 'VIP Loyallıq Proqramı', en: 'VIP Loyalty Program' },
+  { key: 'allows_custom_domain', az: 'Şəxsi Domen (White-Label CNAME)', en: 'White-Label Custom CNAME Domain' },
+];
 
 const Businesses = () => {
   const { businesses, plans, fetchBusinesses, fetchPlans, updateBusinessStatus } = useDataStore();
@@ -13,6 +27,8 @@ const Businesses = () => {
   const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [customDomainInput, setCustomDomainInput] = useState('');
   const [selectedPlanInput, setSelectedPlanInput] = useState('');
+  const [trialDaysInput, setTrialDaysInput] = useState(14);
+  const [trialFeaturesOverride, setTrialFeaturesOverride] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -24,6 +40,15 @@ const Businesses = () => {
     setSelectedBusiness(row);
     setCustomDomainInput(row.customDomain || '');
     setSelectedPlanInput(row.plan || (plans[0]?.name ?? ''));
+    setTrialDaysInput(row.trialDaysRemaining || 14);
+    setTrialFeaturesOverride(row.trialFeaturesOverride || {});
+  };
+
+  const toggleOverrideFeature = (key) => {
+    setTrialFeaturesOverride((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
   };
 
   const filteredBusinesses = businesses.filter(
@@ -41,6 +66,18 @@ const Businesses = () => {
     { header: isAz ? 'Sahibkar' : 'Owner', accessor: 'owner' },
     { header: isAz ? 'Paket' : 'Plan', accessor: 'plan' },
     {
+      header: isAz ? 'Pulsuz Sınaq (Trial)' : 'Free Trial',
+      accessor: 'trialDaysRemaining',
+      render: (row) =>
+        row.status === 'trial' ? (
+          <span style={{ color: 'var(--primary-start)', fontWeight: 600 }}>
+            {row.trialDaysRemaining} {isAz ? 'gün qalıb' : 'days left'}
+          </span>
+        ) : (
+          <span style={{ color: 'var(--text-secondary)' }}>—</span>
+        ),
+    },
+    {
       header: isAz ? 'Şəxsi Domen (White-Label)' : 'White-Label Domain',
       accessor: 'customDomain',
       render: (row) => (
@@ -57,11 +94,11 @@ const Businesses = () => {
     <div className="page-container">
       <div className="flex-between" style={{ marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1>{isAz ? 'Qeydiyyatdan Keçmiş Bizneslər' : 'Tenant Businesses'}</h1>
+          <h1>{isAz ? 'Qeydiyyatdan Keçmiş Bizneslər və Pulsuz Sınaq İdarəetməsi' : 'Tenant Businesses & Dynamic Free Trial'}</h1>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isAz
-              ? 'Biznes hesablarını, şəxsi domen (CNAME) təyinatlarını və abunəlik paketlərini idarə edin.'
-              : 'Manage business tenants, white-label custom domain assignments, and subscription plans.'}
+              ? 'Biznes hesablarını, fərdi Pulsuz Sınaq (Free Trial) müddətini və xüsusiyyətlərini, şəxsi domenləri və paketləri idarə edin.'
+              : 'Manage business tenants, dynamic Free Trial duration & features, white-label domains, and subscription plans.'}
           </p>
         </div>
         <div className="flex-center" style={{ gap: '1rem' }}>
@@ -81,11 +118,11 @@ const Businesses = () => {
       <Modal
         isOpen={!!selectedBusiness}
         onClose={() => setSelectedBusiness(null)}
-        title={isAz ? 'Biznesi və Şəxsi Domeni İdarə Et' : 'Manage Business Tenant & White-Label Setup'}
+        title={isAz ? 'Biznesi, Pulsuz Sınağı və Domeni İdarə Et' : 'Manage Business, Dynamic Free Trial & Domain'}
       >
         {selectedBusiness && (
           <div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
               <div>
                 <p className="form-label">{isAz ? 'Biznes Adı' : 'Business Name'}</p>
                 <p style={{ fontWeight: 600 }}>{selectedBusiness.name}</p>
@@ -114,6 +151,50 @@ const Businesses = () => {
               </div>
             </div>
 
+            {/* Dynamic Free Trial Duration & Features Section */}
+            <div
+              style={{
+                padding: '1rem',
+                background: 'rgba(6, 182, 212, 0.08)',
+                borderRadius: '8px',
+                border: '1px solid rgba(6, 182, 212, 0.3)',
+                marginBottom: '1.25rem',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Clock size={18} color="var(--primary-start)" />
+                  <span style={{ fontWeight: 600 }}>
+                    {isAz ? 'Dinamik Pulsuz Sınaq (Free Trial) Tənzimləməsi' : 'Dynamic Free Trial Duration & Features'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.85rem' }}>{isAz ? 'Sınaq Günləri:' : 'Trial Days:'}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="365"
+                    className="form-control"
+                    style={{ width: '85px', padding: '0.3rem 0.5rem' }}
+                    value={trialDaysInput}
+                    onChange={(e) => setTrialDaysInput(Number(e.target.value))}
+                  />
+                </div>
+              </div>
+              <div style={{ maxHeight: '130px', overflowY: 'auto', fontSize: '0.82rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
+                {TRIAL_FEATURE_OPTIONS.map((opt) => (
+                  <label key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(trialFeaturesOverride[opt.key])}
+                      onChange={() => toggleOverrideFeature(opt.key)}
+                    />
+                    <span>{isAz ? opt.az : opt.en}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
             <div
               style={{
                 padding: '1rem',
@@ -129,11 +210,6 @@ const Businesses = () => {
                   {isAz ? 'Şəxsi CNAME Domen Təyin Et' : 'Assign White-Label Custom CNAME Domain'}
                 </span>
               </div>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-                {isAz
-                  ? 'Fərdi brendləşdirilmiş randevu portalını (`booking.mysalon.az`) aktivləşdirir.'
-                  : 'Enables custom branded booking portal (`booking.mysalon.az`).'}
-              </p>
               <div className="flex-between" style={{ gap: '0.5rem' }}>
                 <input
                   type="text"
@@ -142,18 +218,6 @@ const Businesses = () => {
                   value={customDomainInput}
                   onChange={(e) => setCustomDomainInput(e.target.value)}
                 />
-                <button
-                  className="btn btn-secondary"
-                  onClick={async () => {
-                    await updateBusinessStatus(selectedBusiness.id, selectedBusiness.status, {
-                      custom_domain: customDomainInput,
-                      plan: selectedPlanInput,
-                    });
-                    setSelectedBusiness(null);
-                  }}
-                >
-                  {isAz ? 'Təsdiqlə' : 'Verify & Assign'}
-                </button>
               </div>
             </div>
 
@@ -165,6 +229,8 @@ const Businesses = () => {
                     await updateBusinessStatus(selectedBusiness.id, 'active', {
                       custom_domain: customDomainInput,
                       plan: selectedPlanInput,
+                      trial_days: Number(trialDaysInput),
+                      trial_features_override: trialFeaturesOverride,
                     });
                     setSelectedBusiness(null);
                   }}
@@ -189,11 +255,13 @@ const Businesses = () => {
                   await updateBusinessStatus(selectedBusiness.id, selectedBusiness.status, {
                     custom_domain: customDomainInput,
                     plan: selectedPlanInput,
+                    trial_days: Number(trialDaysInput),
+                    trial_features_override: trialFeaturesOverride,
                   });
                   setSelectedBusiness(null);
                 }}
               >
-                {isAz ? 'Dəyişiklikləri Yadda Saxla' : 'Save Tenant Setup'}
+                {isAz ? 'Dəyişiklikləri Yadda Saxla' : 'Save Tenant & Trial Setup'}
               </button>
             </div>
           </div>

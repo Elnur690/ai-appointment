@@ -1,4 +1,6 @@
+from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any, Optional
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -173,16 +175,34 @@ async def register_business(
         if reseller:
             reseller_id = reseller.id
 
-    # Assign Starter plan by default if present
-    starter_plan = (
-        await db.execute(select(Plan).where(Plan.is_active == True).order_by(Plan.price.asc()))
-    ).scalars().first()
+    # Assign selected plan or Starter plan by default
+    selected_plan = None
+    if request.plan_id:
+        try:
+            selected_plan = (
+                await db.execute(select(Plan).where(Plan.id == UUID(request.plan_id), Plan.is_active == True))
+            ).scalar_one_or_none()
+        except ValueError:
+            selected_plan = None
+    if not selected_plan:
+        selected_plan = (
+            await db.execute(select(Plan).where(Plan.is_active == True).order_by(Plan.price.asc()))
+        ).scalars().first()
+
+    trial_days = int(getattr(selected_plan, "trial_days", 14) or 14) if selected_plan else 14
+    allows_trial = bool(getattr(selected_plan, "allows_free_trial", True)) if selected_plan else True
+    trial_ends = (
+        datetime.now(timezone.utc) + timedelta(days=trial_days)
+        if allows_trial and trial_days > 0
+        else None
+    )
 
     business = Business(
         name=request.business_name.strip(),
-        plan_id=starter_plan.id if starter_plan else None,
+        plan_id=selected_plan.id if selected_plan else None,
         reseller_id=reseller_id,
-        subscription_status="trial",
+        subscription_status="trial" if allows_trial else "active",
+        trial_ends_at=trial_ends,
         category=request.category,
         is_active=True,
     )
@@ -285,6 +305,9 @@ async def get_public_plans(
             "max_whatsapp_numbers": p.max_whatsapp_numbers,
             "ai_message_quota": p.ai_message_quota,
             "message_limit": p.ai_message_quota,
+            "allows_free_trial": bool(getattr(p, "allows_free_trial", True)),
+            "trial_days": int(getattr(p, "trial_days", 14) or 0),
+            "trial_features": getattr(p, "trial_features", None) or {},
             "allows_whatsapp": bool(getattr(p, "allows_whatsapp", True)),
             "allows_instagram": bool(getattr(p, "allows_instagram", False) or p.allows_omnichannel_messaging),
             "allows_telegram": bool(getattr(p, "allows_telegram", False) or p.allows_omnichannel_messaging),

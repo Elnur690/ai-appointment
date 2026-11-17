@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import httpx
 from typing import Annotated, Any, Optional
 from uuid import UUID
@@ -13,6 +14,7 @@ from app.core.database import get_db
 from app.core.dependencies import require_role, get_business_context
 from app.models.business import Business, Branch
 from app.models.appointment import Appointment
+from app.models.conversation import Conversation, Message
 from app.models.payment import Payment, PaymentGatewayConfig
 from app.services.custom_domain_service import CustomDomainService
 from app.integrations.whatsapp.client import EvolutionAPIClient
@@ -26,6 +28,9 @@ class BusinessResponse(BaseModel):
     custom_domain: Optional[str] = None
     reseller_id: Optional[str] = None
     plan_name: str = "Starter"
+    subscription_status: str = "trial"
+    trial_ends_at: Optional[str] = None
+    trial_days_remaining: int = 0
     entitlements: dict = {}
     webhook_urls: dict = {}
     settings: dict = {}
@@ -40,6 +45,10 @@ class BusinessUpdate(BaseModel):
 class BusinessAnalyticsResponse(BaseModel):
     appointments_this_month: int
     revenue_this_month: float
+    total_messages: int = 0
+    ai_tokens_used: int = 0
+    ai_spend_usd: float = 0.0
+    ai_spend_azn: float = 0.0
 
 
 class CustomDomainVerifyRequest(BaseModel):
@@ -80,6 +89,23 @@ def _build_business_response(biz: Business) -> BusinessResponse:
         "allows_online_payments": bool(getattr(plan, "allows_online_payments", True)) if plan else True,
         "allows_custom_domain": bool(getattr(plan, "allows_custom_domain", False)) if plan else False,
     }
+    now_utc = datetime.now(timezone.utc)
+    trial_days_remaining = 0
+    if biz.trial_ends_at:
+        end_dt = biz.trial_ends_at if biz.trial_ends_at.tzinfo else biz.trial_ends_at.replace(tzinfo=timezone.utc)
+        trial_days_remaining = max(0, (end_dt - now_utc).days)
+
+    if biz.subscription_status == "trial" and (not biz.trial_ends_at or trial_days_remaining > 0):
+        plan_trial_feats = getattr(plan, "trial_features", None) if plan else None
+        if isinstance(plan_trial_feats, dict):
+            for k, v in plan_trial_feats.items():
+                if isinstance(v, bool):
+                    entitlements[k] = v
+        if isinstance(biz.trial_features_override, dict):
+            for k, v in biz.trial_features_override.items():
+                if isinstance(v, bool):
+                    entitlements[k] = v
+
     api_base = f"https://api.{settings.PLATFORM_DOMAIN}/api/v1/webhooks"
     webhook_urls = {
         "whatsapp": f"{api_base}/whatsapp",
@@ -92,6 +118,9 @@ def _build_business_response(biz: Business) -> BusinessResponse:
         custom_domain=biz.custom_domain,
         reseller_id=str(biz.reseller_id) if biz.reseller_id else None,
         plan_name=plan.name if plan else "Starter",
+        subscription_status=biz.subscription_status or "trial",
+        trial_ends_at=biz.trial_ends_at.strftime("%Y-%m-%d") if biz.trial_ends_at else None,
+        trial_days_remaining=trial_days_remaining,
         entitlements=entitlements,
         webhook_urls=webhook_urls,
         settings=biz.default_ai_tone_config or {},
@@ -317,7 +346,7 @@ async def get_business_analytics(
     user: Annotated[dict[str, Any], Depends(require_role("owner"))],
     business_id: Annotated[str, Depends(get_business_context)],
 ):
-    """Get analytics for the current business."""
+    """Get analytics and AI spend for the current business."""
     biz_uuid = _parse_uuid_safe(business_id)
     if biz_uuid:
         appt_count = (
@@ -326,9 +355,24 @@ async def get_business_analytics(
         rev_sum = (
             await db.execute(select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.business_id == biz_uuid))
         ).scalar_one()
+        msg_rows = (
+            await db.execute(
+                select(Message.content, Message.direction)
+                .join(Conversation, Message.conversation_id == Conversation.id)
+                .where(Conversation.business_id == biz_uuid)
+            )
+        ).all()
+        total_msgs = len(msg_rows)
+        tokens_used = sum(max(120, int(len(r[0] or "") / 3.5)) + 350 for r in msg_rows)
+        spend_usd = round((tokens_used / 1_000_000.0) * 0.75, 4)
+        spend_azn = round(spend_usd * 1.70, 4)
         return BusinessAnalyticsResponse(
             appointments_this_month=int(appt_count or 0),
             revenue_this_month=float(rev_sum or 0.0),
+            total_messages=total_msgs,
+            ai_tokens_used=tokens_used,
+            ai_spend_usd=spend_usd,
+            ai_spend_azn=spend_azn,
         )
     return BusinessAnalyticsResponse(appointments_this_month=0, revenue_this_month=0.0)
 

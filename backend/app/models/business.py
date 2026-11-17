@@ -1,6 +1,7 @@
 import uuid
+from datetime import datetime
 from typing import Any, List
-from sqlalchemy import String, ForeignKey, Boolean
+from sqlalchemy import String, ForeignKey, Boolean, DateTime
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -33,6 +34,8 @@ class Business(Base, TimestampMixin):
     reseller_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("resellers.id"), nullable=True, index=True)
     custom_domain: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     subscription_status: Mapped[str] = mapped_column(String, default="trial")
+    trial_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    trial_features_override: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     default_ai_tone_config: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True, default=DEFAULT_AI_TONE)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     

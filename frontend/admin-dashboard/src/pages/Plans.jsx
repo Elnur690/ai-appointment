@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useDataStore } from '../store/dataStore';
 import { useAuthStore } from '../store/authStore';
 import Modal from '../components/common/Modal';
-import { Check, X, MessageSquare, Instagram, Send } from 'lucide-react';
+import { Check, X, MessageSquare, Instagram, Send, Clock } from 'lucide-react';
 
 const ALL_PLAN_FEATURES = [
   {
@@ -146,6 +146,9 @@ const Plans = () => {
     max_branches: 1,
     max_whatsapp_numbers: 1,
     assigned_ai_model: 'gemini-3.5-flash',
+    allows_free_trial: true,
+    trial_days: 14,
+    trial_features: {},
     allows_whatsapp: true,
     allows_instagram: false,
     allows_telegram: false,
@@ -171,7 +174,6 @@ const Plans = () => {
     allows_cadence_engine: false,
     allows_gift_vouchers: false,
     allows_flash_drops: false,
-    features: '',
   };
 
   const [newPlan, setNewPlan] = useState(defaultForm);
@@ -191,6 +193,9 @@ const Plans = () => {
       max_branches: Number(plan.max_branches || 1),
       max_whatsapp_numbers: Number(plan.max_whatsapp_numbers || 1),
       assigned_ai_model: plan.features?.assigned_model || 'gemini-3.5-flash',
+      allows_free_trial: plan.allows_free_trial !== false,
+      trial_days: Number(plan.trial_days ?? 14),
+      trial_features: plan.trial_features || {},
       allows_whatsapp: plan.allows_whatsapp !== false,
       allows_instagram: Boolean(plan.allows_instagram),
       allows_telegram: Boolean(plan.allows_telegram),
@@ -216,7 +221,6 @@ const Plans = () => {
       allows_cadence_engine: Boolean(plan.allows_cadence_engine),
       allows_gift_vouchers: Boolean(plan.allows_gift_vouchers),
       allows_flash_drops: Boolean(plan.allows_flash_drops),
-      features: plan.features || '',
     });
     setIsModalOpen(true);
   };
@@ -232,6 +236,9 @@ const Plans = () => {
         max_branches: Number(newPlan.max_branches || 1),
         max_whatsapp_numbers: Number(newPlan.max_whatsapp_numbers || 1),
         message_limit: parsedLimit,
+        allows_free_trial: Boolean(newPlan.allows_free_trial),
+        trial_days: Number(newPlan.trial_days ?? 14),
+        trial_features: newPlan.trial_features || {},
         allows_whatsapp: newPlan.allows_whatsapp !== false,
         allows_instagram: Boolean(newPlan.allows_instagram),
         allows_telegram: Boolean(newPlan.allows_telegram),
@@ -279,15 +286,23 @@ const Plans = () => {
     });
   };
 
+  const toggleTrialFeature = (key) => {
+    setNewPlan((prev) => {
+      const nextTrialFeats = { ...(prev.trial_features || {}) };
+      nextTrialFeats[key] = !nextTrialFeats[key];
+      return { ...prev, trial_features: nextTrialFeats };
+    });
+  };
+
   return (
     <div className="page-container">
       <div className="flex-between" style={{ marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1>{isAz ? 'Abunəlik Paketləri və Bütün Xüsusiyyətlər' : 'Subscription Plans & All Feature Entitlements'}</h1>
+          <h1>{isAz ? 'Abunəlik Paketləri, Pulsuz Sınaq (Free Trial) və Xüsusiyyətlər' : 'Subscription Plans, Dynamic Free Trial & All Features'}</h1>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isAz
-              ? 'WhatsApp standart paketdədir. Instagram Direct, Telegram Bot və platformanın bütün 24+ xüsusiyyətini hər paket üzrə aktiv və ya deaktiv edin.'
-              : 'WhatsApp is included in the default package. Enable or disable Instagram Direct, Telegram Bot, and all 24+ platform features per plan.'}
+              ? 'Hər paket üçün Pulsuz Sınaq müddətini (gün), sınaq xüsusiyyətlərini, kanalları (WhatsApp, Instagram, Telegram) və 24+ funksiyanı dinamik tənzimləyin.'
+              : 'Dynamically configure Free Trial duration (days), trial feature unlocks, channels (WhatsApp, Instagram, Telegram), and all 24+ features per plan.'}
           </p>
         </div>
         <button className="btn btn-primary" onClick={handleOpenCreate}>
@@ -298,7 +313,32 @@ const Plans = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem' }}>
         {plans.map((plan) => (
           <div key={plan.id} className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column' }}>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '0.35rem' }}>{plan.name}</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+              <h2 style={{ fontSize: '1.5rem', margin: 0 }}>{plan.name}</h2>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  padding: '0.25rem 0.65rem',
+                  borderRadius: '999px',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  background: plan.allows_free_trial && plan.trial_days > 0 ? 'rgba(6, 182, 212, 0.15)' : 'rgba(255,255,255,0.06)',
+                  color: plan.allows_free_trial && plan.trial_days > 0 ? 'var(--primary-start)' : 'var(--text-secondary)',
+                }}
+              >
+                <Clock size={13} />
+                {plan.allows_free_trial && plan.trial_days > 0
+                  ? isAz
+                    ? `${plan.trial_days} Gün Pulsuz Sınaq`
+                    : `${plan.trial_days}-Day Free Trial`
+                  : isAz
+                  ? 'Pulsuz Sınaq Yoxdur'
+                  : 'No Free Trial'}
+              </span>
+            </div>
+
             <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--primary-start)', marginBottom: '1.25rem' }}>
               {plan.price_num} AZN/{isAz ? 'ay' : 'mo'}
             </div>
@@ -426,7 +466,7 @@ const Plans = () => {
 
             <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
               <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => handleOpenEdit(plan)}>
-                {isAz ? 'Paketi və Xüsusiyyətləri Redaktə Et' : 'Edit Plan & All Features'}
+                {isAz ? 'Paketi və Pulsuz Sınağı Redaktə Et' : 'Edit Plan & Free Trial'}
               </button>
             </div>
           </div>
@@ -481,6 +521,65 @@ const Plans = () => {
               />
             </div>
           </div>
+
+          {/* Dynamic Free Trial Configuration Section */}
+          <div
+            style={{
+              padding: '1rem',
+              background: 'rgba(6, 182, 212, 0.08)',
+              border: '1px solid rgba(6, 182, 212, 0.3)',
+              borderRadius: '8px',
+              marginBottom: '1.25rem',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 600 }}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(newPlan.allows_free_trial)}
+                  onChange={(e) => setNewPlan({ ...newPlan, allows_free_trial: e.target.checked })}
+                />
+                <span>{isAz ? 'Pulsuz Sınaq (Free Trial) Aktivdir' : 'Enable Free Trial on This Plan'}</span>
+              </label>
+              {newPlan.allows_free_trial && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.85rem' }}>{isAz ? 'Müddət (Gün):' : 'Duration (Days):'}</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="365"
+                    className="form-control"
+                    style={{ width: '85px', padding: '0.35rem 0.5rem' }}
+                    value={newPlan.trial_days}
+                    onChange={(e) => setNewPlan({ ...newPlan, trial_days: Number(e.target.value) })}
+                  />
+                </div>
+              )}
+            </div>
+            {newPlan.allows_free_trial && (
+              <div style={{ maxHeight: '130px', overflowY: 'auto', fontSize: '0.82rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
+                  {isAz
+                    ? 'Pulsuz sınaq müddətində əlavə olaraq aktiv ediləcək xüsusiyyətləri seçin:'
+                    : 'Select additional features to unlock dynamically during the Free Trial:'}
+                </div>
+                {ALL_PLAN_FEATURES.map((feat) => (
+                  <label
+                    key={`trial_${feat.key}`}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', cursor: 'pointer' }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={Boolean(newPlan.trial_features?.[feat.key] ?? newPlan[feat.key])}
+                      onChange={() => toggleTrialFeature(feat.key)}
+                    />
+                    <span>{isAz ? feat.az : feat.en}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="form-group">
               <label className="form-label">{isAz ? 'Maksimum Filial Sayı' : 'Max Branches'}</label>
@@ -511,13 +610,13 @@ const Plans = () => {
               value={newPlan.assigned_ai_model}
               onChange={(e) => setNewPlan({ ...newPlan, assigned_ai_model: e.target.value })}
             >
-              <option value="gemini-3.5-flash">Google Gemini 3.5 Flash</option>
-              <option value="claude-3-7-sonnet">Anthropic Claude 3.7 Sonnet</option>
-              <option value="gpt-4o">OpenAI GPT-4o</option>
+              <option value="gemini-3.5-flash">Google Gemini 3.5 Flash ($0.45 / 1M tokens)</option>
+              <option value="claude-3-7-sonnet">Anthropic Claude 3.7 Sonnet ($9.00 / 1M tokens)</option>
+              <option value="gpt-4o">OpenAI GPT-4o ($6.25 / 1M tokens)</option>
             </select>
           </div>
 
-          <div style={{ margin: '1.25rem 0', maxHeight: '320px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+          <div style={{ margin: '1.25rem 0', maxHeight: '240px', overflowY: 'auto', paddingRight: '0.5rem' }}>
             <label className="form-label" style={{ marginBottom: '0.75rem', display: 'block' }}>
               {isAz ? 'Bütün Platforma Xüsusiyyətləri (24 Xüsusiyyət)' : 'All Platform Feature Entitlements (24 Features)'}
             </label>

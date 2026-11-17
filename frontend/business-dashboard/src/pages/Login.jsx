@@ -15,6 +15,7 @@ const Login = ({ initialMode = 'login' }) => {
   const [ownerName, setOwnerName] = useState('');
   const [phone, setPhone] = useState('');
   const [referralCode, setReferralCode] = useState(refParam);
+  const [selectedPlanId, setSelectedPlanId] = useState('');
   const [plans, setPlans] = useState([]);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -27,7 +28,13 @@ const Login = ({ initialMode = 'login' }) => {
   useEffect(() => {
     api
       .get('/auth/plans')
-      .then((res) => setPlans(res.data || []))
+      .then((res) => {
+        const list = res.data || [];
+        setPlans(list);
+        if (list.length > 0 && !selectedPlanId) {
+          setSelectedPlanId(list[0].id);
+        }
+      })
       .catch(() => setPlans([]));
   }, []);
 
@@ -68,6 +75,7 @@ const Login = ({ initialMode = 'login' }) => {
         password,
         phone: phone || null,
         referral_code: referralCode || null,
+        plan_id: selectedPlanId || null,
       });
       localStorage.setItem('access_token', res.data.access_token);
       login({
@@ -413,7 +421,14 @@ const Login = ({ initialMode = 'login' }) => {
               const allFeatures = getPlanFeatureItems(p, lang);
               return (
                 <div key={p.id} className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column' }}>
-                  <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem' }}>{p.name}</h3>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <h3 style={{ fontSize: '1.4rem', margin: 0 }}>{p.name}</h3>
+                    {p.allows_free_trial !== false && (p.trial_days ?? 14) > 0 && (
+                      <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>
+                        {lang === 'en' ? `${p.trial_days ?? 14}-Day Free Trial` : `${p.trial_days ?? 14} Gün Pulsuz Sınaq`}
+                      </span>
+                    )}
+                  </div>
                   <div style={{ fontSize: '2.1rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '1.25rem' }}>
                     {p.price} AZN
                     <span style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', fontWeight: 400 }}>
@@ -448,6 +463,7 @@ const Login = ({ initialMode = 'login' }) => {
                     className="btn btn-primary"
                     style={{ marginTop: 'auto', justifyContent: 'center', width: '100%' }}
                     onClick={() => {
+                      setSelectedPlanId(p.id);
                       setMode('register');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}

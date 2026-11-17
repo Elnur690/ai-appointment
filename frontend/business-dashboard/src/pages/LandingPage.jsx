@@ -139,6 +139,25 @@ const TRANSLATIONS = {
     onlinePayments: 'Nağd, Payriff və Paymegate Ödənişlər',
     customDomain: 'Şəxsi Domen (White-Label CNAME)',
     planCta: (name) => `${name} ilə Başla`,
+    faqTitle: 'Tez-tez Verilən Suallar (FAQ)',
+    faqs: [
+      {
+        q: 'Randevu.vip necə işləyir və qoşulmaq nə qədər vaxt aparır?',
+        a: 'app.randevu.vip üzərindən qeydiyyatdan keçdikdən sonra Tənzimləmələr bölməsində WhatsApp QR kodunu skan edirsiniz. 60 saniyə ərzində AI resepşn müştərilərin mətn və səsli mesajlarına Azərbaycan, Rus, Türk və İngilis dillərində cavab verməyə başlayır.',
+      },
+      {
+        q: 'WhatsApp, Instagram və Telegram kanalları necə idarə olunur?',
+        a: 'WhatsApp Biznes bütün paketlərə standart daxildir. Instagram Direct və Telegram Bot (@BotFather) inteqrasiyalarını paketinizə uyğun olaraq Tənzimləmələr bölməsindən 1 kliklə aktivləşdirə bilərsiniz.',
+      },
+      {
+        q: 'Hansı ödəniş şlüzləri (Payment Gateways) dəstəklənir?',
+        a: 'Randevu.vip həm salonda Nağd (Cash) ödəniş uçotunu, həm də Payriff və Paymegate (api.paymegate.com) vasitəsilə onlayn beh (depozit) və kart ödənişlərini dəstəkləyir.',
+      },
+      {
+        q: 'Pulsuz Sınaq (Free Trial) müddəti necə işləyir?',
+        a: 'Yeni qeydiyyatdan keçən hər bir biznes seçdiyi paket üzrə təyin olunmuş Pulsuz Sınaq müddəti ərzində sistemi sınaqdan keçirə və istənilən vaxt paketini dəyişə bilər.',
+      },
+    ],
     footerTagline: 'AI Randevu və Biznes İdarəetmə Platforması',
     footerLogin: 'İdarəetmə Paneli (app.randevu.vip)',
     footerRegister: 'Biznes Qeydiyyatı',
@@ -254,6 +273,25 @@ const TRANSLATIONS = {
     onlinePayments: 'Cash, Payriff & Paymegate Gateways',
     customDomain: 'White-Label Custom CNAME Domain',
     planCta: (name) => `Get Started with ${name}`,
+    faqTitle: 'Frequently Asked Questions (FAQ)',
+    faqs: [
+      {
+        q: 'How does Randevu.vip work and how fast can I go live?',
+        a: 'After registering at app.randevu.vip, simply scan the WhatsApp QR code in Settings. Within 60 seconds, your AI receptionist replies to text and voice notes in Azerbaijani, English, Russian, and Turkish.',
+      },
+      {
+        q: 'How are WhatsApp, Instagram Direct, and Telegram Bot configured?',
+        a: 'WhatsApp Business is included in the default package. Instagram Direct and Telegram Bot (@BotFather) can be enabled on your plan and connected directly inside your workspace Settings.',
+      },
+      {
+        q: 'Which payment gateways are supported?',
+        a: 'Randevu.vip supports in-person Cash payments, Payriff, and Paymegate (api.paymegate.com) for automated online deposits and no-show protection.',
+      },
+      {
+        q: 'How does the dynamic Free Trial work?',
+        a: 'Every new business starts with a Free Trial configured on their chosen plan, giving instant access to AI booking, staff scheduling, and omnichannel messaging.',
+      },
+    ],
     footerTagline: 'AI Appointment & Booking Platform',
     footerLogin: 'Workspace Login (app.randevu.vip)',
     footerRegister: 'Register Business',
@@ -288,6 +326,16 @@ const LandingPage = () => {
       .then((res) => setPlans(res.data || []))
       .catch(() => setPlans([]));
   }, []);
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = lang;
+      document.title =
+        lang === 'en'
+          ? 'Randevu.vip — 24/7 AI Appointment & Revenue Platform for WhatsApp, Instagram & Telegram'
+          : 'Randevu.vip — WhatsApp, Instagram və Telegram üçün 24/7 AI Randevu və Biznes Platforması';
+    }
+  }, [lang]);
 
   const t = TRANSLATIONS[lang] || TRANSLATIONS.az;
   const appOrigin = getAppOrigin();
@@ -482,7 +530,14 @@ const LandingPage = () => {
             const allFeatures = getPlanFeatureItems(p, lang);
             return (
               <div key={p.id} className="glass-card" style={{ padding: '2.25rem', display: 'flex', flexDirection: 'column' }}>
-                <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem' }}>{p.name}</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <h3 style={{ fontSize: '1.4rem', margin: 0 }}>{p.name}</h3>
+                  {p.allows_free_trial !== false && (p.trial_days ?? 14) > 0 && (
+                    <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>
+                      {lang === 'en' ? `${p.trial_days ?? 14}-Day Free Trial` : `${p.trial_days ?? 14} Gün Pulsuz Sınaq`}
+                    </span>
+                  )}
+                </div>
                 <div style={{ fontSize: '2.25rem', fontWeight: 800, color: 'var(--primary)', marginBottom: '1.5rem' }}>
                   {p.price} AZN
                   <span style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', fontWeight: 400 }}>{t.perMonth}</span>
@@ -520,6 +575,19 @@ const LandingPage = () => {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      {/* SEO & GEO Structured FAQ Section */}
+      <section id="faq" style={{ maxWidth: '1000px', margin: '0 auto', padding: '2.5rem 1.5rem 1rem' }}>
+        <h2 style={{ textAlign: 'center', fontSize: '2rem', marginBottom: '2rem' }}>{t.faqTitle}</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '1.25rem' }}>
+          {(t.faqs || []).map((item, idx) => (
+            <div key={idx} className="glass-card" style={{ padding: '1.5rem' }}>
+              <h3 style={{ fontSize: '1.05rem', marginBottom: '0.6rem', color: 'var(--primary)' }}>{item.q}</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', lineHeight: 1.6, margin: 0 }}>{item.a}</p>
+            </div>
+          ))}
         </div>
       </section>
 

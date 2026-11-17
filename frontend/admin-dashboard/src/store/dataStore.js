@@ -5,8 +5,27 @@ export const useDataStore = create((set, get) => ({
   analytics: {
     total_businesses: 0,
     active_subscriptions: 0,
+    trial_businesses: 0,
+    suspended_businesses: 0,
     mrr_usd: 0,
+    mrr_azn: 0,
+    arr_azn: 0,
+    total_settled_revenue_azn: 0,
+    total_appointments: 0,
+    completed_appointments: 0,
+    cancelled_appointments: 0,
+    pending_appointments: 0,
+    total_customers: 0,
+    total_messages: 0,
+    inbound_messages: 0,
+    outbound_ai_messages: 0,
     total_messages_this_month: 0,
+    total_resellers: 0,
+    total_ai_tokens_used: 0,
+    total_ai_spend_usd: 0,
+    total_ai_spend_azn: 0,
+    net_platform_margin_azn: 0,
+    ai_spend_per_business: [],
   },
   businesses: [],
   plans: [],
@@ -79,6 +98,9 @@ export const useDataStore = create((set, get) => ({
         customDomain: b.custom_domain || '',
         resellerCode: b.reseller_code || '',
         status: b.status || (b.is_active ? 'active' : 'suspended'),
+        trialEndsAt: b.trial_ends_at || null,
+        trialDaysRemaining: b.trial_days_remaining ?? 0,
+        trialFeaturesOverride: b.trial_features_override || {},
         branches: b.branches ?? 0,
         created: b.created_at ? b.created_at.slice(0, 10) : '—',
       }));
@@ -99,6 +121,9 @@ export const useDataStore = create((set, get) => ({
         price_num: p.price,
         price: `${p.price} AZN/mo`,
         message_limit: p.message_limit,
+        allows_free_trial: p.allows_free_trial !== false,
+        trial_days: p.trial_days ?? 14,
+        trial_features: p.trial_features || {},
         limits: p.message_limit >= 100000 ? 'Unlimited messages' : `${Number(p.message_limit).toLocaleString()} messages`,
         allows_whatsapp: p.allows_whatsapp !== false,
         allows_instagram: Boolean(p.allows_instagram || p.allows_omnichannel_messaging),
@@ -106,9 +131,7 @@ export const useDataStore = create((set, get) => ({
         allows_online_payments: Boolean(p.allows_online_payments),
         allows_voice_messages: Boolean(p.allows_voice_messages),
         allows_custom_domain: Boolean(p.allows_custom_domain),
-        features: Array.isArray(p.features?.list)
-          ? p.features.list.join(', ')
-          : Object.keys(p.features || {}).join(', ') || 'AI Booking, WhatsApp, Instagram & Telegram',
+        features: p.features || {},
       }));
       set({ plans: mapped, loading: false });
     } catch (err) {
@@ -145,16 +168,15 @@ export const useDataStore = create((set, get) => ({
   createPlan: async (plan) => {
     const parsedPrice = parseFloat(String(plan.price).replace(/[^0-9.]/g, '')) || 49.0;
     const parsedLimit = parseInt(String(plan.limits).replace(/[^0-9]/g, ''), 10) || 2000;
-    const featureList = String(plan.features || '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
     await apiClient.post('/saas-admin/plans', {
       name: plan.name,
       price: parsedPrice,
       max_branches: Number(plan.max_branches || 1),
       max_whatsapp_numbers: Number(plan.max_whatsapp_numbers || 1),
       message_limit: parsedLimit,
+      allows_free_trial: Boolean(plan.allows_free_trial),
+      trial_days: Number(plan.trial_days ?? 14),
+      trial_features: plan.trial_features || {},
       allows_whatsapp: plan.allows_whatsapp !== false,
       allows_instagram: Boolean(plan.allows_instagram),
       allows_telegram: Boolean(plan.allows_telegram),
@@ -180,7 +202,7 @@ export const useDataStore = create((set, get) => ({
       allows_cadence_engine: Boolean(plan.allows_cadence_engine),
       allows_gift_vouchers: Boolean(plan.allows_gift_vouchers),
       allows_flash_drops: Boolean(plan.allows_flash_drops),
-      features: { list: featureList, assigned_model: plan.assigned_ai_model || 'gemini-3.5-flash' },
+      features: { assigned_model: plan.assigned_ai_model || 'gemini-3.5-flash' },
     });
     await get().fetchPlans();
   },

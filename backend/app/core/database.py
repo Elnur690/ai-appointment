@@ -69,6 +69,11 @@ async def init_db() -> None:
         "ALTER TABLE plans ADD COLUMN IF NOT EXISTS allows_whatsapp BOOLEAN DEFAULT TRUE;",
         "ALTER TABLE plans ADD COLUMN IF NOT EXISTS allows_instagram BOOLEAN DEFAULT FALSE;",
         "ALTER TABLE plans ADD COLUMN IF NOT EXISTS allows_telegram BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE plans ADD COLUMN IF NOT EXISTS allows_free_trial BOOLEAN DEFAULT TRUE;",
+        "ALTER TABLE plans ADD COLUMN IF NOT EXISTS trial_days INTEGER DEFAULT 14;",
+        "ALTER TABLE plans ADD COLUMN IF NOT EXISTS trial_features JSONB;",
+        "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMP WITH TIME ZONE;",
+        "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS trial_features_override JSONB;",
     ]
     for stmt_sql in alter_statements:
         try:

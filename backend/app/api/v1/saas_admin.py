@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any, List, Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, HTTPException
@@ -11,12 +12,21 @@ from app.core.database import get_db
 from app.core.dependencies import require_role
 from app.models.business import Business
 from app.models.saas import Plan, PlatformConfig, DEFAULT_PLATFORM_GATEWAYS
-from app.models.subscription import Subscription
-from app.models.appointment import Appointment
-from app.models.conversation import Message
+from app.models.appointment import Appointment, AppointmentStatus
+from app.models.customer import Customer
+from app.models.conversation import Conversation, Message, MessageDirection
+from app.models.payment import Payment, PaymentStatus
 from app.models.reseller import Reseller
 
 router = APIRouter()
+
+# Official blended per-1M token cost in USD (input + output weighted)
+MODEL_COST_PER_1M_TOKENS_USD = {
+    "gemini-3.5-flash": 0.45,
+    "claude-3-7-sonnet": 9.00,
+    "gpt-4o": 6.25,
+}
+USD_TO_AZN_RATE = 1.70
 
 
 class BusinessResponse(BaseModel):
@@ -26,6 +36,9 @@ class BusinessResponse(BaseModel):
     plan: Optional[str] = None
     branches: int = 0
     status: str
+    trial_ends_at: Optional[str] = None
+    trial_days_remaining: int = 0
+    trial_features_override: Optional[dict] = None
     custom_domain: Optional[str] = None
     reseller_id: Optional[str] = None
     created_at: Optional[str] = None
@@ -39,6 +52,9 @@ class PlanResponse(BaseModel):
     max_whatsapp_numbers: int = 1
     ai_message_quota: int = 1000
     message_limit: int = 1000
+    allows_free_trial: bool = True
+    trial_days: int = 14
+    trial_features: Optional[dict] = None
     allows_whatsapp: bool = True
     allows_instagram: bool = False
     allows_telegram: bool = False
@@ -63,6 +79,7 @@ class PlanResponse(BaseModel):
     allows_cadence_engine: bool = False
     allows_gift_vouchers: bool = False
     allows_flash_drops: bool = False
+    allows_branch_level_ai_tone: bool = False
     features: Optional[dict] = None
 
 
@@ -73,6 +90,9 @@ class PlanCreate(BaseModel):
     max_whatsapp_numbers: int = 1
     ai_message_quota: int = 1000
     message_limit: Optional[int] = None
+    allows_free_trial: bool = True
+    trial_days: int = 14
+    trial_features: Optional[dict] = None
     allows_whatsapp: bool = True
     allows_instagram: bool = False
     allows_telegram: bool = False
@@ -97,6 +117,7 @@ class PlanCreate(BaseModel):
     allows_cadence_engine: bool = False
     allows_gift_vouchers: bool = False
     allows_flash_drops: bool = False
+    allows_branch_level_ai_tone: bool = False
     features: Optional[dict] = None
 
 
@@ -107,6 +128,9 @@ class PlanUpdate(BaseModel):
     max_whatsapp_numbers: Optional[int] = None
     ai_message_quota: Optional[int] = None
     message_limit: Optional[int] = None
+    allows_free_trial: Optional[bool] = None
+    trial_days: Optional[int] = None
+    trial_features: Optional[dict] = None
     allows_whatsapp: Optional[bool] = None
     allows_instagram: Optional[bool] = None
     allows_telegram: Optional[bool] = None
@@ -131,6 +155,7 @@ class PlanUpdate(BaseModel):
     allows_cadence_engine: Optional[bool] = None
     allows_gift_vouchers: Optional[bool] = None
     allows_flash_drops: Optional[bool] = None
+    allows_branch_level_ai_tone: Optional[bool] = None
     features: Optional[dict] = None
 
 
@@ -138,6 +163,8 @@ class BusinessStatusUpdate(BaseModel):
     status: Optional[str] = None
     custom_domain: Optional[str] = None
     plan: Optional[str] = None
+    trial_days: Optional[int] = None
+    trial_features_override: Optional[dict] = None
 
 
 class PaymentGatewayToggleRequest(BaseModel):
@@ -146,14 +173,50 @@ class PaymentGatewayToggleRequest(BaseModel):
     description: Optional[str] = None
 
 
+class BusinessAISpendItem(BaseModel):
+    business_id: str
+    business_name: str
+    owner_email: str
+    plan_name: str
+    assigned_model: str
+    status: str
+    trial_days_remaining: int = 0
+    total_messages: int = 0
+    inbound_messages: int = 0
+    ai_replies: int = 0
+    tokens_used: int = 0
+    ai_spend_usd: float = 0.0
+    ai_spend_azn: float = 0.0
+    appointments_count: int = 0
+    revenue_azn: float = 0.0
+    plan_price_azn: float = 0.0
+    net_margin_azn: float = 0.0
+
+
 class AnalyticsResponse(BaseModel):
     total_businesses: int
     active_subscriptions: int = 0
+    trial_businesses: int = 0
+    suspended_businesses: int = 0
     mrr_usd: float = 0.0
+    mrr_azn: float = 0.0
+    arr_azn: float = 0.0
+    total_settled_revenue_azn: float = 0.0
     total_appointments: int = 0
+    completed_appointments: int = 0
+    cancelled_appointments: int = 0
+    pending_appointments: int = 0
+    total_customers: int = 0
     total_messages: int = 0
+    inbound_messages: int = 0
+    outbound_ai_messages: int = 0
     total_messages_this_month: int = 0
     total_resellers: int = 0
+    total_ai_tokens_used: int = 0
+    total_ai_spend_usd: float = 0.0
+    total_ai_spend_azn: float = 0.0
+    net_platform_margin_azn: float = 0.0
+    ai_spend_per_business: List[BusinessAISpendItem] = []
 
 
 def _plan_to_response(p: Plan) -> PlanResponse:
@@ -166,6 +229,9 @@ def _plan_to_response(p: Plan) -> PlanResponse:
         max_whatsapp_numbers=p.max_whatsapp_numbers,
         ai_message_quota=quota,
         message_limit=quota,
+        allows_free_trial=bool(getattr(p, "allows_free_trial", True)),
+        trial_days=int(getattr(p, "trial_days", 14) or 0),
+        trial_features=getattr(p, "trial_features", None) or {},
         allows_whatsapp=bool(getattr(p, "allows_whatsapp", True)),
         allows_instagram=bool(getattr(p, "allows_instagram", False) or p.allows_omnichannel_messaging),
         allows_telegram=bool(getattr(p, "allows_telegram", False) or p.allows_omnichannel_messaging),
@@ -190,8 +256,17 @@ def _plan_to_response(p: Plan) -> PlanResponse:
         allows_cadence_engine=bool(p.allows_cadence_engine),
         allows_gift_vouchers=bool(p.allows_gift_vouchers),
         allows_flash_drops=bool(p.allows_flash_drops),
+        allows_branch_level_ai_tone=bool(p.allows_branch_level_ai_tone),
         features=p.features,
     )
+
+
+def _calc_trial_days_remaining(b: Business) -> int:
+    if not getattr(b, "trial_ends_at", None):
+        return 14 if b.subscription_status == "trial" else 0
+    now_utc = datetime.now(timezone.utc)
+    end_dt = b.trial_ends_at if b.trial_ends_at.tzinfo else b.trial_ends_at.replace(tzinfo=timezone.utc)
+    return max(0, (end_dt - now_utc).days)
 
 
 def _biz_to_response(b: Business) -> BusinessResponse:
@@ -205,6 +280,9 @@ def _biz_to_response(b: Business) -> BusinessResponse:
         plan=plan_str,
         branches=branch_cnt,
         status=b.subscription_status if b.is_active else "suspended",
+        trial_ends_at=b.trial_ends_at.strftime("%Y-%m-%d") if getattr(b, "trial_ends_at", None) else None,
+        trial_days_remaining=_calc_trial_days_remaining(b),
+        trial_features_override=getattr(b, "trial_features_override", None) or {},
         custom_domain=b.custom_domain,
         reseller_id=str(b.reseller_id) if b.reseller_id else None,
         created_at=b.created_at.strftime("%Y-%m-%d") if b.created_at else None,
@@ -328,7 +406,7 @@ async def update_business_status(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
-    """Approve, suspend, or assign white-label domain to a business."""
+    """Approve, suspend, configure dynamic free trial duration/features, or assign white-label domain to a business."""
     stmt = (
         select(Business)
         .where(Business.id == UUID(id))
@@ -353,6 +431,16 @@ async def update_business_status(
         if plan_obj:
             biz.plan_id = plan_obj.id
             biz.plan = plan_obj
+    if status_update.trial_days is not None:
+        if status_update.trial_days > 0:
+            biz.subscription_status = "trial"
+            biz.is_active = True
+            biz.trial_ends_at = datetime.now(timezone.utc) + timedelta(days=int(status_update.trial_days))
+        else:
+            biz.trial_ends_at = None
+    if status_update.trial_features_override is not None:
+        biz.trial_features_override = status_update.trial_features_override
+        flag_modified(biz, "trial_features_override")
     await db.flush()
     return _biz_to_response(biz)
 
@@ -373,7 +461,7 @@ async def create_plan(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
-    """Create a new subscription plan with all entitlement flags."""
+    """Create a new subscription plan with all entitlement and trial flags."""
     dump = plan_in.model_dump()
     msg_limit = dump.pop("message_limit", None)
     if msg_limit is not None:
@@ -391,7 +479,7 @@ async def update_plan(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
-    """Update a subscription plan."""
+    """Update a subscription plan and its dynamic free trial configuration."""
     plan = (await db.execute(select(Plan).where(Plan.id == UUID(id)))).scalar_one_or_none()
     if not plan:
         raise HTTPException(status_code=404, detail="Plan not found")
@@ -401,6 +489,8 @@ async def update_plan(
         updates["ai_message_quota"] = msg_limit
     for k, v in updates.items():
         setattr(plan, k, v)
+        if k in {"trial_features", "features"}:
+            flag_modified(plan, k)
     await db.flush()
     return _plan_to_response(plan)
 
@@ -410,21 +500,31 @@ async def list_subscriptions(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
-    """List all business subscriptions from PostgreSQL."""
+    """List all business subscriptions with live message usage and trial status."""
     stmt = (
         select(Business)
         .options(selectinload(Business.plan))
         .order_by(Business.created_at.desc())
     )
     businesses = (await db.execute(stmt)).scalars().all()
+    msg_counts_rows = (
+        await db.execute(
+            select(Conversation.business_id, func.count(Message.id))
+            .join(Message, Message.conversation_id == Conversation.id)
+            .group_by(Conversation.business_id)
+        )
+    ).all()
+    msg_map = {row[0]: int(row[1] or 0) for row in msg_counts_rows}
+
     return [
         {
             "id": str(b.id),
             "business": b.name,
             "plan": b.plan.name if b.plan else "Starter",
             "status": b.subscription_status if b.is_active else "suspended",
-            "period": "Monthly",
-            "messagesUsed": f"0 / {b.plan.ai_message_quota if b.plan else 1000}",
+            "trial_days_remaining": _calc_trial_days_remaining(b),
+            "period": f"Trial ({_calc_trial_days_remaining(b)}d left)" if b.subscription_status == "trial" else "Monthly",
+            "messagesUsed": f"{msg_map.get(b.id, 0)} / {b.plan.ai_message_quota if b.plan else 1000}",
         }
         for b in businesses
     ]
@@ -435,30 +535,167 @@ async def get_platform_analytics(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
-    """Get real platform-wide analytics from PostgreSQL."""
-    biz_cnt = (await db.execute(select(func.count(Business.id)))).scalar_one()
-    active_cnt = (
-        await db.execute(select(func.count(Business.id)).where(Business.is_active == True))
-    ).scalar_one()
-    appt_cnt = (await db.execute(select(func.count(Appointment.id)))).scalar_one()
-    msg_cnt = (await db.execute(select(func.count(Message.id)))).scalar_one()
-    res_cnt = (await db.execute(select(func.count(Reseller.id)))).scalar_one()
-    mrr_val = (
+    """Get precise platform-wide analytics and per-business AI spend from PostgreSQL."""
+    stmt = (
+        select(Business)
+        .options(selectinload(Business.owners), selectinload(Business.plan))
+        .order_by(Business.created_at.desc())
+    )
+    businesses = (await db.execute(stmt)).scalars().all()
+
+    total_businesses = len(businesses)
+    active_subscriptions = sum(1 for b in businesses if b.is_active and b.subscription_status != "suspended")
+    trial_businesses = sum(1 for b in businesses if b.is_active and b.subscription_status == "trial")
+    suspended_businesses = sum(1 for b in businesses if not b.is_active or b.subscription_status == "suspended")
+
+    # Appointments breakdown
+    appt_rows = (
+        await db.execute(select(Appointment.business_id, Appointment.status, func.count(Appointment.id)).group_by(Appointment.business_id, Appointment.status))
+    ).all()
+    appt_by_biz: dict[UUID, int] = {}
+    total_appointments = 0
+    completed_appointments = 0
+    cancelled_appointments = 0
+    pending_appointments = 0
+    for biz_id, st, cnt in appt_rows:
+        c = int(cnt or 0)
+        total_appointments += c
+        appt_by_biz[biz_id] = appt_by_biz.get(biz_id, 0) + c
+        st_val = st.value if hasattr(st, "value") else str(st)
+        if st_val == "completed":
+            completed_appointments += c
+        elif st_val in {"cancelled", "no_show"}:
+            cancelled_appointments += c
+        else:
+            pending_appointments += c
+
+    # Payments / Settled Revenue breakdown
+    pay_rows = (
         await db.execute(
-            select(func.coalesce(func.sum(Plan.price), 0))
-            .select_from(Business)
-            .join(Plan, Business.plan_id == Plan.id)
-            .where(Business.is_active == True)
+            select(Payment.business_id, func.coalesce(func.sum(Payment.amount), 0))
+            .where(Payment.status == PaymentStatus.completed)
+            .group_by(Payment.business_id)
         )
-    ).scalar_one()
+    ).all()
+    rev_by_biz = {r[0]: float(r[1] or 0.0) for r in pay_rows}
+    total_settled_revenue_azn = round(sum(rev_by_biz.values()), 2)
+
+    # Customers & Resellers count
+    total_customers = int((await db.execute(select(func.count(Customer.id)))).scalar_one() or 0)
+    total_resellers = int((await db.execute(select(func.count(Reseller.id)))).scalar_one() or 0)
+
+    # Messages & Precise AI Token / Spend per Business
+    msg_rows = (
+        await db.execute(
+            select(Conversation.business_id, Message.direction, Message.content)
+            .join(Conversation, Message.conversation_id == Conversation.id)
+        )
+    ).all()
+
+    biz_msg_stats: dict[UUID, dict[str, int]] = {}
+    total_messages = 0
+    inbound_messages = 0
+    outbound_ai_messages = 0
+
+    for biz_id, direction, content in msg_rows:
+        if biz_id not in biz_msg_stats:
+            biz_msg_stats[biz_id] = {"total": 0, "inbound": 0, "outbound": 0, "tokens": 0}
+        stats = biz_msg_stats[biz_id]
+        stats["total"] += 1
+        total_messages += 1
+        dir_val = direction.value if hasattr(direction, "value") else str(direction)
+        # Estimate tokens: ~1 token per 3.5 chars + 350 system/context tokens per turn
+        est_tokens = max(120, int(len(content or "") / 3.5)) + 350
+        stats["tokens"] += est_tokens
+        if dir_val == "inbound":
+            stats["inbound"] += 1
+            inbound_messages += 1
+        else:
+            stats["outbound"] += 1
+            outbound_ai_messages += 1
+
+    ai_spend_per_business: List[BusinessAISpendItem] = []
+    total_ai_tokens_used = 0
+    total_ai_spend_usd = 0.0
+    total_ai_spend_azn = 0.0
+    mrr_azn = 0.0
+
+    for b in businesses:
+        plan_name = b.plan.name if b.plan else "Starter"
+        plan_price = float(b.plan.price) if b.plan else 29.0
+        if b.is_active and b.subscription_status != "suspended":
+            mrr_azn += plan_price
+
+        assigned_model = (
+            (b.plan.features or {}).get("assigned_model")
+            if b.plan and isinstance(b.plan.features, dict)
+            else None
+        ) or "gemini-3.5-flash"
+        cost_rate = MODEL_COST_PER_1M_TOKENS_USD.get(assigned_model, 0.75)
+
+        m_stats = biz_msg_stats.get(b.id, {"total": 0, "inbound": 0, "outbound": 0, "tokens": 0})
+        tokens = m_stats["tokens"]
+        spend_usd = round((tokens / 1_000_000.0) * cost_rate, 4)
+        spend_azn = round(spend_usd * USD_TO_AZN_RATE, 4)
+        net_margin = round(plan_price - spend_azn, 2)
+
+        total_ai_tokens_used += tokens
+        total_ai_spend_usd += spend_usd
+        total_ai_spend_azn += spend_azn
+
+        owner_email = b.owners[0].email if getattr(b, "owners", None) else "—"
+        ai_spend_per_business.append(
+            BusinessAISpendItem(
+                business_id=str(b.id),
+                business_name=b.name,
+                owner_email=owner_email,
+                plan_name=plan_name,
+                assigned_model=assigned_model,
+                status=b.subscription_status if b.is_active else "suspended",
+                trial_days_remaining=_calc_trial_days_remaining(b),
+                total_messages=m_stats["total"],
+                inbound_messages=m_stats["inbound"],
+                ai_replies=m_stats["outbound"],
+                tokens_used=tokens,
+                ai_spend_usd=spend_usd,
+                ai_spend_azn=spend_azn,
+                appointments_count=appt_by_biz.get(b.id, 0),
+                revenue_azn=round(rev_by_biz.get(b.id, 0.0), 2),
+                plan_price_azn=plan_price,
+                net_margin_azn=net_margin,
+            )
+        )
+
+    mrr_azn = round(mrr_azn, 2)
+    arr_azn = round(mrr_azn * 12, 2)
+    total_ai_spend_usd = round(total_ai_spend_usd, 4)
+    total_ai_spend_azn = round(total_ai_spend_azn, 4)
+    net_platform_margin_azn = round(mrr_azn - total_ai_spend_azn, 2)
+
     return AnalyticsResponse(
-        total_businesses=int(biz_cnt or 0),
-        active_subscriptions=int(active_cnt or 0),
-        mrr_usd=float(mrr_val or 0.0),
-        total_appointments=int(appt_cnt or 0),
-        total_messages=int(msg_cnt or 0),
-        total_messages_this_month=int(msg_cnt or 0),
-        total_resellers=int(res_cnt or 0),
+        total_businesses=total_businesses,
+        active_subscriptions=active_subscriptions,
+        trial_businesses=trial_businesses,
+        suspended_businesses=suspended_businesses,
+        mrr_usd=mrr_azn,
+        mrr_azn=mrr_azn,
+        arr_azn=arr_azn,
+        total_settled_revenue_azn=total_settled_revenue_azn,
+        total_appointments=total_appointments,
+        completed_appointments=completed_appointments,
+        cancelled_appointments=cancelled_appointments,
+        pending_appointments=pending_appointments,
+        total_customers=total_customers,
+        total_messages=total_messages,
+        inbound_messages=inbound_messages,
+        outbound_ai_messages=outbound_ai_messages,
+        total_messages_this_month=total_messages,
+        total_resellers=total_resellers,
+        total_ai_tokens_used=total_ai_tokens_used,
+        total_ai_spend_usd=total_ai_spend_usd,
+        total_ai_spend_azn=total_ai_spend_azn,
+        net_platform_margin_azn=net_platform_margin_azn,
+        ai_spend_per_business=ai_spend_per_business,
     )
 
 
