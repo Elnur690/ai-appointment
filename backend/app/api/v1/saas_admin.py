@@ -10,7 +10,8 @@ from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.core.dependencies import require_role
-from app.models.business import Business
+from app.core.security import hash_password
+from app.models.business import Business, BusinessOwner, Branch
 from app.models.saas import Plan, PlatformConfig, DEFAULT_PLATFORM_GATEWAYS
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.customer import Customer
@@ -27,6 +28,21 @@ MODEL_COST_PER_1M_TOKENS_USD = {
     "gpt-4o": 6.25,
 }
 USD_TO_AZN_RATE = 1.70
+
+
+class BusinessCreate(BaseModel):
+    business_name: str
+    owner_name: Optional[str] = None
+    email: str
+    password: str
+    phone: Optional[str] = None
+    category: Optional[str] = None
+    plan: Optional[str] = None
+    plan_id: Optional[str] = None
+    status: str = "trial"
+    trial_days: Optional[int] = None
+    custom_domain: Optional[str] = None
+    trial_features_override: Optional[dict[str, bool]] = None
 
 
 class BusinessResponse(BaseModel):
@@ -375,6 +391,100 @@ async def list_businesses(
     )
     res = await db.execute(stmt)
     return [_biz_to_response(b) for b in res.scalars().all()]
+
+
+@router.post("/businesses", response_model=BusinessResponse, status_code=201)
+async def create_business(
+    payload: BusinessCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    """Create a new tenant Business, default Branch, and BusinessOwner from the SaaS Admin dashboard."""
+    email_clean = payload.email.strip().lower()
+    if not email_clean or not payload.password or not payload.business_name.strip():
+        raise HTTPException(status_code=400, detail="Business name, owner email, and password are required")
+
+    existing_owner = (
+        await db.execute(select(BusinessOwner).where(BusinessOwner.email == email_clean))
+    ).scalar_one_or_none()
+    if existing_owner:
+        raise HTTPException(status_code=400, detail="Email is already registered")
+
+    selected_plan = None
+    if payload.plan_id:
+        try:
+            selected_plan = (
+                await db.execute(select(Plan).where(Plan.id == UUID(payload.plan_id)))
+            ).scalar_one_or_none()
+        except ValueError:
+            selected_plan = None
+    if not selected_plan and payload.plan:
+        selected_plan = (
+            await db.execute(select(Plan).where(Plan.name == payload.plan))
+        ).scalar_one_or_none()
+    if not selected_plan:
+        selected_plan = (
+            await db.execute(select(Plan).where(Plan.is_active == True).order_by(Plan.price.asc()))
+        ).scalars().first()
+
+    req_status = (payload.status or "trial").strip().lower()
+    if req_status not in {"trial", "active"}:
+        req_status = "trial"
+
+    trial_days = (
+        int(payload.trial_days)
+        if payload.trial_days is not None
+        else (int(getattr(selected_plan, "trial_days", 14) or 14) if selected_plan else 14)
+    )
+    trial_ends = (
+        datetime.now(timezone.utc) + timedelta(days=trial_days)
+        if req_status == "trial" and trial_days > 0
+        else None
+    )
+
+    business = Business(
+        name=payload.business_name.strip(),
+        plan_id=selected_plan.id if selected_plan else None,
+        subscription_status=req_status,
+        trial_ends_at=trial_ends,
+        trial_features_override=payload.trial_features_override or {},
+        custom_domain=payload.custom_domain.strip().lower() if payload.custom_domain and payload.custom_domain.strip() else None,
+        category=payload.category.strip() if payload.category and payload.category.strip() else None,
+        is_active=True,
+    )
+    db.add(business)
+    await db.flush()
+
+    default_branch = Branch(
+        business_id=business.id,
+        name=f"{business.name} - Main Branch",
+        timezone="Asia/Baku",
+        is_active=True,
+    )
+    db.add(default_branch)
+
+    owner = BusinessOwner(
+        business_id=business.id,
+        name=(payload.owner_name or payload.business_name).strip(),
+        phone=payload.phone.strip() if payload.phone and payload.phone.strip() else None,
+        email=email_clean,
+        password_hash=hash_password(payload.password),
+        is_active=True,
+    )
+    db.add(owner)
+    await db.flush()
+
+    stmt = (
+        select(Business)
+        .where(Business.id == business.id)
+        .options(
+            selectinload(Business.owners),
+            selectinload(Business.plan),
+            selectinload(Business.branches),
+        )
+    )
+    created_biz = (await db.execute(stmt)).scalar_one()
+    return _biz_to_response(created_biz)
 
 
 @router.get("/businesses/{id}", response_model=BusinessResponse)

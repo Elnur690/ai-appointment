@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import DataTable from '../components/common/DataTable';
 import StatusBadge from '../components/common/StatusBadge';
 import Modal from '../components/common/Modal';
-import { Globe, Clock } from 'lucide-react';
+import { Globe, Clock, Plus } from 'lucide-react';
 
 const TRIAL_FEATURE_OPTIONS = [
   { key: 'allows_instagram', az: 'Instagram Direct AI', en: 'Instagram Direct AI' },
@@ -21,7 +21,7 @@ const TRIAL_FEATURE_OPTIONS = [
 ];
 
 const Businesses = () => {
-  const { businesses, plans, fetchBusinesses, fetchPlans, updateBusinessStatus } = useDataStore();
+  const { businesses, plans, fetchBusinesses, fetchPlans, createBusiness, updateBusinessStatus } = useDataStore();
   const { language } = useAuthStore();
   const isAz = (language || 'az') !== 'en';
   const [selectedBusiness, setSelectedBusiness] = useState(null);
@@ -30,6 +30,21 @@ const Businesses = () => {
   const [trialDaysInput, setTrialDaysInput] = useState(14);
   const [trialFeaturesOverride, setTrialFeaturesOverride] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [addError, setAddError] = useState('');
+  const [addSubmitting, setAddSubmitting] = useState(false);
+  const [newBiz, setNewBiz] = useState({
+    business_name: '',
+    owner_name: '',
+    email: '',
+    password: '',
+    phone: '',
+    category: 'medical',
+    plan: 'Starter',
+    status: 'trial',
+    trial_days: 14,
+    custom_domain: '',
+  });
 
   useEffect(() => {
     fetchBusinesses();
@@ -101,7 +116,7 @@ const Businesses = () => {
               : 'Manage business tenants, dynamic Free Trial duration & features, white-label domains, and subscription plans.'}
           </p>
         </div>
-        <div className="flex-center" style={{ gap: '1rem' }}>
+        <div className="flex-center" style={{ gap: '0.75rem', flexWrap: 'wrap' }}>
           <input
             type="text"
             className="form-control"
@@ -110,6 +125,23 @@ const Businesses = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => {
+              setAddError('');
+              setNewBiz((prev) => ({
+                ...prev,
+                plan: plans[0]?.name || prev.plan || 'Starter',
+                trial_days: plans[0]?.trial_days ?? 14,
+              }));
+              setIsAddOpen(true);
+            }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}
+          >
+            <Plus size={16} />
+            {isAz ? 'Yeni Biznes Əlavə Et' : 'Add Business'}
+          </button>
         </div>
       </div>
 
@@ -266,6 +298,208 @@ const Businesses = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Add New Business Modal */}
+      <Modal
+        isOpen={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        title={isAz ? 'Yeni Biznes Yarat (SaaS Admin)' : 'Add New Business (SaaS Admin)'}
+      >
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setAddError('');
+            setAddSubmitting(true);
+            try {
+              await createBusiness({
+                business_name: newBiz.business_name,
+                owner_name: newBiz.owner_name || newBiz.business_name,
+                email: newBiz.email,
+                password: newBiz.password,
+                phone: newBiz.phone || null,
+                category: newBiz.category || null,
+                plan: newBiz.plan,
+                status: newBiz.status,
+                trial_days: newBiz.status === 'trial' ? Number(newBiz.trial_days) : 0,
+                custom_domain: newBiz.custom_domain || null,
+              });
+              setIsAddOpen(false);
+              setNewBiz({
+                business_name: '',
+                owner_name: '',
+                email: '',
+                password: '',
+                phone: '',
+                category: 'medical',
+                plan: plans[0]?.name || 'Starter',
+                status: 'trial',
+                trial_days: 14,
+                custom_domain: '',
+              });
+            } catch (err) {
+              setAddError(err.response?.data?.detail || err.message || 'Could not create business');
+            } finally {
+              setAddSubmitting(false);
+            }
+          }}
+        >
+          {addError && (
+            <div
+              style={{
+                padding: '0.65rem 0.9rem',
+                background: 'rgba(239, 68, 68, 0.14)',
+                border: '1px solid var(--error)',
+                borderRadius: '8px',
+                color: '#fca5a5',
+                fontSize: '0.85rem',
+                marginBottom: '1rem',
+              }}
+            >
+              {addError}
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+            <div className="form-group">
+              <label className="form-label">{isAz ? 'Biznesin Adı *' : 'Business Name *'}</label>
+              <input
+                type="text"
+                className="form-control"
+                required
+                placeholder={isAz ? 'məs: Baku Dental Clinic' : 'e.g. Baku Dental Clinic'}
+                value={newBiz.business_name}
+                onChange={(e) => setNewBiz({ ...newBiz, business_name: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">{isAz ? 'Sahibkarın Adı' : 'Owner Full Name'}</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder={isAz ? 'məs: Kamran Əliyev' : 'e.g. Kamran Aliyev'}
+                value={newBiz.owner_name}
+                onChange={(e) => setNewBiz({ ...newBiz, owner_name: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">{isAz ? 'Sahibkar E-poçtu *' : 'Owner Email *'}</label>
+              <input
+                type="email"
+                className="form-control"
+                required
+                placeholder="owner@business.az"
+                value={newBiz.email}
+                onChange={(e) => setNewBiz({ ...newBiz, email: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">{isAz ? 'İlkin Şifrə *' : 'Initial Password *'}</label>
+              <input
+                type="password"
+                className="form-control"
+                required
+                minLength={6}
+                placeholder="Min 6 simvol"
+                value={newBiz.password}
+                onChange={(e) => setNewBiz({ ...newBiz, password: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">{isAz ? 'Telefon' : 'Phone'}</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="+994 50 000 00 00"
+                value={newBiz.phone}
+                onChange={(e) => setNewBiz({ ...newBiz, phone: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">{isAz ? 'Sektor / Kateqoriya' : 'Industry Category'}</label>
+              <select
+                className="form-control"
+                value={newBiz.category}
+                onChange={(e) => setNewBiz({ ...newBiz, category: e.target.value })}
+              >
+                <option value="medical">{isAz ? 'Tibb və Klinika' : 'Medical & Clinic'}</option>
+                <option value="dental">{isAz ? 'Stomatologiya' : 'Dental Practice'}</option>
+                <option value="beauty">{isAz ? 'Gözəllik və SPA' : 'Beauty & Wellness'}</option>
+                <option value="barbershop">{isAz ? 'Bərbərxana' : 'Barbershop'}</option>
+                <option value="auto">{isAz ? 'Avtoservis' : 'Auto Service'}</option>
+                <option value="legal">{isAz ? 'Hüquq və Konsaltinq' : 'Legal & Consulting'}</option>
+                <option value="education">{isAz ? 'Tədris Mərkəzi' : 'Education Center'}</option>
+                <option value="other">{isAz ? 'Digər Xidmət Biznesi' : 'Other Service Business'}</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">{isAz ? 'Abunəlik Paketi' : 'Subscription Plan'}</label>
+              <select
+                className="form-control"
+                value={newBiz.plan}
+                onChange={(e) => setNewBiz({ ...newBiz, plan: e.target.value })}
+              >
+                {plans.map((p) => (
+                  <option key={p.id} value={p.name}>
+                    {p.name} ({p.price})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">{isAz ? 'İlkin Status' : 'Initial Status'}</label>
+              <select
+                className="form-control"
+                value={newBiz.status}
+                onChange={(e) => setNewBiz({ ...newBiz, status: e.target.value })}
+              >
+                <option value="trial">{isAz ? 'Pulsuz Sınaq (Trial)' : 'Free Trial'}</option>
+                <option value="active">{isAz ? 'Birbaşa Aktiv (Active)' : 'Active Subscription'}</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+            {newBiz.status === 'trial' && (
+              <div className="form-group">
+                <label className="form-label">{isAz ? 'Sınaq Müddəti (Gün)' : 'Trial Duration (Days)'}</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={365}
+                  className="form-control"
+                  value={newBiz.trial_days}
+                  onChange={(e) => setNewBiz({ ...newBiz, trial_days: Number(e.target.value) })}
+                />
+              </div>
+            )}
+            <div className="form-group" style={{ gridColumn: newBiz.status === 'trial' ? undefined : '1 / -1' }}>
+              <label className="form-label">{isAz ? 'Şəxsi Domen (İstəyə bağlı)' : 'Custom Domain (Optional)'}</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="booking.business.az"
+                value={newBiz.custom_domain}
+                onChange={(e) => setNewBiz({ ...newBiz, custom_domain: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="flex-center" style={{ justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setIsAddOpen(false)}>
+              {isAz ? 'Ləğv et' : 'Cancel'}
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={addSubmitting}>
+              {addSubmitting
+                ? isAz
+                  ? 'Yaradılır...'
+                  : 'Creating...'
+                : isAz
+                ? 'Biznesi Yarat'
+                : 'Create Business'}
+            </button>
+          </div>
+        </form>
       </Modal>
     </div>
   );
