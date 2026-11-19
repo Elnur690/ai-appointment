@@ -9,6 +9,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from pydantic import BaseModel
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.core.dependencies import require_role
 from app.core.security import hash_password
 from app.models.business import Business, BusinessOwner, Branch
@@ -335,10 +336,34 @@ async def list_platform_payment_gateways(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
-    """List all platform payment gateways (1. Cash, 2. Payriff, 3. Paymegate) and their enabled status."""
+    """List all platform payment gateways (1. Cash, 2. Payriff, 3. Paymegate) and their enabled + .env status."""
     cfg = await _get_or_create_platform_config(db)
     order = ["cash", "payriff", "paymegate"]
-    return [cfg.payment_gateways[k] for k in order if k in cfg.payment_gateways]
+
+    def _mask_secret(val: str) -> str:
+        s = (val or "").strip()
+        if not s or s.startswith("change_me"):
+            return ""
+        return f"••••{s[-4:]}" if len(s) >= 4 else "••••"
+
+    results = []
+    for k in order:
+        if k not in cfg.payment_gateways:
+            continue
+        item = dict(cfg.payment_gateways[k])
+        if k == "paymegate":
+            masked = _mask_secret(settings.PAYMEGATE_API_KEY)
+            item["env_configured"] = bool(masked)
+            item["env_hint"] = masked
+        elif k == "payriff":
+            masked = _mask_secret(settings.PAYRIFF_SECRET_KEY or settings.PAYRIFF_MERCHANT_ID)
+            item["env_configured"] = bool(masked)
+            item["env_hint"] = masked
+        else:
+            item["env_configured"] = True
+            item["env_hint"] = ""
+        results.append(item)
+    return results
 
 
 @router.put("/payment-gateways/{provider}")

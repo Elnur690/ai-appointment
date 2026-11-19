@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     SAAS_ADMIN_EMAIL: str = "admin@randevu.vip"
     SAAS_ADMIN_PASSWORD: str = "admin123"
 
+    PAYMEGATE_API_KEY: str = ""
+    PAYMEGATE_WEBHOOK_SECRET: str = ""
+    PAYRIFF_MERCHANT_ID: str = ""
+    PAYRIFF_SECRET_KEY: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @model_validator(mode="after")

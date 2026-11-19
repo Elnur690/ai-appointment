@@ -2,6 +2,7 @@ import logging
 from decimal import Decimal
 from uuid import UUID
 import httpx
+from app.core.config import settings
 from app.integrations.payments.adapter import PaymentAdapter, PaymentLinkResult, WebhookResult, PaymentStatus
 
 logger = logging.getLogger(__name__)
@@ -20,8 +21,8 @@ class PayriffAdapter(PaymentAdapter):
         merchant_config: dict,
         return_url: str,
     ) -> PaymentLinkResult:
-        merchant_id = merchant_config.get("merchant_id")
-        secret_key = merchant_config.get("secret_key")
+        merchant_id = (merchant_config.get("merchant_id") or settings.PAYRIFF_MERCHANT_ID or "").strip()
+        secret_key = (merchant_config.get("secret_key") or settings.PAYRIFF_SECRET_KEY or "").strip()
         
         async with httpx.AsyncClient(timeout=15.0) as client:
             payload = {

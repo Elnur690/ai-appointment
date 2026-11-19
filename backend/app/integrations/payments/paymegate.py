@@ -5,6 +5,7 @@ import logging
 from decimal import Decimal
 from uuid import UUID
 import httpx
+from app.core.config import settings
 from app.integrations.payments.adapter import PaymentAdapter, PaymentLinkResult, WebhookResult, PaymentStatus
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ class PaymegateAdapter(PaymentAdapter):
             merchant_config.get("api_key")
             or merchant_config.get("paymegate_api_key")
             or merchant_config.get("paymengate_api_key")
+            or settings.PAYMEGATE_API_KEY
             or ""
         ).strip()
         base_url = (merchant_config.get("base_url") or self.BASE_URL).rstrip("/")
@@ -117,6 +119,7 @@ class PaymegateAdapter(PaymentAdapter):
             merchant_config.get("webhook_secret")
             or merchant_config.get("secret_key")
             or merchant_config.get("paymegate_webhook_secret")
+            or settings.PAYMEGATE_WEBHOOK_SECRET
             or ""
         ).strip()
         sig_header = (
@@ -163,7 +166,12 @@ class PaymegateAdapter(PaymentAdapter):
         merchant_config: dict,
     ) -> str:
         """Check order status via GET /v1/orders/{orderUUID}."""
-        api_key = (merchant_config.get("api_key") or merchant_config.get("paymegate_api_key") or "").strip()
+        api_key = (
+            merchant_config.get("api_key")
+            or merchant_config.get("paymegate_api_key")
+            or settings.PAYMEGATE_API_KEY
+            or ""
+        ).strip()
         base_url = (merchant_config.get("base_url") or self.BASE_URL).rstrip("/")
         if not api_key:
             return "completed"

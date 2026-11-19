@@ -104,9 +104,13 @@ const PaymentGateways = () => {
               >
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                   {gw.requires_credentials
-                    ? isAz
-                      ? 'Biznes Tənzimləmələrində API Açar tələb edir'
-                      : 'Requires Merchant API Keys in Business Settings'
+                    ? gw.env_configured
+                      ? isAz
+                        ? `.env konfiqurasiyası: Aktiv (${gw.env_hint})`
+                        : `.env configured (${gw.env_hint})`
+                      : isAz
+                      ? `.env açarı təyin edilməyib (${gw.provider === 'paymegate' ? 'PAYMEGATE_API_KEY' : 'PAYRIFF_SECRET_KEY'})`
+                      : `Set ${gw.provider === 'paymegate' ? 'PAYMEGATE_API_KEY' : 'PAYRIFF_SECRET_KEY'} in .env`
                     : isAz
                     ? 'Daxili kassa / nağd ödəniş üsulu'
                     : 'Built-in Ledger Method'}
