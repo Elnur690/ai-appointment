@@ -25,6 +25,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   ArrowRight,
+  Menu,
 } from 'lucide-react';
 
 const getAppOrigin = () => {
@@ -597,6 +598,7 @@ const LandingPage = () => {
   const [sellerSubmitting, setSellerSubmitting] = useState(false);
   const [sellerResult, setSellerResult] = useState(null);
   const [sellerError, setSellerError] = useState('');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [lang, setLang] = useState(() => {
     try {
@@ -711,42 +713,30 @@ const LandingPage = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', color: 'var(--text-primary)' }}>
+    <div style={{ minHeight: '100vh', color: 'var(--text-primary)', overflowX: 'hidden' }}>
       {/* Top Navigation */}
-      <header
-        style={{
-          maxWidth: '1280px',
-          margin: '0 auto',
-          padding: '1.25rem 1.5rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          position: 'sticky',
-          top: 0,
-          zIndex: 50,
-          background: 'rgba(6, 8, 15, 0.85)',
-          backdropFilter: 'blur(16px)',
-          borderBottom: '1px solid rgba(148, 163, 184, 0.12)',
-        }}
-      >
+      <header className="landing-header">
         <a
           href="/"
-          onClick={handleBrandClick}
+          onClick={(e) => {
+            setMobileMenuOpen(false);
+            handleBrandClick(e);
+          }}
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '0.75rem',
+            gap: '0.65rem',
             textDecoration: 'none',
             cursor: 'pointer',
+            flexShrink: 0,
           }}
           title="Randevu.vip — Ana Səhifə"
         >
-          <BrandLogo size={40} fontSize="1.65rem" />
+          <BrandLogo size={36} fontSize="1.45rem" />
         </a>
 
-        <nav style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
+        {/* Desktop Navigation */}
+        <nav className="landing-nav-desktop">
           <a href="#features" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontWeight: 500, fontSize: '0.92rem' }}>
             {t.navFeatures}
           </a>
@@ -818,10 +808,123 @@ const LandingPage = () => {
             {t.navStartTrial} <ArrowRight size={16} />
           </a>
         </nav>
+
+        {/* Mobile Header Controls (Compact Lang + Hamburger) */}
+        <div className="landing-nav-mobile-controls">
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid var(--border)',
+              borderRadius: '999px',
+              padding: '0.16rem',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => handleLanguageChange('az')}
+              style={{
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.28rem 0.55rem',
+                borderRadius: '999px',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                background: lang === 'az' ? 'var(--primary)' : 'transparent',
+                color: lang === 'az' ? '#06080f' : 'var(--text-secondary)',
+              }}
+            >
+              AZ
+            </button>
+            <button
+              type="button"
+              onClick={() => handleLanguageChange('en')}
+              style={{
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.28rem 0.55rem',
+                borderRadius: '999px',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                background: lang === 'en' ? 'var(--primary)' : 'transparent',
+                color: lang === 'en' ? '#06080f' : 'var(--text-secondary)',
+              }}
+            >
+              EN
+            </button>
+          </div>
+
+          <button
+            type="button"
+            className="landing-hamburger-btn"
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileMenuOpen}
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
       </header>
+
+      {/* Mobile Collapsible Drawer */}
+      {mobileMenuOpen && (
+        <div className="landing-mobile-drawer">
+          <a
+            href="#features"
+            className="landing-mobile-link"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            {t.navFeatures}
+          </a>
+          <a
+            href="#roi"
+            className="landing-mobile-link"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            {t.navRoi}
+          </a>
+          <a
+            href="#pricing"
+            className="landing-mobile-link"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            {t.navPricing}
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              openSellerModal();
+            }}
+            className="btn btn-gold"
+            style={{ width: '100%', justifyContent: 'center' }}
+          >
+            <Handshake size={16} />
+            {t.navReseller}
+          </button>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+            <a
+              href={loginUrl}
+              className="btn btn-secondary"
+              style={{ textDecoration: 'none', justifyContent: 'center', width: '100%' }}
+            >
+              {t.navSignIn}
+            </a>
+            <a
+              href={registerUrl}
+              className="btn btn-primary"
+              style={{ textDecoration: 'none', justifyContent: 'center', width: '100%' }}
+            >
+              {t.navStartTrial}
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* Hero Section */}
       <section
+        className="landing-hero-section"
         style={{
           maxWidth: '1140px',
           margin: '0 auto',
@@ -829,8 +932,19 @@ const LandingPage = () => {
           textAlign: 'center',
         }}
       >
-        <span className="badge badge-gold" style={{ marginBottom: '1.25rem', display: 'inline-flex', fontSize: '0.84rem' }}>
-          <Sparkles size={14} /> {t.heroBadge}
+        <span
+          className="badge badge-gold"
+          style={{
+            marginBottom: '1.25rem',
+            display: 'inline-flex',
+            fontSize: '0.82rem',
+            maxWidth: '100%',
+            whiteSpace: 'normal',
+            textAlign: 'center',
+            lineHeight: 1.35,
+          }}
+        >
+          <Sparkles size={14} style={{ flexShrink: 0 }} /> {t.heroBadge}
         </span>
         <h1 style={{ fontSize: 'clamp(2.2rem, 4.8vw, 3.6rem)', lineHeight: 1.14, marginBottom: '1.5rem', fontWeight: 800 }}>
           {t.heroTitlePrefix}
@@ -896,11 +1010,11 @@ const LandingPage = () => {
       </section>
 
       {/* Loss Aversion: Old Way vs New Way Comparison */}
-      <section style={{ maxWidth: '1200px', margin: '0 auto', padding: '2.5rem 1.5rem' }}>
-        <h2 style={{ textAlign: 'center', fontSize: '1.85rem', marginBottom: '2rem' }}>{t.painTitle}</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem' }}>
+      <section className="landing-section" style={{ maxWidth: '1200px', margin: '0 auto', padding: '2.5rem 1.5rem' }}>
+        <h2 style={{ textAlign: 'center', fontSize: 'clamp(1.45rem, 3.2vw, 1.85rem)', marginBottom: '2rem' }}>{t.painTitle}</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: '1.5rem' }}>
           <div
-            className="glass-card"
+            className="glass-card landing-card"
             style={{
               padding: '2rem',
               border: '1px solid rgba(239, 68, 68, 0.35)',
@@ -922,7 +1036,7 @@ const LandingPage = () => {
           </div>
 
           <div
-            className="glass-card"
+            className="glass-card landing-card"
             style={{
               padding: '2rem',
               border: '1px solid rgba(16, 185, 129, 0.45)',
@@ -946,9 +1060,9 @@ const LandingPage = () => {
       </section>
 
       {/* Interactive ROI & Lost Revenue Calculator */}
-      <section id="roi" style={{ maxWidth: '1100px', margin: '0 auto', padding: '3rem 1.5rem' }}>
+      <section id="roi" className="landing-section" style={{ maxWidth: '1100px', margin: '0 auto', padding: '3rem 1.5rem' }}>
         <div
-          className="glass-card"
+          className="glass-card landing-card"
           style={{
             padding: '2.5rem',
             border: '1px solid rgba(245, 158, 11, 0.4)',
@@ -959,11 +1073,11 @@ const LandingPage = () => {
             <span className="badge badge-gold" style={{ marginBottom: '0.75rem' }}>
               <TrendingUp size={14} /> ROI CALCULATOR
             </span>
-            <h2 style={{ fontSize: '1.9rem', marginBottom: '0.5rem' }}>{t.roiTitle}</h2>
+            <h2 style={{ fontSize: 'clamp(1.45rem, 3.2vw, 1.9rem)', marginBottom: '0.5rem' }}>{t.roiTitle}</h2>
             <p style={{ color: 'var(--text-secondary)' }}>{t.roiSubtitle}</p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem', alignItems: 'center' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '2rem', alignItems: 'center' }}>
             <div>
               <div className="form-group">
                 <label htmlFor="roi-missed-range" className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1025,16 +1139,16 @@ const LandingPage = () => {
       </section>
 
       {/* How It Works */}
-      <section id="how-it-works" style={{ maxWidth: '1200px', margin: '0 auto', padding: '2.5rem 1.5rem' }}>
-        <h2 style={{ textAlign: 'center', fontSize: '2rem', marginBottom: '0.5rem' }}>{t.howTitle}</h2>
+      <section id="how-it-works" className="landing-section" style={{ maxWidth: '1200px', margin: '0 auto', padding: '2.5rem 1.5rem' }}>
+        <h2 style={{ textAlign: 'center', fontSize: 'clamp(1.5rem, 3.2vw, 2rem)', marginBottom: '0.5rem' }}>{t.howTitle}</h2>
         <p style={{ textAlign: 'center', color: 'var(--text-secondary)', marginBottom: '2.5rem' }}>
           {t.howSubtitlePrefix}
           <strong>{t.howSubtitleHighlight}</strong>
           {t.howSubtitleSuffix}
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.5rem' }}>
           {t.steps.map((step, idx) => (
-            <div key={idx} className="glass-card" style={{ padding: '2rem' }}>
+            <div key={idx} className="glass-card landing-card" style={{ padding: '2rem' }}>
               <div style={{ fontSize: '0.85rem', fontWeight: 700, color: step.color, marginBottom: '0.5rem' }}>
                 {step.badge}
               </div>
@@ -1046,14 +1160,14 @@ const LandingPage = () => {
       </section>
 
       {/* Feature Grid (12 Multi-Channel & Revenue Features) */}
-      <section id="features" style={{ maxWidth: '1240px', margin: '0 auto', padding: '3rem 1.5rem' }}>
-        <h2 style={{ textAlign: 'center', fontSize: '2rem', marginBottom: '0.5rem' }}>{t.featuresTitle}</h2>
+      <section id="features" className="landing-section" style={{ maxWidth: '1240px', margin: '0 auto', padding: '3rem 1.5rem' }}>
+        <h2 style={{ textAlign: 'center', fontSize: 'clamp(1.5rem, 3.2vw, 2rem)', marginBottom: '0.5rem' }}>{t.featuresTitle}</h2>
         <p style={{ textAlign: 'center', color: 'var(--text-secondary)', marginBottom: '2.5rem' }}>
           {t.featuresSubtitle}
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.5rem' }}>
           {t.features.map((f, idx) => (
-            <div key={idx} className="glass-card" style={{ padding: '1.75rem' }}>
+            <div key={idx} className="glass-card landing-card" style={{ padding: '1.75rem' }}>
               <f.icon size={26} color={f.color} style={{ marginBottom: '1rem' }} />
               <h3 style={{ fontSize: '1.15rem', marginBottom: '0.5rem' }}>{f.title}</h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', lineHeight: 1.6, margin: 0 }}>
@@ -1065,8 +1179,8 @@ const LandingPage = () => {
       </section>
 
       {/* Live Subscription Plans with Price Anchoring */}
-      <section id="pricing" style={{ maxWidth: '1240px', margin: '0 auto', padding: '3.5rem 1.5rem' }}>
-        <h2 style={{ textAlign: 'center', fontSize: '2.1rem', marginBottom: '0.5rem' }}>{t.pricingTitle}</h2>
+      <section id="pricing" className="landing-section" style={{ maxWidth: '1240px', margin: '0 auto', padding: '3.5rem 1.5rem' }}>
+        <h2 style={{ textAlign: 'center', fontSize: 'clamp(1.55rem, 3.4vw, 2.1rem)', marginBottom: '0.5rem' }}>{t.pricingTitle}</h2>
         <p style={{ textAlign: 'center', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
           {t.pricingSubtitle}
         </p>
@@ -1076,13 +1190,13 @@ const LandingPage = () => {
             type="button"
             className="btn btn-secondary"
             onClick={() => setShowFullMatrix((prev) => !prev)}
-            style={{ fontSize: '0.85rem' }}
+            style={{ fontSize: '0.85rem', maxWidth: '100%', whiteSpace: 'normal', textAlign: 'center' }}
           >
             {showFullMatrix ? t.showOnlyIncluded : t.showAllComparison}
           </button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1.75rem', alignItems: 'stretch' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '1.75rem', alignItems: 'stretch' }}>
           {plans.map((p) => {
             const pKey = String(p.name || '').trim().toLowerCase();
             const isPro = pKey === 'pro';
@@ -1094,9 +1208,11 @@ const LandingPage = () => {
             return (
               <div
                 key={p.id}
-                className="glass-card"
+                className="glass-card landing-plan-card"
                 style={{
                   padding: '2.25rem',
+                  paddingTop: isPro ? '2.5rem' : '2.25rem',
+                  marginTop: isPro ? '0.65rem' : 0,
                   display: 'flex',
                   flexDirection: 'column',
                   position: 'relative',
@@ -1127,7 +1243,7 @@ const LandingPage = () => {
                   </div>
                 )}
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
                   <h3 style={{ fontSize: '1.5rem', margin: 0 }}>{p.name}</h3>
                   {p.allows_free_trial !== false && (p.trial_days ?? 14) > 0 && (
                     <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>
@@ -1185,15 +1301,15 @@ const LandingPage = () => {
       </section>
 
       {/* Become a Seller / Agency Partner Section */}
-      <section id="reseller" style={{ maxWidth: '1200px', margin: '0 auto', padding: '3rem 1.5rem' }}>
+      <section id="reseller" className="landing-section" style={{ maxWidth: '1200px', margin: '0 auto', padding: '3rem 1.5rem' }}>
         <div
-          className="glass-card"
+          className="glass-card landing-card"
           style={{
             padding: '3rem 2.5rem',
             border: '1px solid rgba(251, 191, 36, 0.45)',
             background: 'linear-gradient(135deg, rgba(24, 20, 12, 0.9), rgba(15, 20, 34, 0.92))',
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))',
             gap: '2.5rem',
             alignItems: 'center',
           }}
@@ -1202,7 +1318,7 @@ const LandingPage = () => {
             <span className="badge badge-gold" style={{ marginBottom: '1rem' }}>
               <Handshake size={14} /> {t.resellerBadge}
             </span>
-            <h2 style={{ fontSize: '2rem', marginBottom: '1rem', lineHeight: 1.25 }}>{t.resellerTitle}</h2>
+            <h2 style={{ fontSize: 'clamp(1.45rem, 3.2vw, 2rem)', marginBottom: '1rem', lineHeight: 1.25 }}>{t.resellerTitle}</h2>
             <p style={{ color: 'var(--text-secondary)', lineHeight: 1.65, marginBottom: '1.5rem' }}>
               {t.resellerSubtitle}
             </p>
@@ -1257,16 +1373,16 @@ const LandingPage = () => {
       </section>
 
       {/* Enterprise Security & Data Privacy Section */}
-      <section style={{ maxWidth: '1200px', margin: '0 auto', padding: '2.5rem 1.5rem' }}>
+      <section className="landing-section" style={{ maxWidth: '1200px', margin: '0 auto', padding: '2.5rem 1.5rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <span className="badge badge-success" style={{ marginBottom: '0.6rem' }}>
             <Lock size={13} /> SECURITY & COMPLIANCE
           </span>
-          <h2 style={{ fontSize: '1.9rem' }}>{t.securityTitle}</h2>
+          <h2 style={{ fontSize: 'clamp(1.45rem, 3.2vw, 1.9rem)' }}>{t.securityTitle}</h2>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: '1.25rem' }}>
           {t.securityItems.map((sec, idx) => (
-            <div key={idx} className="glass-card" style={{ padding: '1.5rem' }}>
+            <div key={idx} className="glass-card landing-card" style={{ padding: '1.5rem' }}>
               <ShieldCheck size={22} color="var(--success)" style={{ marginBottom: '0.75rem' }} />
               <h3 style={{ fontSize: '1.05rem', marginBottom: '0.4rem' }}>{sec.title}</h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: 1.55 }}>{sec.desc}</p>
@@ -1276,11 +1392,11 @@ const LandingPage = () => {
       </section>
 
       {/* SEO & GEO Structured FAQ Section */}
-      <section id="faq" style={{ maxWidth: '1040px', margin: '0 auto', padding: '2.5rem 1.5rem 1rem' }}>
-        <h2 style={{ textAlign: 'center', fontSize: '2rem', marginBottom: '2rem' }}>{t.faqTitle}</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '1.25rem' }}>
+      <section id="faq" className="landing-section" style={{ maxWidth: '1040px', margin: '0 auto', padding: '2.5rem 1.5rem 1rem' }}>
+        <h2 style={{ textAlign: 'center', fontSize: 'clamp(1.45rem, 3.2vw, 2rem)', marginBottom: '2rem' }}>{t.faqTitle}</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: '1.25rem' }}>
           {(t.faqs || []).map((item, idx) => (
-            <div key={idx} className="glass-card" style={{ padding: '1.5rem' }}>
+            <div key={idx} className="glass-card landing-card" style={{ padding: '1.5rem' }}>
               <h3 style={{ fontSize: '1.05rem', marginBottom: '0.6rem', color: 'var(--primary)' }}>{item.q}</h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', lineHeight: 1.6, margin: 0 }}>{item.a}</p>
             </div>
@@ -1487,6 +1603,7 @@ const LandingPage = () => {
         }}
       >
         <div
+          className="landing-footer-inner"
           style={{
             maxWidth: '1200px',
             margin: '0 auto',
@@ -1503,15 +1620,17 @@ const LandingPage = () => {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.6rem',
+              justifyContent: 'center',
+              flexWrap: 'wrap',
+              gap: '0.5rem',
               textDecoration: 'none',
               color: 'var(--text-secondary)',
               cursor: 'pointer',
             }}
           >
-            <BrandLogo size={28} fontSize="1.1rem" /> — {t.footerTagline}
+            <BrandLogo size={28} fontSize="1.1rem" /> <span>— {t.footerTagline}</span>
           </a>
-          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', justifyContent: 'center' }}>
             <button
               type="button"
               onClick={openSellerModal}

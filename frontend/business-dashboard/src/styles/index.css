@@ -47,6 +47,11 @@
   padding: 0;
 }
 
+html {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background-color: var(--bg-main);
@@ -284,4 +289,113 @@ textarea:focus-visible {
 
 .table tr:hover td {
   background: rgba(255, 255, 255, 0.025);
+}
+
+/* Landing Page Responsive Header & Mobile Layout */
+.landing-header {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0.9rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(6, 8, 15, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.landing-nav-desktop {
+  display: flex;
+  align-items: center;
+  gap: 1.15rem;
+  flex-wrap: wrap;
+}
+
+.landing-nav-mobile-controls {
+  display: none;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.landing-mobile-drawer {
+  display: none;
+}
+
+.landing-hamburger-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+@media (max-width: 960px) {
+  .landing-header {
+    padding: 0.75rem 1rem;
+  }
+
+  .landing-nav-desktop {
+    display: none;
+  }
+
+  .landing-nav-mobile-controls {
+    display: flex;
+  }
+
+  .landing-mobile-drawer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    position: sticky;
+    top: 65px;
+    z-index: 49;
+    padding: 1rem;
+    background: rgba(7, 10, 15, 0.98);
+    border-bottom: 1px solid rgba(212, 175, 55, 0.25);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+
+  .landing-mobile-link {
+    color: var(--text-primary);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+  }
+
+  .landing-hero-section {
+    padding: 2.25rem 1rem 2rem !important;
+  }
+
+  .landing-section {
+    padding: 1.75rem 1rem !important;
+  }
+
+  .landing-card {
+    padding: 1.35rem !important;
+  }
+
+  .landing-plan-card {
+    padding: 1.75rem 1.25rem !important;
+  }
+
+  .landing-footer-inner {
+    flex-direction: column;
+    text-align: center;
+    justify-content: center !important;
+  }
 }
