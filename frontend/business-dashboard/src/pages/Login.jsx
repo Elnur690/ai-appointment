@@ -10,10 +10,15 @@ const Login = ({ initialMode = 'login' }) => {
   const [searchParams] = useSearchParams();
   const refParam = searchParams.get('ref') || '';
   const planParam = searchParams.get('plan') || '';
-  const [mode, setMode] = useState(refParam || planParam ? 'register' : initialMode);
+  const resetTokenParam = searchParams.get('reset_token') || '';
+  const [mode, setMode] = useState(
+    resetTokenParam ? 'reset' : refParam || planParam ? 'register' : initialMode
+  );
   const [showFullMatrix, setShowFullMatrix] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [resetMessage, setResetMessage] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [ownerName, setOwnerName] = useState('');
   const [phone, setPhone] = useState('');
@@ -51,14 +56,20 @@ const Login = ({ initialMode = 'login' }) => {
     try {
       const res = await api.post('/auth/login', { email, password });
       localStorage.setItem('access_token', res.data.access_token);
+      const userRole = res.data.role || 'owner';
       login({
         name: email.split('@')[0],
         email,
-        role: res.data.role || 'owner',
+        role: userRole,
         business_id: res.data.business_id,
+        reseller_id: res.data.reseller_id,
       });
-      await fetchBusinessProfile();
-      navigate('/');
+      if (userRole === 'reseller') {
+        navigate('/partner');
+      } else {
+        await fetchBusinessProfile();
+        navigate('/');
+      }
     } catch (err) {
       setError(
         err.response?.data?.detail ||
@@ -99,6 +110,48 @@ const Login = ({ initialMode = 'login' }) => {
             ? 'Registration failed. Please check your details.'
             : 'Qeydiyyat zamanı xəta baş verdi. Məlumatları yoxlayın.')
       );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setError('');
+    setResetMessage('');
+    setSubmitting(true);
+    try {
+      await api.post('/auth/forgot-password', { email });
+      setResetMessage(
+        lang === 'en'
+          ? 'If an account with that email exists, password reset instructions have been sent.'
+          : 'Bu e-poçt ünvanına aid hesab mövcuddursa, şifrə yeniləmə təlimatı göndərildi.'
+      );
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to request password reset.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setError('');
+    setResetMessage('');
+    setSubmitting(true);
+    try {
+      await api.post('/auth/reset-password', {
+        token: resetTokenParam,
+        new_password: newPassword,
+      });
+      setResetMessage(
+        lang === 'en'
+          ? 'Password updated! You can now sign in.'
+          : 'Şifrə yeniləndi! İndi daxil ola bilərsiniz.'
+      );
+      setMode('login');
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Invalid or expired reset token.');
     } finally {
       setSubmitting(false);
     }
@@ -296,7 +349,68 @@ const Login = ({ initialMode = 'login' }) => {
             </div>
           )}
 
-          {mode === 'login' ? (
+          {resetMessage && (
+            <div
+              style={{
+                padding: '0.75rem 1rem',
+                background: 'rgba(16, 185, 129, 0.15)',
+                border: '1px solid var(--success)',
+                borderRadius: '8px',
+                color: 'var(--success)',
+                marginBottom: '1.25rem',
+                fontSize: '0.9rem',
+              }}
+            >
+              {resetMessage}
+            </div>
+          )}
+
+          {mode === 'forgot' ? (
+            <form onSubmit={handleForgotPassword}>
+              <h2 style={{ marginBottom: '0.5rem' }}>{lang === 'en' ? 'Forgot Password' : 'Şifrəni Unutmusunuz?'}</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+                {lang === 'en'
+                  ? 'Enter your account email and we will send you a password reset link.'
+                  : 'Hesabınızın e-poçt ünvanını daxil edin, sizə şifrə yeniləmə linki göndərək.'}
+              </p>
+              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                <label className="form-label">{t.emailLabel}</label>
+                <input
+                  type="email"
+                  className="form-control"
+                  required
+                  placeholder="you@yourbusiness.az"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+              <button type="submit" disabled={submitting} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginBottom: '0.75rem' }}>
+                {lang === 'en' ? 'Send Reset Link' : 'Sıfırlama Linki Göndər'}
+              </button>
+              <button type="button" className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setMode('login')}>
+                {lang === 'en' ? 'Back to Sign In' : 'Girişə Qayıt'}
+              </button>
+            </form>
+          ) : mode === 'reset' ? (
+            <form onSubmit={handleResetPassword}>
+              <h2 style={{ marginBottom: '0.5rem' }}>{lang === 'en' ? 'Set New Password' : 'Yeni Şifrə Təyin Edin'}</h2>
+              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                <label className="form-label">{lang === 'en' ? 'New Password' : 'Yeni Şifrə'}</label>
+                <input
+                  type="password"
+                  className="form-control"
+                  required
+                  minLength={6}
+                  placeholder="Min 6 simvol"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </div>
+              <button type="submit" disabled={submitting} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+                {lang === 'en' ? 'Save New Password' : 'Yeni Şifrəni Yadda Saxla'}
+              </button>
+            </form>
+          ) : mode === 'login' ? (
             <form onSubmit={handleLogin}>
               <h2 style={{ marginBottom: '0.5rem' }}>{t.welcomeBack}</h2>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
@@ -313,7 +427,7 @@ const Login = ({ initialMode = 'login' }) => {
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
-              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+              <div className="form-group" style={{ marginBottom: '0.75rem' }}>
                 <label className="form-label">{t.passwordLabel}</label>
                 <input
                   type="password"
@@ -323,6 +437,19 @@ const Login = ({ initialMode = 'login' }) => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
+              </div>
+              <div style={{ textAlign: 'right', marginBottom: '1.25rem' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError('');
+                    setResetMessage('');
+                    setMode('forgot');
+                  }}
+                  style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.84rem', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  {lang === 'en' ? 'Forgot password?' : 'Şifrəni unutmusunuz?'}
+                </button>
               </div>
               <button
                 type="submit"
@@ -442,7 +569,49 @@ const Login = ({ initialMode = 'login' }) => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem' }}>
             {plans.map((p) => {
               const allFeatures = getPlanFeatureItems(p, lang, !showFullMatrix);
-              return (
+              const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setError('');
+    setResetMessage('');
+    setSubmitting(true);
+    try {
+      await api.post('/auth/forgot-password', { email });
+      setResetMessage(
+        lang === 'en'
+          ? 'If an account with that email exists, password reset instructions have been sent.'
+          : 'Bu e-poçt ünvanına aid hesab mövcuddursa, şifrə yeniləmə təlimatı göndərildi.'
+      );
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to request password reset.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setError('');
+    setResetMessage('');
+    setSubmitting(true);
+    try {
+      await api.post('/auth/reset-password', {
+        token: resetTokenParam,
+        new_password: newPassword,
+      });
+      setResetMessage(
+        lang === 'en'
+          ? 'Password updated! You can now sign in.'
+          : 'Şifrə yeniləndi! İndi daxil ola bilərsiniz.'
+      );
+      setMode('login');
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Invalid or expired reset token.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
                 <div key={p.id} className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                     <h3 style={{ fontSize: '1.4rem', margin: 0 }}>{p.name}</h3>

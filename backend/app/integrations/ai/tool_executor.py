@@ -263,17 +263,50 @@ class ToolExecutor:
         self.db.add(appt)
         await self.db.flush()
 
+        checkout_url: str | None = None
         if deposit_req.is_deposit_required:
+            from app.core.config import settings
+            from app.integrations.payments.paymegate import PaymegateAdapter
+            from app.integrations.payments.payriff import PayriffAdapter
+
+            dep_method = PaymentMethod.paymegate if settings.PAYMEGATE_API_KEY else PaymentMethod.payriff
             dep_payment = Payment(
                 business_id=self.business_id,
                 appointment_id=appt.id,
                 amount=float(deposit_req.deposit_amount),
                 currency=svc.currency or "AZN",
-                method=PaymentMethod.paymegate,
+                method=dep_method,
                 status=PaymentStatus.pending,
                 notes=f"Beh / Deposit ({svc.name})",
             )
             self.db.add(dep_payment)
+            await self.db.flush()
+
+            try:
+                if settings.PAYMEGATE_API_KEY:
+                    link_res = await PaymegateAdapter().create_payment_link(
+                        payment_id=dep_payment.id,
+                        amount=deposit_req.deposit_amount,
+                        currency=svc.currency or "AZN",
+                        description=f"Beh / Deposit - {svc.name}",
+                        merchant_config={"business_id": str(self.business_id), "appointment_id": str(appt.id)},
+                        return_url=f"https://{settings.PLATFORM_DOMAIN}",
+                    )
+                    dep_payment.gateway_transaction_id = link_res.transaction_id
+                    checkout_url = link_res.payment_url
+                elif settings.PAYRIFF_SECRET_KEY:
+                    link_res = await PayriffAdapter().create_payment_link(
+                        payment_id=dep_payment.id,
+                        amount=deposit_req.deposit_amount,
+                        currency=svc.currency or "AZN",
+                        description=f"Beh / Deposit - {svc.name}",
+                        merchant_config={"business_id": str(self.business_id)},
+                        return_url=f"https://{settings.PLATFORM_DOMAIN}",
+                    )
+                    dep_payment.gateway_transaction_id = link_res.transaction_id
+                    checkout_url = link_res.payment_url
+            except Exception:
+                checkout_url = None
 
         await self.db.commit()
         await self.db.refresh(appt)
@@ -290,6 +323,7 @@ class ToolExecutor:
                 "deposit_required": deposit_req.is_deposit_required,
                 "deposit_amount": float(deposit_req.deposit_amount) if deposit_req.is_deposit_required else 0.0,
                 "deposit_reason": deposit_req.reason,
+                "checkout_url": checkout_url,
             },
         }
 

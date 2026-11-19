@@ -88,6 +88,8 @@ def _build_business_response(biz: Business) -> BusinessResponse:
         else False,
         "allows_online_payments": bool(getattr(plan, "allows_online_payments", True)) if plan else True,
         "allows_no_show_deposits": bool(getattr(plan, "allows_no_show_deposits", False)) if plan else False,
+        "allows_gcal_sync": bool(getattr(plan, "allows_gcal_sync", False)) if plan else False,
+        "allows_apple_cal_sync": bool(getattr(plan, "allows_apple_cal_sync", False)) if plan else False,
         "allows_custom_domain": bool(getattr(plan, "allows_custom_domain", False)) if plan else False,
     }
     now_utc = datetime.now(timezone.utc)
@@ -464,3 +466,221 @@ async def get_whatsapp_pairing_qr(
             "detail": str(exc),
             "source": "evolution_api_internal",
         }
+
+
+class SubscriptionCheckoutRequest(BaseModel):
+    plan_id: str | None = None
+    plan_name: str | None = None
+
+
+@router.get("/subscription")
+async def get_business_subscription(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("owner"))],
+    business_id: Annotated[str, Depends(get_business_context)],
+):
+    """Return current subscription plan, status, trial expiry, and available upgrade plans."""
+    biz = (await db.execute(select(Business).where(Business.id == UUID(business_id)))).scalar_one_or_none()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    plans = (await db.execute(select(Plan).where(Plan.is_active.is_(True)).order_by(Plan.price.asc()))).scalars().all()
+    current_plan = next((p for p in plans if p.id == biz.plan_id), None)
+    return {
+        "current_plan_id": str(biz.plan_id) if biz.plan_id else None,
+        "current_plan_name": current_plan.name if current_plan else "Starter",
+        "current_plan_price": float(current_plan.price) if current_plan else 29.0,
+        "subscription_status": biz.subscription_status or "trial",
+        "trial_ends_at": biz.trial_ends_at.isoformat() if biz.trial_ends_at else None,
+        "plans": [
+            {
+                "id": str(p.id),
+                "name": p.name,
+                "price": float(p.price),
+                "ai_message_quota": int(p.ai_message_quota or 1000),
+            }
+            for p in plans
+        ],
+    }
+
+
+@router.post("/subscription/checkout")
+async def create_subscription_checkout(
+    req: SubscriptionCheckoutRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("owner"))],
+    business_id: Annotated[str, Depends(get_business_context)],
+):
+    """Create a live Paymegate/Payriff checkout link for SaaS plan payment or upgrade."""
+    from decimal import Decimal
+    from app.integrations.payments.paymegate import PaymegateAdapter
+    from app.integrations.payments.payriff import PayriffAdapter
+
+    biz = (await db.execute(select(Business).where(Business.id == UUID(business_id)))).scalar_one_or_none()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    target_plan = None
+    if req.plan_id:
+        try:
+            target_plan = (await db.execute(select(Plan).where(Plan.id == UUID(req.plan_id)))).scalar_one_or_none()
+        except ValueError:
+            target_plan = None
+    if not target_plan and req.plan_name:
+        target_plan = (await db.execute(select(Plan).where(Plan.name == req.plan_name))).scalar_one_or_none()
+    if not target_plan and biz.plan_id:
+        target_plan = (await db.execute(select(Plan).where(Plan.id == biz.plan_id))).scalar_one_or_none()
+    if not target_plan:
+        raise HTTPException(status_code=404, detail="Subscription plan not found")
+
+    amount = Decimal(str(target_plan.price))
+    sub_payment = Payment(
+        business_id=biz.id,
+        appointment_id=None,
+        amount=float(amount),
+        currency="AZN",
+        method=PaymentMethod.paymegate if settings.PAYMEGATE_API_KEY else PaymentMethod.payriff,
+        status=PaymentStatus.pending,
+        notes=f"SaaS Subscription - {target_plan.name}",
+    )
+    db.add(sub_payment)
+    await db.flush()
+
+    checkout_url: str | None = None
+    if settings.PAYMEGATE_API_KEY:
+        link_res = await PaymegateAdapter().create_payment_link(
+            payment_id=sub_payment.id,
+            amount=amount,
+            currency="AZN",
+            description=f"Randevu.vip {target_plan.name} Subscription",
+            merchant_config={
+                "business_id": str(biz.id),
+                "type": "saas_subscription",
+                "plan_id": str(target_plan.id),
+            },
+            return_url=f"https://app.{settings.PLATFORM_DOMAIN}/payments",
+        )
+        sub_payment.gateway_transaction_id = link_res.transaction_id
+        checkout_url = link_res.payment_url
+    elif settings.PAYRIFF_SECRET_KEY:
+        link_res = await PayriffAdapter().create_payment_link(
+            payment_id=sub_payment.id,
+            amount=amount,
+            currency="AZN",
+            description=f"Randevu.vip {target_plan.name} Subscription",
+            merchant_config={},
+            return_url=f"https://app.{settings.PLATFORM_DOMAIN}/payments",
+        )
+        sub_payment.gateway_transaction_id = link_res.transaction_id
+        checkout_url = link_res.payment_url
+
+    await db.commit()
+    return {
+        "payment_id": str(sub_payment.id),
+        "plan_name": target_plan.name,
+        "amount": float(amount),
+        "currency": "AZN",
+        "checkout_url": checkout_url,
+    }
+
+
+@router.get("/public/resolve")
+async def resolve_public_booking_business(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    domain: Optional[str] = None,
+    business_id: Optional[str] = None,
+):
+    """Public endpoint to load business services and staff for white-label custom domains or /book/:businessId."""
+    from app.models.service import Service
+    from app.models.staff import Staff
+
+    biz = None
+    if business_id:
+        try:
+            biz = (await db.execute(select(Business).where(Business.id == UUID(business_id), Business.is_active.is_(True)))).scalar_one_or_none()
+        except ValueError:
+            biz = None
+    elif domain:
+        clean_dom = domain.strip().lower()
+        biz = (await db.execute(select(Business).where(Business.custom_domain == clean_dom, Business.is_active.is_(True)))).scalar_one_or_none()
+
+    if not biz:
+        raise HTTPException(status_code=404, detail="Business booking page not found")
+
+    services = (
+        await db.execute(select(Service).where(Service.business_id == biz.id, Service.is_active.is_(True)))
+    ).scalars().all()
+    staff = (
+        await db.execute(select(Staff).where(Staff.business_id == biz.id, Staff.is_active.is_(True)))
+    ).scalars().all()
+
+    return {
+        "id": str(biz.id),
+        "name": biz.name,
+        "category": biz.category,
+        "services": [
+            {
+                "id": str(s.id),
+                "name": s.name,
+                "duration_minutes": s.duration_minutes,
+                "price": float(s.price),
+                "currency": s.currency or "AZN",
+            }
+            for s in services
+        ],
+        "staff": [
+            {"id": str(st.id), "name": st.name, "role": st.role}
+            for st in staff
+        ],
+    }
+
+
+class PublicBookRequest(BaseModel):
+    service_id: str
+    staff_id: str
+    date: str
+    time: str
+    customer_name: str
+    customer_phone: str
+
+
+@router.post("/public/{business_id}/book")
+async def create_public_booking(
+    business_id: str,
+    req: PublicBookRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Create a real appointment from a public white-label booking page (with Beh deposit evaluation)."""
+    from app.models.customer import Customer
+    from app.integrations.ai.tool_executor import ToolExecutor
+
+    biz = (await db.execute(select(Business).where(Business.id == UUID(business_id), Business.is_active.is_(True)))).scalar_one_or_none()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    branch = (await db.execute(select(Branch).where(Branch.business_id == biz.id, Branch.is_active.is_(True)))).scalars().first()
+    if not branch:
+        raise HTTPException(status_code=400, detail="Business has no active branch")
+
+    phone_clean = req.customer_phone.strip()
+    customer = (
+        await db.execute(select(Customer).where(Customer.business_id == biz.id, Customer.phone_number == phone_clean))
+    ).scalar_one_or_none()
+    if not customer:
+        customer = Customer(
+            business_id=biz.id,
+            phone_number=phone_clean,
+            name=req.customer_name.strip(),
+            language_pref="az",
+        )
+        db.add(customer)
+        await db.flush()
+
+    executor = ToolExecutor(db=db, branch_id=branch.id, business_id=biz.id, customer_id=customer.id)
+    return await executor._create_appointment(
+        service_id=req.service_id,
+        staff_id=req.staff_id,
+        date=req.date,
+        time=req.time,
+        customer_name=req.customer_name.strip(),
+    )

@@ -62,3 +62,31 @@ async def _async_send_reminders():
             
         await session.commit()
     await engine.dispose()
+
+
+@celery_app.task(name="expire_overdue_trials")
+def expire_overdue_trials():
+    """Daily task to suspend businesses whose dynamic free trial has expired without upgrading."""
+    import asyncio
+    asyncio.run(_async_expire_overdue_trials())
+
+
+async def _async_expire_overdue_trials():
+    from app.models.business import Business
+
+    now = datetime.now(timezone.utc)
+    async with AsyncSessionLocal() as session:
+        stmt = select(Business).where(
+            and_(
+                Business.subscription_status == "trial",
+                Business.trial_ends_at.is_not(None),
+                Business.trial_ends_at < now,
+                Business.is_active.is_(True),
+            )
+        )
+        expired = (await session.execute(stmt)).scalars().all()
+        for biz in expired:
+            biz.subscription_status = "trial_expired"
+            logger.info(f"Marked overdue trial as trial_expired for business {biz.id}")
+        await session.commit()
+    await engine.dispose()

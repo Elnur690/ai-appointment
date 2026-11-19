@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     PAYRIFF_MERCHANT_ID: str = ""
     PAYRIFF_SECRET_KEY: str = ""
 
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = "noreply@randevu.vip"
+    RESEND_API_KEY: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @model_validator(mode="after")

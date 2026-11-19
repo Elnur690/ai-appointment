@@ -55,10 +55,14 @@ class AIRegistryService:
 
         try:
             if chosen == "claude":
-                api_key = config["api_key"] or getattr(settings, "CLAUDE_API_KEY", "mock_claude_key")
+                api_key = config["api_key"] or getattr(settings, "CLAUDE_API_KEY", "")
+                if not api_key:
+                    return GeminiProvider(api_key=settings.GEMINI_API_KEY, model_name="gemini-3.5-flash")
                 return ClaudeProvider(api_key=api_key, model_name=config["model_name"])
             elif chosen == "openai":
-                api_key = config["api_key"] or getattr(settings, "OPENAI_API_KEY", "mock_openai_key")
+                api_key = config["api_key"] or getattr(settings, "OPENAI_API_KEY", "")
+                if not api_key:
+                    return GeminiProvider(api_key=settings.GEMINI_API_KEY, model_name="gemini-3.5-flash")
                 return OpenAIProvider(api_key=api_key, model_name=config["model_name"])
             else:
                 api_key = config["api_key"] or settings.GEMINI_API_KEY

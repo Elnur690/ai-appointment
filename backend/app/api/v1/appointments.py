@@ -1,7 +1,7 @@
 from datetime import date, datetime, time, timezone
 from typing import Annotated, Any, List
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -248,6 +248,58 @@ async def check_availability(
 ):
     """Check available slots."""
     return []
+
+
+@router.get("/ical-feed")
+async def export_ical_feed(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    business_id: str = Query(...),
+):
+    """Export upcoming business appointments as an iCalendar (.ics) feed for Google & Apple Calendar."""
+    try:
+        biz_uuid = UUID(str(business_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid business_id")
+
+    stmt = (
+        select(Appointment)
+        .where(
+            Appointment.business_id == biz_uuid,
+            Appointment.status.notin_([AppointmentStatus.cancelled]),
+        )
+        .options(
+            selectinload(Appointment.customer),
+            selectinload(Appointment.service),
+            selectinload(Appointment.staff),
+        )
+        .order_by(Appointment.start_time.asc())
+        .limit(200)
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Randevu.vip//AI Appointment Calendar//EN",
+        "CALSCALE:GREGORIAN",
+        "X-WR-CALNAME:Randevu.vip Appointments",
+    ]
+    for a in rows:
+        dt_start = a.start_time.strftime("%Y%m%dT%H%M%SZ")
+        dt_end = a.end_time.strftime("%Y%m%dT%H%M%SZ")
+        svc_name = a.service.name if a.service else "Appointment"
+        cust_name = (a.customer.name or a.customer.phone_number) if a.customer else "Client"
+        staff_name = a.staff.name if a.staff else "Staff"
+        lines.extend([
+            "BEGIN:VEVENT",
+            f"UID:{a.id}@randevu.vip",
+            f"DTSTART:{dt_start}",
+            f"DTEND:{dt_end}",
+            f"SUMMARY:{svc_name} - {cust_name}",
+            f"DESCRIPTION:Staff: {staff_name} | Status: {a.status.value}",
+            "END:VEVENT",
+        ])
+    lines.append("END:VCALENDAR")
+    return Response(content="\r\n".join(lines), media_type="text/calendar")
 
 
 @router.get("/my", response_model=List[AppointmentResponse])

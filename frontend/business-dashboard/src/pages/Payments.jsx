@@ -4,13 +4,17 @@ import { StatusBadge } from '../components/common/StatusBadge';
 import { Modal } from '../components/common/Modal';
 import { useAuthStore } from '../store/authStore';
 import api from '../api/client';
-import { Plus } from 'lucide-react';
+import { Plus, CreditCard } from 'lucide-react';
 
 const Payments = () => {
   const { language } = useAuthStore();
   const isAz = (language || 'az') !== 'en';
   const [payments, setPayments] = useState([]);
   const [summary, setSummary] = useState({ total_revenue: 0, count: 0 });
+  const [subscription, setSubscription] = useState(null);
+  const [selectedPlanId, setSelectedPlanId] = useState('');
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutMessage, setCheckoutMessage] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState({ amount: '', currency: 'AZN', method: 'cash', status: 'paid', notes: '' });
 
@@ -28,12 +32,38 @@ const Payments = () => {
   ];
 
   const loadPayments = async () => {
-    const [payRes, sumRes] = await Promise.all([
+    const [payRes, sumRes, subRes] = await Promise.all([
       api.get('/payments/').catch(() => ({ data: [] })),
       api.get('/payments/summary').catch(() => ({ data: { total_revenue: 0, count: 0 } })),
+      api.get('/businesses/subscription').catch(() => ({ data: null })),
     ]);
     setPayments(payRes.data || []);
     setSummary(sumRes.data || { total_revenue: 0, count: 0 });
+    if (subRes.data) {
+      setSubscription(subRes.data);
+      setSelectedPlanId((prev) => prev || subRes.data.current_plan_id || subRes.data.plans?.[0]?.id || '');
+    }
+  };
+
+  const handlePlanCheckout = async () => {
+    setCheckoutMessage('');
+    setCheckoutLoading(true);
+    try {
+      const res = await api.post('/businesses/subscription/checkout', { plan_id: selectedPlanId });
+      if (res.data?.checkout_url) {
+        window.open(res.data.checkout_url, '_blank', 'noopener,noreferrer');
+      } else {
+        setCheckoutMessage(
+          isAz
+            ? `Ödəniş sorğusu yaradıldı (${res.data?.plan_name} — ${res.data?.amount} AZN).`
+            : `Subscription invoice created (${res.data?.plan_name} — ${res.data?.amount} AZN).`
+        );
+      }
+    } catch (err) {
+      setCheckoutMessage(err.response?.data?.detail || 'Checkout failed.');
+    } finally {
+      setCheckoutLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -123,6 +153,68 @@ const Payments = () => {
           {isAz ? 'Ödəniş Qeydə Al' : 'Record Payment'}
         </button>
       </div>
+
+      {subscription && (
+        <div
+          className="glass-card"
+          style={{
+            padding: '1.25rem 1.5rem',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem',
+            border: '1px solid rgba(212, 175, 55, 0.35)',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+              {isAz ? 'Cari Abunəlik Paketi' : 'Current Subscription Plan'}
+            </div>
+            <div style={{ fontSize: '1.15rem', fontWeight: 700 }}>
+              {subscription.current_plan_name} ({subscription.current_plan_price} AZN/ay) •{' '}
+              <span style={{ color: subscription.subscription_status === 'active' ? 'var(--success)' : 'var(--warning)' }}>
+                {subscription.subscription_status}
+              </span>
+            </div>
+            {checkoutMessage && (
+              <div style={{ fontSize: '0.84rem', color: 'var(--primary)', marginTop: '0.35rem' }}>
+                {checkoutMessage}
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+            <select
+              className="form-control"
+              style={{ width: 'auto', minWidth: '190px' }}
+              value={selectedPlanId}
+              onChange={(e) => setSelectedPlanId(e.target.value)}
+            >
+              {(subscription.plans || []).map((pl) => (
+                <option key={pl.id} value={pl.id}>
+                  {pl.name} — {pl.price} AZN
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn btn-gold"
+              onClick={handlePlanCheckout}
+              disabled={checkoutLoading || !selectedPlanId}
+            >
+              <CreditCard size={16} />
+              {checkoutLoading
+                ? isAz
+                  ? 'Yönləndirilir...'
+                  : 'Redirecting...'
+                : isAz
+                ? 'Abunəliyi Ödə / Yenilə'
+                : 'Pay / Upgrade Plan'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <DataTable
         columns={columns}

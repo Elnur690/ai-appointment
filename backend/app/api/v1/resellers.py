@@ -23,6 +23,7 @@ class ResellerPublicApplyRequest(BaseModel):
     company_name: Optional[str] = None
     email: EmailStr
     phone: str
+    password: Optional[str] = None
     preferred_referral_code: Optional[str] = None
     website_honeypot: Optional[str] = None
 
@@ -150,12 +151,13 @@ async def apply_as_reseller_public(
     if code_taken:
         norm_code = f"{norm_code[:12]}-{secrets.token_hex(2).upper()}"
 
+    raw_password = data.password.strip() if data.password and len(data.password.strip()) >= 6 else secrets.token_urlsafe(12)
     reseller = Reseller(
         name=data.name.strip(),
         company_name=data.company_name.strip() if data.company_name else None,
         email=email_clean,
         phone=data.phone.strip(),
-        password_hash=hash_password(secrets.token_urlsafe(12)),
+        password_hash=hash_password(raw_password),
         referral_code=norm_code,
         commission_rate_percent=20.0,
         is_active=False,
@@ -167,6 +169,61 @@ async def apply_as_reseller_public(
         "referral_code": norm_code,
         "referral_url": f"https://randevu.vip/?ref={norm_code}",
         "commission_rate_percent": 20.0,
+    }
+
+
+@router.get("/me")
+async def get_my_reseller_portal(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("reseller"))],
+):
+    """Self-service portal endpoint for approved Reseller / Agency Partners."""
+    reseller_id = user.get("reseller_id") or user.get("id")
+    reseller = (await db.execute(select(Reseller).where(Reseller.id == UUID(str(reseller_id))))).scalar_one_or_none()
+    if not reseller:
+        raise HTTPException(status_code=404, detail="Reseller account not found")
+
+    summary = await _build_reseller_response(reseller, db)
+    biz_rows = (
+        await db.execute(
+            select(Business, Plan.name, Plan.price)
+            .outerjoin(Plan, Business.plan_id == Plan.id)
+            .where(Business.reseller_id == reseller.id)
+            .order_by(Business.created_at.desc())
+        )
+    ).all()
+    payouts = (
+        await db.execute(
+            select(ResellerPayout)
+            .where(ResellerPayout.reseller_id == reseller.id)
+            .order_by(ResellerPayout.created_at.desc())
+        )
+    ).scalars().all()
+
+    return {
+        "partner": summary.model_dump(),
+        "referred_businesses": [
+            {
+                "id": str(b.id),
+                "name": b.name,
+                "plan_name": p_name or "Starter",
+                "plan_price": float(p_price or 0.0),
+                "status": b.subscription_status if b.is_active else "suspended",
+                "created_at": b.created_at.isoformat() if b.created_at else None,
+            }
+            for b, p_name, p_price in biz_rows
+        ],
+        "payouts": [
+            {
+                "id": str(po.id),
+                "amount_azn": float(po.amount_azn),
+                "payment_method": po.payment_method,
+                "reference_note": po.reference_note,
+                "status": po.status,
+                "created_at": po.created_at.isoformat() if po.created_at else None,
+            }
+            for po in payouts
+        ],
     }
 
 

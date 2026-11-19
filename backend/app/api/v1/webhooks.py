@@ -346,6 +346,18 @@ async def platform_payment_gateway_webhook(
     if biz_uuid:
         service = PaymentService(db=db, business_id=biz_uuid)
         verified = await service.handle_webhook_callback(provider=prov, payload=payload, headers=headers)
+        if verified and metadata.get("type") == "saas_subscription" and metadata.get("plan_id"):
+            from app.models.business import Business
+            biz = (await db.execute(select(Business).where(Business.id == biz_uuid))).scalar_one_or_none()
+            if biz:
+                try:
+                    biz.plan_id = UUID(str(metadata["plan_id"]))
+                except ValueError:
+                    pass
+                biz.subscription_status = "active"
+                biz.is_active = True
+                biz.trial_ends_at = None
+                await db.commit()
         return {"status": "verified" if verified else "ignored", "provider": prov}
 
     # Test / live event where payment row is not yet matched (e.g. Paymegate Dashboard "Test Webhook")

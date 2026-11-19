@@ -31,7 +31,9 @@ class AIModelDiscoveryService:
 
     @staticmethod
     async def discover_claude_models(api_key: str | None = None) -> list[dict]:
-        key = api_key or getattr(settings, "CLAUDE_API_KEY", "mock_key")
+        key = api_key or getattr(settings, "CLAUDE_API_KEY", "")
+        if not key:
+            return []
         url = "https://api.anthropic.com/v1/models"
         headers = {"x-api-key": key, "anthropic-version": "2023-06-01"}
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -57,7 +59,9 @@ class AIModelDiscoveryService:
 
     @staticmethod
     async def discover_openai_models(api_key: str | None = None) -> list[dict]:
-        key = api_key or getattr(settings, "OPENAI_API_KEY", "mock_key")
+        key = api_key or getattr(settings, "OPENAI_API_KEY", "")
+        if not key:
+            return []
         url = "https://api.openai.com/v1/models"
         headers = {"Authorization": f"Bearer {key}"}
         async with httpx.AsyncClient(timeout=10.0) as client:

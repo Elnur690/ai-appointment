@@ -13,11 +13,28 @@ import Payments from './pages/Payments';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import LandingPage from './pages/LandingPage';
+import PartnerPortal from './pages/PartnerPortal';
+import PublicBooking from './pages/PublicBooking';
 
 const isApexMarketingHost = () => {
   if (typeof window === 'undefined') return false;
   const h = window.location.hostname.toLowerCase();
   return h === 'randevu.vip' || h === 'www.randevu.vip';
+};
+
+const isCustomWhiteLabelHost = () => {
+  if (typeof window === 'undefined') return false;
+  const h = window.location.hostname.toLowerCase();
+  if (
+    h === 'randevu.vip' ||
+    h === 'www.randevu.vip' ||
+    h === 'app.randevu.vip' ||
+    h === 'localhost' ||
+    h === '127.0.0.1'
+  ) {
+    return false;
+  }
+  return true;
 };
 
 const RedirectToAppHost = ({ path }) => {
@@ -30,6 +47,17 @@ const RedirectToAppHost = ({ path }) => {
 
 function App() {
   const onMarketingDomain = isApexMarketingHost();
+  const onCustomDomain = isCustomWhiteLabelHost();
+
+  if (onCustomDomain) {
+    return (
+      <BrowserRouter>
+        <Routes>
+          <Route path="*" element={<PublicBooking />} />
+        </Routes>
+      </BrowserRouter>
+    );
+  }
 
   if (onMarketingDomain) {
     return (
@@ -37,6 +65,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<RedirectToAppHost path="/login" />} />
           <Route path="/register" element={<RedirectToAppHost path="/register" />} />
+          <Route path="/book/:businessId" element={<PublicBooking />} />
           <Route path="*" element={<LandingPage />} />
         </Routes>
       </BrowserRouter>
@@ -49,6 +78,8 @@ function App() {
         <Route path="/welcome" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Login initialMode="register" />} />
+        <Route path="/partner" element={<PartnerPortal />} />
+        <Route path="/book/:businessId" element={<PublicBooking />} />
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="calendar" element={<CalendarPage />} />

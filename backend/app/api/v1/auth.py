@@ -352,3 +352,122 @@ async def get_current_user_info(
         reseller_id=current_user.get("reseller_id"),
         is_active=current_user.get("is_active", True),
     )
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+async def _send_reset_email(to_email: str, reset_url: str) -> None:
+    if settings.RESEND_API_KEY:
+        import httpx
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                await client.post(
+                    "https://api.resend.com/emails",
+                    headers={
+                        "Authorization": f"Bearer {settings.RESEND_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "from": settings.SMTP_FROM_EMAIL,
+                        "to": [to_email],
+                        "subject": "Randevu.vip — Şifrə Sıfırlama / Password Reset",
+                        "html": f"<p>Şifrənizi yeniləmək üçün aşağıdakı linkə keçid edin (30 dəqiqə etibarlıdır):</p><p><a href='{reset_url}'>{reset_url}</a></p>",
+                    },
+                )
+        except Exception:
+            pass
+    elif settings.SMTP_HOST and settings.SMTP_USER and settings.SMTP_PASSWORD:
+        import smtplib
+        from email.message import EmailMessage
+        try:
+            msg = EmailMessage()
+            msg["Subject"] = "Randevu.vip — Password Reset"
+            msg["From"] = settings.SMTP_FROM_EMAIL
+            msg["To"] = to_email
+            msg.set_content(f"Reset your password (valid 30 minutes): {reset_url}")
+            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as server:
+                server.starttls()
+                server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+                server.send_message(msg)
+        except Exception:
+            pass
+
+
+@router.post("/forgot-password")
+async def forgot_password(
+    req: ForgotPasswordRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Send a password reset link if the account exists (business owner or reseller)."""
+    email_clean = req.email.strip().lower()
+    target_id: str | None = None
+    target_role: str | None = None
+
+    owner = (await db.execute(select(BusinessOwner).where(BusinessOwner.email == email_clean))).scalar_one_or_none()
+    if owner:
+        target_id = str(owner.id)
+        target_role = "owner"
+    else:
+        reseller = (await db.execute(select(Reseller).where(Reseller.email == email_clean))).scalar_one_or_none()
+        if reseller:
+            target_id = str(reseller.id)
+            target_role = "reseller"
+
+    if target_id and target_role:
+        reset_token = create_access_token(
+            subject=target_id,
+            role=target_role,
+            extra_claims={"purpose": "password_reset", "email": email_clean},
+            expires_delta=timedelta(minutes=30),
+        )
+        reset_url = f"https://app.{settings.PLATFORM_DOMAIN}/login?reset_token={reset_token}"
+        await _send_reset_email(email_clean, reset_url)
+
+    return {
+        "status": "ok",
+        "message": "If an account with that email exists, password reset instructions have been sent.",
+    }
+
+
+@router.post("/reset-password")
+async def reset_password(
+    req: ResetPasswordRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Verify a password reset JWT token and update the user's password."""
+    from jose import JWTError
+    from app.core.security import decode_token
+
+    if len(req.new_password or "") < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    try:
+        payload = decode_token(req.token)
+    except JWTError:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    if payload.get("purpose") != "password_reset":
+        raise HTTPException(status_code=400, detail="Invalid reset token")
+
+    user_id = payload.get("sub")
+    role = payload.get("role")
+    if role == "owner":
+        user = (await db.execute(select(BusinessOwner).where(BusinessOwner.id == UUID(user_id)))).scalar_one_or_none()
+    elif role == "reseller":
+        user = (await db.execute(select(Reseller).where(Reseller.id == UUID(user_id)))).scalar_one_or_none()
+    else:
+        user = None
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    user.password_hash = hash_password(req.new_password)
+    await db.commit()
+    return {"status": "ok", "message": "Password has been reset successfully."}

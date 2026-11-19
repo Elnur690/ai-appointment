@@ -930,6 +930,86 @@ const Settings = () => {
             </div>
           )}
         </div>
+
+        {/* 7. Google & Apple Calendar Sync (.ics Subscription) */}
+        <div className="glass-card" style={{ padding: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <Globe color="var(--primary)" size={24} />
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', margin: 0 }}>
+                {isAz ? 'Google & Apple Təqvim Sinxronizasiyası' : 'Google & Apple Calendar Sync'}
+              </h2>
+            </div>
+            <span
+              className={
+                entitlements.allows_gcal_sync || entitlements.allows_apple_cal_sync
+                  ? 'badge badge-success'
+                  : 'badge badge-warning'
+              }
+            >
+              {entitlements.allows_gcal_sync || entitlements.allows_apple_cal_sync
+                ? isAz
+                  ? 'Paketdə Aktivdir'
+                  : 'Enabled on Plan'
+                : isAz
+                ? 'Paketdə Deaktivdir'
+                : 'Disabled on Plan'}
+            </span>
+          </div>
+
+          {!(entitlements.allows_gcal_sync || entitlements.allows_apple_cal_sync) ? (
+            <div
+              style={{
+                padding: '1rem',
+                borderRadius: '8px',
+                background: 'rgba(255,255,255,0.03)',
+                color: 'var(--text-secondary)',
+                fontSize: '0.9rem',
+              }}
+            >
+              <Lock size={15} style={{ marginRight: '0.4rem', verticalAlign: 'middle' }} />
+              {isAz
+                ? `Təqvim sinxronizasiyası (${planName}) paketinizdə aktiv deyil. Pro/Enterprise paketinə keçin.`
+                : `Calendar sync is disabled on your (${planName}) plan. Upgrade to Pro or Enterprise.`}
+            </div>
+          ) : (
+            <>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginBottom: '0.85rem' }}>
+                {isAz
+                  ? 'Aşağıdakı canlı .ics linkini Google Calendar ("Add by URL") və ya Apple Calendar ("New Calendar Subscription") bölməsinə əlavə edin:'
+                  : 'Subscribe to your live .ics feed in Google Calendar ("Add by URL") or Apple Calendar ("New Calendar Subscription"):'}
+              </p>
+              <div
+                style={{
+                  padding: '0.7rem 0.85rem',
+                  borderRadius: '8px',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid var(--border)',
+                  fontFamily: 'monospace',
+                  fontSize: '0.78rem',
+                  wordBreak: 'break-all',
+                  marginBottom: '0.85rem',
+                }}
+              >
+                {`https://api.randevu.vip/api/v1/appointments/ical-feed?business_id=${businessId}`}
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  const url = `https://api.randevu.vip/api/v1/appointments/ical-feed?business_id=${businessId}`;
+                  if (navigator.clipboard) navigator.clipboard.writeText(url);
+                  setChannelStatusMsg(
+                    isAz ? 'Təqvim (.ics) linki kopyalandı!' : 'Calendar (.ics) feed URL copied!'
+                  );
+                }}
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                {isAz ? 'Təqvim Linkini (.ics) Kopyala' : 'Copy Calendar Feed URL (.ics)'}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* WhatsApp QR Modal */}

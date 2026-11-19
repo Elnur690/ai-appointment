@@ -594,6 +594,7 @@ const LandingPage = () => {
     company_name: '',
     email: '',
     phone: '',
+    password: '',
     preferred_referral_code: '',
     website_honeypot: '',
   });
@@ -1560,6 +1561,24 @@ const LandingPage = () => {
                 placeholder="+994 50 000 00 00"
                 value={sellerForm.phone}
                 onChange={(e) => setSellerForm({ ...sellerForm, phone: e.target.value })}
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="seller-password" className="form-label">
+                {lang === 'en' ? 'Partner Portal Password' : 'Partnyor Portalı Şifrəsi'} <span aria-hidden="true">*</span>
+              </label>
+              <input
+                id="seller-password"
+                name="password"
+                type="password"
+                required
+                minLength={6}
+                autoComplete="new-password"
+                className="form-control"
+                placeholder="Min 6 simvol"
+                value={sellerForm.password}
+                onChange={(e) => setSellerForm({ ...sellerForm, password: e.target.value })}
               />
             </div>
 
