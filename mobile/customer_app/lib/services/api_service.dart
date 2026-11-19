@@ -75,11 +75,50 @@ class CustomerApiService {
         .get(Uri.parse('$baseUrl/appointments/my'), headers: headers)
         .timeout(_timeout);
     if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+      return jsonDecode(response.body) as List<dynamic>;
     }
     if (response.statusCode == 401) {
       await logout();
     }
     return [];
+  }
+
+  Future<List<dynamic>> discoverBusinesses({String? category, String? query}) async {
+    final params = <String, String>{};
+    if (category != null && category.isNotEmpty && category != 'Hamısı') {
+      params['category'] = category;
+    }
+    if (query != null && query.trim().isNotEmpty) {
+      params['q'] = query.trim();
+    }
+    final uri = Uri.parse('$baseUrl/businesses/public/discover').replace(queryParameters: params.isEmpty ? null : params);
+    final response = await http.get(uri).timeout(_timeout);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as List<dynamic>;
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>?> resolveBusiness(String businessId) async {
+    final uri = Uri.parse('$baseUrl/businesses/public/resolve').replace(queryParameters: {'business_id': businessId});
+    final response = await http.get(uri).timeout(_timeout);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>> createPublicBooking(String businessId, Map<String, dynamic> payload) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/businesses/public/$businessId/book'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(payload),
+        )
+        .timeout(_timeout);
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Booking failed (${response.statusCode})');
   }
 }

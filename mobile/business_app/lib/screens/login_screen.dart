@@ -10,11 +10,13 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController(text: 'owner@randevu.vip');
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _api = ApiService();
   bool _loading = false;
+  bool _forgotMode = false;
   String? _errorMessage;
+  String? _infoMessage;
 
   @override
   void dispose() {
@@ -28,17 +30,18 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _passwordController.text;
 
     if (email.isEmpty || !email.contains('@')) {
-      setState(() => _errorMessage = 'Please enter a valid business email address.');
+      setState(() => _errorMessage = 'Düzgün e-poçt ünvanı daxil edin.');
       return;
     }
     if (password.length < 4) {
-      setState(() => _errorMessage = 'Please enter your password.');
+      setState(() => _errorMessage = 'Şifrənizi daxil edin.');
       return;
     }
 
     setState(() {
       _loading = true;
       _errorMessage = null;
+      _infoMessage = null;
     });
 
     try {
@@ -48,33 +51,54 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (_) => const DashboardScreen()),
       );
     } catch (e) {
-      final errText = e.toString();
-      if (errText.contains('Invalid email or password')) {
-        setState(() {
-          _loading = false;
-          _errorMessage = 'Invalid email or password.';
-        });
-        return;
-      }
-      // Graceful offline preview fallback when local dev server is not reachable
-      await _api.saveToken('offline-preview-session-token');
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const DashboardScreen()),
-      );
+      setState(() {
+        _loading = false;
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _requestPasswordReset() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() => _errorMessage = 'E-poçt ünvanınızı daxil edin.');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+      _infoMessage = null;
+    });
+    try {
+      await _api.forgotPassword(email);
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _forgotMode = false;
+        _infoMessage = 'Bu e-poçt mövcuddursa, şifrə sıfırlama linki göndərildi.';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF070A0E),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const SizedBox(height: 36),
               Center(
                 child: Container(
                   width: 88,
@@ -82,12 +106,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
-                      color: const Color(0xFFF59E0B).withOpacity(0.5),
+                      color: const Color(0xFFD4AF37).withOpacity(0.55),
                       width: 1.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF38BDF8).withOpacity(0.28),
+                        color: const Color(0xFFD4AF37).withOpacity(0.24),
                         blurRadius: 24,
                       ),
                     ],
@@ -102,14 +126,14 @@ class _LoginScreenState extends State<LoginScreen> {
               const Text(
                 'Randevu.vip',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37)),
               ),
               const Text(
-                'Business & Branch Management',
+                'Biznes və Filial İdarəetməsi',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 36),
               if (_errorMessage != null) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -118,47 +142,82 @@ class _LoginScreenState extends State<LoginScreen> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: Colors.redAccent),
                   ),
-                  child: Text(
-                    _errorMessage!,
-                    style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                  child: Text(_errorMessage!, style: const TextStyle(color: Colors.redAccent)),
+                ),
+                const SizedBox(height: 16),
+              ],
+              if (_infoMessage != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF10B981)),
                   ),
+                  child: Text(_infoMessage!, style: const TextStyle(color: Color(0xFF10B981))),
                 ),
                 const SizedBox(height: 16),
               ],
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: 'Business Email',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.email_outlined),
+                decoration: InputDecoration(
+                  labelText: 'Biznes E-poçt',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Icon(Icons.email_outlined),
                 ),
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Password',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.lock_outline),
+              if (!_forgotMode) ...[
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'Şifrə',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    prefixIcon: const Icon(Icons.lock_outline),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => setState(() {
+                      _forgotMode = true;
+                      _errorMessage = null;
+                    }),
+                    child: const Text('Şifrəni unutmusunuz?', style: TextStyle(color: Color(0xFFD4AF37))),
+                  ),
+                ),
+              ] else
+                const SizedBox(height: 16),
+              const SizedBox(height: 8),
               ElevatedButton(
-                onPressed: _loading ? null : _login,
+                onPressed: _loading ? null : (_forgotMode ? _requestPasswordReset : _login),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0EA5E9),
+                  backgroundColor: const Color(0xFFD4AF37),
+                  foregroundColor: const Color(0xFF070A0E),
                   padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: _loading
                     ? const SizedBox(
-                        height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        height: 20,
+                        child: CircularProgressIndicator(color: Color(0xFF070A0E), strokeWidth: 2),
                       )
-                    : const Text('Sign In', style: TextStyle(fontSize: 16, color: Colors.white)),
+                    : Text(
+                        _forgotMode ? 'Sıfırlama Linki Göndər' : 'Daxil ol',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
               ),
+              if (_forgotMode)
+                TextButton(
+                  onPressed: () => setState(() {
+                    _forgotMode = false;
+                    _errorMessage = null;
+                  }),
+                  child: const Text('Girişə qayıt', style: TextStyle(color: Colors.grey)),
+                ),
             ],
           ),
         ),

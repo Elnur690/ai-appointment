@@ -1,61 +1,67 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 
-class CalendarScreen extends StatelessWidget {
+class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
+
+  @override
+  State<CalendarScreen> createState() => _CalendarScreenState();
+}
+
+class _CalendarScreenState extends State<CalendarScreen> {
+  final _api = ApiService();
+  bool _loading = true;
+  List<dynamic> _appointments = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final rows = await _api.getAppointments();
+    if (!mounted) return;
+    setState(() {
+      _appointments = rows;
+      _loading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Appointments Calendar')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF11141E),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('August 2026', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  Row(
-                    children: [
-                      Icon(Icons.chevron_left),
-                      SizedBox(width: 8),
-                      Icon(Icons.chevron_right),
-                    ],
-                  ),
-                ],
-              ),
+      appBar: AppBar(title: const Text('Tam Təqvim')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)))
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: _appointments.isEmpty
+                  ? ListView(
+                      children: const [
+                        SizedBox(height: 120),
+                        Center(child: Text('Təqvimdə randevu yoxdur.', style: TextStyle(color: Colors.grey))),
+                      ],
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _appointments.length,
+                      itemBuilder: (context, idx) {
+                        final a = _appointments[idx] as Map<String, dynamic>;
+                        final dt = a['start_time']?.toString().substring(0, 16).replaceAll('T', ' ') ?? '';
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          child: ListTile(
+                            leading: const Icon(Icons.event, color: Color(0xFFD4AF37)),
+                            title: Text('${a['customer_name'] ?? 'Müştəri'} — ${a['service_name'] ?? 'Xidmət'}'),
+                            subtitle: Text('$dt • ${a['staff_name'] ?? ''}'),
+                            trailing: Text(a['status']?.toString() ?? ''),
+                          ),
+                        );
+                      },
+                    ),
             ),
-            const SizedBox(height: 16),
-            _buildTimeSlot('09:00 AM', 'Available'),
-            _buildTimeSlot('10:00 AM', 'Aysel Mammadova - Haircut'),
-            _buildTimeSlot('11:00 AM', 'Available'),
-            _buildTimeSlot('02:00 PM', 'Nigar Huseynova - Manicure'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTimeSlot(String time, String title) {
-    final isBooked = !title.contains('Available');
-    return Card(
-      color: isBooked ? const Color(0xFF11141E) : Colors.transparent,
-      shape: RoundedRectangleBorder(
-        side: BorderSide(color: isBooked ? const Color(0xFF0EA5E9) : Colors.white12),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Text(time, style: const TextStyle(fontWeight: FontWeight.bold)),
-        title: Text(title, style: TextStyle(color: isBooked ? Colors.white : Colors.grey)),
-        trailing: isBooked ? const Icon(Icons.check_circle, color: Color(0xFF0EA5E9)) : const Icon(Icons.add_circle_outline),
-      ),
     );
   }
 }

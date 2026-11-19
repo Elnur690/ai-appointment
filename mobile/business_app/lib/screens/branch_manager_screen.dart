@@ -1,42 +1,70 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 
-class BranchManagerScreen extends StatelessWidget {
+class BranchManagerScreen extends StatefulWidget {
   const BranchManagerScreen({super.key});
+
+  @override
+  State<BranchManagerScreen> createState() => _BranchManagerScreenState();
+}
+
+class _BranchManagerScreenState extends State<BranchManagerScreen> {
+  final _api = ApiService();
+  bool _loading = true;
+  List<dynamic> _branches = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final rows = await _api.getBranches();
+    if (!mounted) return;
+    setState(() {
+      _branches = rows;
+      _loading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Branch List / Switcher'),
-        actions: [
-          IconButton(icon: const Icon(Icons.add_location_alt), onPressed: () {}),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildBranchCard('Central Branch', 'Nizami St 42', 'Connected', Colors.green),
-          _buildBranchCard('Mall Branch', '28 Mall 3rd Floor', 'Connected', Colors.green),
-          _buildBranchCard('Baku White City', 'White City Blvd 12', 'Offline', Colors.red),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBranchCard(String name, String address, String status, Color color) {
-    return Card(
-      color: const Color(0xFF11141E),
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: const Icon(Icons.store, color: Color(0xFF0EA5E9)),
-        title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(address),
-        trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-          child: Text(status, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold)),
-        ),
-      ),
+      appBar: AppBar(title: const Text('Filiallar')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)))
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: _branches.isEmpty
+                  ? ListView(
+                      children: const [
+                        SizedBox(height: 120),
+                        Center(child: Text('Filial tapılmadı.', style: TextStyle(color: Colors.grey))),
+                      ],
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _branches.length,
+                      itemBuilder: (context, idx) {
+                        final b = _branches[idx] as Map<String, dynamic>;
+                        final active = b['is_active'] != false;
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          child: ListTile(
+                            leading: Icon(Icons.store, color: active ? const Color(0xFF10B981) : Colors.grey),
+                            title: Text(b['name']?.toString() ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text(b['address']?.toString() ?? b['timezone']?.toString() ?? 'Asia/Baku'),
+                            trailing: Text(
+                              active ? 'Aktiv' : 'Deaktiv',
+                              style: TextStyle(color: active ? const Color(0xFF10B981) : Colors.redAccent),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
     );
   }
 }

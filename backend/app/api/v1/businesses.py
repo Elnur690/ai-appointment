@@ -584,6 +584,39 @@ async def create_subscription_checkout(
     }
 
 
+@router.get("/public/discover")
+async def discover_public_businesses(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    category: Optional[str] = None,
+    q: Optional[str] = None,
+):
+    """Public discovery endpoint for Customer Mobile App & Web Directory."""
+    stmt = (
+        select(Business)
+        .options(selectinload(Business.branches), selectinload(Business.services))
+        .where(Business.is_active.is_(True))
+        .order_by(Business.created_at.desc())
+        .limit(50)
+    )
+    if category and category.lower() != "all":
+        stmt = stmt.where(Business.category.ilike(f"%{category.strip()}%"))
+    if q and q.strip():
+        stmt = stmt.where(Business.name.ilike(f"%{q.strip()}%"))
+
+    rows = (await db.execute(stmt)).scalars().all()
+    return [
+        {
+            "id": str(b.id),
+            "name": b.name,
+            "category": b.category or "Service Business",
+            "address": b.branches[0].address if getattr(b, "branches", None) and b.branches[0].address else "Baku",
+            "branches_count": len(b.branches) if getattr(b, "branches", None) else 0,
+            "services_count": len([s for s in (b.services or []) if s.is_active]),
+        }
+        for b in rows
+    ]
+
+
 @router.get("/public/resolve")
 async def resolve_public_booking_business(
     db: Annotated[AsyncSession, Depends(get_db)],

@@ -1,35 +1,47 @@
 import 'package:flutter/material.dart';
 
 class CustomerProfileScreen extends StatelessWidget {
-  final String name;
+  final String customerName;
   final String phone;
+  final List<dynamic> history;
 
   const CustomerProfileScreen({
     super.key,
-    this.name = 'Aysel Mammadova',
-    this.phone = '+994 50 123 45 67',
+    required this.customerName,
+    required this.phone,
+    this.history = const [],
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(name)),
+      appBar: AppBar(title: Text(customerName)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Card(
-            color: const Color(0xFF11141E),
-            child: ListTile(
-              leading: CircleAvatar(child: Text(name[0])),
-              title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(phone),
+          ListTile(
+            leading: const CircleAvatar(
+              backgroundColor: Color(0xFFD4AF37),
+              child: Icon(Icons.person, color: Color(0xFF070A0E)),
             ),
+            title: Text(customerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            subtitle: Text(phone),
           ),
-          const SizedBox(height: 16),
-          const Text('Past Appointments History', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const Divider(),
           const SizedBox(height: 8),
-          const ListTile(title: Text('Haircut & Styling'), subtitle: Text('Aug 10, 2026'), trailing: Text('Completed', style: TextStyle(color: Colors.green))),
-          const ListTile(title: Text('Manicure & Polish'), subtitle: Text('Jul 14, 2026'), trailing: Text('Completed', style: TextStyle(color: Colors.green))),
+          const Text('Ziyarət Tarixçəsi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 8),
+          if (history.isEmpty)
+            const Text('Ziyarət tarixçəsi yoxdur.', style: TextStyle(color: Colors.grey))
+          else
+            ...history.map((h) {
+              final item = h as Map<String, dynamic>;
+              return ListTile(
+                title: Text(item['service_name']?.toString() ?? 'Xidmət'),
+                subtitle: Text(item['start_time']?.toString() ?? ''),
+                trailing: Text(item['status']?.toString() ?? ''),
+              );
+            }),
         ],
       ),
     );

@@ -1,34 +1,56 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 
-class NotificationsScreen extends StatelessWidget {
+class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
+
+  @override
+  State<NotificationsScreen> createState() => _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends State<NotificationsScreen> {
+  final _api = ApiService();
+  bool _loading = true;
+  List<dynamic> _appointments = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final rows = await _api.getAppointments();
+    if (!mounted) return;
+    setState(() {
+      _appointments = rows;
+      _loading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Push Notifications')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildNotificationTile('New Booking', 'Aysel Mammadova booked Haircut for tomorrow at 10:00 AM', '5 min ago', Icons.calendar_today, Colors.blue),
-          _buildNotificationTile('Human Takeover Request', 'Customer requested human staff support in WhatsApp chat', '15 min ago', Icons.support_agent, Colors.amber),
-          _buildNotificationTile('Cancellation', 'Booking #1042 was cancelled by customer', '1 hour ago', Icons.cancel, Colors.red),
-          _buildNotificationTile('Low Quota Warning', 'Your business has used 85% of monthly AI message quota', '2 hours ago', Icons.warning_amber, Colors.orange),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNotificationTile(String title, String body, String time, IconData icon, Color color) {
-    return Card(
-      color: const Color(0xFF11141E),
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: Icon(icon, color: color),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('$body\n$time'),
-        isThreeLine: true,
-      ),
+      appBar: AppBar(title: const Text('Bildirişlər')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)))
+          : _appointments.isEmpty
+              ? const Center(child: Text('Yeni bildiriş yoxdur.', style: TextStyle(color: Colors.grey)))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _appointments.length,
+                  itemBuilder: (context, idx) {
+                    final a = _appointments[idx] as Map<String, dynamic>;
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        leading: const Icon(Icons.notifications_active, color: Color(0xFFD4AF37)),
+                        title: Text('${a['customer_name'] ?? 'Müştəri'} — ${a['service_name'] ?? 'Xidmət'}'),
+                        subtitle: Text('Status: ${a['status'] ?? ''} • ${a['start_time'] ?? ''}'),
+                      ),
+                    );
+                  },
+                ),
     );
   }
 }

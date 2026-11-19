@@ -1,81 +1,142 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../services/api_service.dart';
 
-class SubscriptionScreen extends StatelessWidget {
+class SubscriptionScreen extends StatefulWidget {
   const SubscriptionScreen({super.key});
 
   @override
+  State<SubscriptionScreen> createState() => _SubscriptionScreenState();
+}
+
+class _SubscriptionScreenState extends State<SubscriptionScreen> {
+  final _api = ApiService();
+  bool _loading = true;
+  bool _checkingOut = false;
+  Map<String, dynamic>? _subData;
+  String? _selectedPlanId;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final data = await _api.getSubscription();
+    if (!mounted) return;
+    setState(() {
+      _subData = data;
+      _selectedPlanId = data?['current_plan_id']?.toString() ??
+          (data?['plans'] is List && (data!['plans'] as List).isNotEmpty
+              ? (data['plans'] as List).first['id']?.toString()
+              : null);
+      _loading = false;
+    });
+  }
+
+  Future<void> _startCheckout() async {
+    if (_selectedPlanId == null) return;
+    setState(() => _checkingOut = true);
+    try {
+      final res = await _api.createSubscriptionCheckout(_selectedPlanId!);
+      final url = res['checkout_url']?.toString();
+      if (!mounted) return;
+      if (url != null && url.isNotEmpty) {
+        await Clipboard.setData(ClipboardData(text: url));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ödəniş linki kopyalandı! Brauzerdə açaraq ödənişi tamamlayın.')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ödəniş sorğusu yaradıldı (${res['plan_name']} - ${res['amount']} AZN).')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Xəta: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _checkingOut = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final features = [
-      'AI Engine: GPT-4o (Assigned by Randevu.vip Plan)',
-      'Predictive Cadence Rebooking Engine',
-      'WhatsApp Digital Gift Vouchers & Gifting',
-      'Last-Minute Flash Drop Dead-Slot Monetizer',
-      'Multi-Branch Location Pin & Geo-Routing',
-      'Shift Overtime & Emergency Sick-Leave Swap',
-    ];
+    final plans = (_subData?['plans'] as List?) ?? [];
+    final planName = _subData?['current_plan_name']?.toString() ?? '—';
+    final planPrice = _subData?['current_plan_price']?.toString() ?? '0';
+    final status = _subData?['subscription_status']?.toString() ?? 'trial';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Subscription & Entitlements')),
-      body: ListView(
-        padding: const EdgeInsets.all(20.0),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFF11141E),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF0EA5E9).withOpacity(0.4)),
+      appBar: AppBar(title: const Text('Abunəlik və Paketlər')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)))
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+                padding: const EdgeInsets.all(20.0),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0D121A),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFD4AF37).withOpacity(0.45)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Cari Paket: $planName',
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37)),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '$planPrice AZN / ay • Status: $status',
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  if (plans.isNotEmpty) ...[
+                    const Text(
+                      'Paketi Seçin və Ödəniş Edin',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: _selectedPlanId,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      items: plans
+                          .map((p) => DropdownMenuItem<String>(
+                                value: p['id'].toString(),
+                                child: Text('${p['name']} — ${p['price']} AZN/ay'),
+                              ))
+                          .toList(),
+                      onChanged: (val) => setState(() => _selectedPlanId = val),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: _checkingOut ? null : _startCheckout,
+                      icon: const Icon(Icons.credit_card),
+                      label: Text(_checkingOut ? 'Hazırlanır...' : 'Abunəliyi Ödə / Yenilə'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD4AF37),
+                        foregroundColor: const Color(0xFF070A0E),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Current Plan: Pro Business',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 8),
-                Text('79 AZN / month • Active on randevu.vip', style: TextStyle(color: Colors.grey)),
-                SizedBox(height: 20),
-                Text('AI Message Usage: 750 / 1,000 messages (75%)', style: TextStyle(fontWeight: FontWeight.bold)),
-                SizedBox(height: 8),
-                LinearProgressIndicator(
-                  value: 0.75,
-                  backgroundColor: Colors.white10,
-                  color: Color(0xFF0EA5E9),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Unlocked Plan Entitlements',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-          ...features.map(
-            (f) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.check_circle, color: Colors.green, size: 20),
-              title: Text(f, style: const TextStyle(fontSize: 14)),
-            ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Redirecting to Payriff / EPoint Plan Upgrade checkout...')),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0EA5E9),
-              padding: const EdgeInsets.all(16),
-            ),
-            child: const Center(
-              child: Text('Upgrade Plan / Buy Message Overage', style: TextStyle(fontSize: 16, color: Colors.white)),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
