@@ -42,6 +42,10 @@ celery_app.conf.update(
             "task": "expire_overdue_trials",
             "schedule": 86400.0,
         },
+        "process-subscription-renewals-daily": {
+            "task": "process_subscription_renewals",
+            "schedule": 86400.0,
+        },
     },
 )
 

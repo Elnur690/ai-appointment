@@ -347,16 +347,43 @@ async def platform_payment_gateway_webhook(
         service = PaymentService(db=db, business_id=biz_uuid)
         verified = await service.handle_webhook_callback(provider=prov, payload=payload, headers=headers)
         if verified and metadata.get("type") == "saas_subscription" and metadata.get("plan_id"):
+            from datetime import datetime, timedelta, timezone
             from app.models.business import Business
+            from app.models.subscription import Subscription, SubscriptionStatus
+
             biz = (await db.execute(select(Business).where(Business.id == biz_uuid))).scalar_one_or_none()
             if biz:
+                now = datetime.now(timezone.utc)
                 try:
-                    biz.plan_id = UUID(str(metadata["plan_id"]))
+                    plan_uuid = UUID(str(metadata["plan_id"]))
+                    biz.plan_id = plan_uuid
                 except ValueError:
-                    pass
+                    plan_uuid = biz.plan_id
                 biz.subscription_status = "active"
                 biz.is_active = True
                 biz.trial_ends_at = None
+
+                if plan_uuid:
+                    sub = (
+                        await db.execute(
+                            select(Subscription).where(Subscription.business_id == biz.id)
+                        )
+                    ).scalars().first()
+                    if sub:
+                        sub.plan_id = plan_uuid
+                        sub.status = SubscriptionStatus.active
+                        sub.current_period_start = now
+                        sub.current_period_end = now + timedelta(days=30)
+                    else:
+                        db.add(
+                            Subscription(
+                                business_id=biz.id,
+                                plan_id=plan_uuid,
+                                status=SubscriptionStatus.active,
+                                current_period_start=now,
+                                current_period_end=now + timedelta(days=30),
+                            )
+                        )
                 await db.commit()
         return {"status": "verified" if verified else "ignored", "provider": prov}
 

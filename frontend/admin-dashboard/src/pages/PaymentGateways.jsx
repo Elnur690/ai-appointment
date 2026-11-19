@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useDataStore } from '../store/dataStore';
 import { useAuthStore } from '../store/authStore';
-import { CreditCard, Banknote, ShieldCheck, CheckCircle2, XCircle } from 'lucide-react';
+import apiClient from '../api/client';
+import { CreditCard, Banknote, ShieldCheck, CheckCircle2, XCircle, ExternalLink } from 'lucide-react';
 
 const GATEWAY_ICONS = {
   cash: Banknote,
@@ -14,10 +15,33 @@ const PaymentGateways = () => {
   const { paymentGateways, fetchPaymentGateways, togglePaymentGateway } = useDataStore();
   const { language } = useAuthStore();
   const isAz = (language || 'az') !== 'en';
+  const [testAmount, setTestAmount] = useState('1.00');
+  const [testCurrency, setTestCurrency] = useState('AZN');
+  const [testLoading, setTestLoading] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [testError, setTestError] = useState('');
 
   useEffect(() => {
     fetchPaymentGateways();
   }, [fetchPaymentGateways]);
+
+  const handleRunLiveTest = async (e) => {
+    e.preventDefault();
+    setTestError('');
+    setTestResult(null);
+    setTestLoading(true);
+    try {
+      const res = await apiClient.post('/saas-admin/payment-gateways/test', {
+        amount: Number(testAmount),
+        currency: testCurrency,
+      });
+      setTestResult(res.data);
+    } catch (err) {
+      setTestError(err.response?.data?.detail || err.message || 'Test checkout failed');
+    } finally {
+      setTestLoading(false);
+    }
+  };
 
   return (
     <div className="page-container">
@@ -134,6 +158,91 @@ const PaymentGateways = () => {
             </div>
           );
         })}
+      </div>
+
+      {/* Live Paymegate Payment Test (with Live AZN -> USD Conversion) */}
+      <div className="glass-card" style={{ padding: '1.75rem', marginTop: '2rem', border: '1px solid rgba(212, 175, 55, 0.35)' }}>
+        <h2 style={{ fontSize: '1.25rem', marginBottom: '0.35rem' }}>
+          {isAz ? 'Canlı Ödəniş Testi (Paymegate USD)' : 'Live Payment Test (Paymegate USD)'}
+        </h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
+          {isAz
+            ? 'İstənilən məbləğ daxil edib real Paymegate ödəniş linki yaradın. AZN daxil etdikdə canlı məzənnə ilə avtomatik USD-yə çevrilir.'
+            : 'Enter any amount to generate a real Paymegate checkout order. AZN amounts are automatically converted to USD using the live exchange rate.'}
+        </p>
+
+        <form onSubmit={handleRunLiveTest} style={{ display: 'flex', gap: '0.85rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div className="form-group" style={{ marginBottom: 0, minWidth: '160px' }}>
+            <label className="form-label">{isAz ? 'Məbləğ' : 'Amount'}</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0.10"
+              required
+              className="form-control"
+              value={testAmount}
+              onChange={(e) => setTestAmount(e.target.value)}
+            />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0, minWidth: '120px' }}>
+            <label className="form-label">{isAz ? 'Valyuta' : 'Currency'}</label>
+            <select className="form-control" value={testCurrency} onChange={(e) => setTestCurrency(e.target.value)}>
+              <option value="AZN">AZN</option>
+              <option value="USD">USD</option>
+            </select>
+          </div>
+          <button type="submit" className="btn btn-primary" disabled={testLoading}>
+            {testLoading
+              ? isAz
+                ? 'Yaradılır...'
+                : 'Creating...'
+              : isAz
+              ? 'Real Test Ödənişi Yarat'
+              : 'Create Live Test Payment'}
+          </button>
+        </form>
+
+        {testError && (
+          <div style={{ marginTop: '1rem', color: 'var(--error)', fontSize: '0.9rem' }}>
+            {testError}
+          </div>
+        )}
+
+        {testResult && (
+          <div
+            style={{
+              marginTop: '1.25rem',
+              padding: '1rem',
+              borderRadius: '10px',
+              background: 'rgba(16, 185, 129, 0.1)',
+              border: '1px solid rgba(16, 185, 129, 0.35)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '1rem',
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 700, color: 'var(--success)', marginBottom: '0.25rem' }}>
+                {testResult.original_amount} {testResult.original_currency} ➔ ${testResult.usd_amount} USD (Rate: {testResult.fx_rate})
+              </div>
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+                Order UUID: {testResult.order_uuid}
+              </div>
+            </div>
+            <a
+              href={testResult.checkout_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-primary"
+              style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}
+            >
+              <ExternalLink size={16} />
+              {isAz ? 'Ödəniş Səhifəsini Aç' : 'Open Live Checkout'}
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -366,6 +366,59 @@ async def list_platform_payment_gateways(
     return results
 
 
+class AdminPaymentTestRequest(BaseModel):
+    amount: float
+    currency: str = "AZN"
+    description: Optional[str] = None
+
+
+@router.post("/payment-gateways/test")
+async def test_live_paymegate_checkout(
+    req: AdminPaymentTestRequest,
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    """Create a live Paymegate checkout order for any amount (auto-converting AZN -> USD at live FX rate)."""
+    from decimal import Decimal
+    from uuid import uuid4
+    from app.integrations.payments.fx import convert_to_usd
+    from app.integrations.payments.paymegate import PaymegateAdapter
+
+    if req.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be greater than 0")
+    if not (settings.PAYMEGATE_API_KEY or "").strip():
+        raise HTTPException(status_code=400, detail="PAYMEGATE_API_KEY is not set in .env")
+
+    orig_currency = (req.currency or "AZN").strip().upper()
+    if orig_currency not in {"AZN", "USD"}:
+        orig_currency = "AZN"
+
+    orig_amount = Decimal(str(req.amount)).quantize(Decimal("0.01"))
+    usd_amount, fx_rate = await convert_to_usd(orig_amount, orig_currency)
+
+    test_payment_id = uuid4()
+    res = await PaymegateAdapter().create_payment_link(
+        payment_id=test_payment_id,
+        amount=orig_amount,
+        currency=orig_currency,
+        description=req.description or f"Randevu.vip Live Test ({orig_amount} {orig_currency})",
+        merchant_config={
+            "type": "admin_test",
+            "customer_email": user.get("email") or settings.SAAS_ADMIN_EMAIL,
+            "customer_name": "Randevu.vip SaaS Admin Test",
+        },
+        return_url=f"https://admin.{settings.PLATFORM_DOMAIN}/payment-gateways",
+    )
+
+    return {
+        "checkout_url": res.payment_url,
+        "order_uuid": res.transaction_id,
+        "original_amount": float(orig_amount),
+        "original_currency": orig_currency,
+        "usd_amount": float(usd_amount),
+        "fx_rate": float(fx_rate),
+    }
+
+
 @router.put("/payment-gateways/{provider}")
 async def toggle_platform_payment_gateway(
     provider: str,

@@ -7,6 +7,7 @@ from uuid import UUID
 import httpx
 from app.core.config import settings
 from app.integrations.payments.adapter import PaymentAdapter, PaymentLinkResult, WebhookResult, PaymentStatus
+from app.integrations.payments.fx import convert_to_usd
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +35,18 @@ class PaymegateAdapter(PaymentAdapter):
         ).strip()
         base_url = (merchant_config.get("base_url") or self.BASE_URL).rstrip("/")
         payment_methods = merchant_config.get("payment_methods_keys") or ["*"]
+        orig_currency = (currency or "AZN").upper()
+        usd_amount, fx_rate = await convert_to_usd(Decimal(str(amount)), orig_currency)
 
+        extra_meta = {
+            k: v
+            for k, v in merchant_config.items()
+            if k in {"business_id", "appointment_id", "type", "plan_id"} and v is not None
+        }
         payload = {
             "externalId": str(payment_id),
-            "amount": f"{Decimal(str(amount)):.2f}",
-            "currency": (currency or "USD").upper(),
+            "amount": f"{usd_amount:.2f}",
+            "currency": "USD",
             "paymentMethodsKeys": payment_methods,
             "backUrl": return_url,
             "customer": {
@@ -48,6 +56,10 @@ class PaymegateAdapter(PaymentAdapter):
             "metadata": {
                 "paymentId": str(payment_id),
                 "description": description,
+                "originalAmount": f"{Decimal(str(amount)):.2f}",
+                "originalCurrency": orig_currency,
+                "fxRate": f"{fx_rate}",
+                **extra_meta,
             },
         }
 
