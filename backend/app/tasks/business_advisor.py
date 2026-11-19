@@ -26,7 +26,11 @@ async def _async_run_weekly_growth_advisor():
         )
         rows = (await session.execute(stmt)).scalars().all()
         for biz in rows:
-            report = advisor.generate_weekly_report(business_id=str(biz.id), business_name=biz.name)
+            report = await advisor.generate_weekly_report(
+                db=session,
+                business_id=str(biz.id),
+                business_name=biz.name,
+            )
             logger.info(
                 f"[WEEKLY AI GROWTH ADVISOR] Dispatched growth insights to '{report.business_name}': {report.recommended_action}"
             )

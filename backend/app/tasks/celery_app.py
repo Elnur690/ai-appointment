@@ -38,6 +38,10 @@ celery_app.conf.update(
             "task": "run_weekly_growth_advisor",
             "schedule": 604800.0,
         },
+        "expire-overdue-trials-daily": {
+            "task": "expire_overdue_trials",
+            "schedule": 86400.0,
+        },
     },
 )
 

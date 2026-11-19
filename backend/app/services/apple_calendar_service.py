@@ -108,8 +108,20 @@ class AppleCalendarService:
             try:
                 resp = await client.request("REPORT", url, content=caldav_report_xml, headers=headers, auth=auth)
                 if resp.status_code in [200, 207]:
-                    # Mock return of parsed busy intervals for external events
-                    return [{"start": dtstart, "end": dtend, "summary": "External Apple Calendar Event"}]
+                    import re
+                    text = resp.text or ""
+                    events = []
+                    for block in re.findall(r"BEGIN:VEVENT(.*?)END:VEVENT", text, flags=re.DOTALL):
+                        s_match = re.search(r"DTSTART[^:]*:([^\r\n]+)", block)
+                        e_match = re.search(r"DTEND[^:]*:([^\r\n]+)", block)
+                        sum_match = re.search(r"SUMMARY[^:]*:([^\r\n]+)", block)
+                        if s_match and e_match:
+                            events.append({
+                                "start": s_match.group(1).strip(),
+                                "end": e_match.group(1).strip(),
+                                "summary": sum_match.group(1).strip() if sum_match else "Busy",
+                            })
+                    return events
                 return []
             except Exception as e:
                 logger.error(f"Apple Calendar freebusy query error: {e}")
