@@ -298,6 +298,70 @@ async def telegram_webhook(
     return {"status": "ok", "channel": "telegram", "sender": parsed.sender_phone}
 
 
+@router.post("/payments/{provider}")
+async def platform_payment_gateway_webhook(
+    provider: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Handle platform-level payment gateway webhooks (e.g. Paymegate / Payriff) without business_id in URL."""
+    from app.models.payment import Payment
+    from app.integrations.payments.paymegate import PaymegateAdapter
+
+    payload = await request.json()
+    headers = dict(request.headers)
+    prov = provider.lower().strip()
+    if prov == "paymengate":
+        prov = "paymegate"
+
+    # Try resolving business_id from metadata or existing Payment row
+    biz_uuid: UUID | None = None
+    metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+    raw_biz = metadata.get("businessId") or metadata.get("business_id") or payload.get("business_id")
+    if raw_biz:
+        try:
+            biz_uuid = UUID(str(raw_biz))
+        except ValueError:
+            biz_uuid = None
+
+    if not biz_uuid:
+        ext_id = payload.get("externalId") or metadata.get("paymentId")
+        order_uuid = payload.get("orderUUID") or payload.get("orderId")
+        if ext_id:
+            try:
+                p_row = (
+                    await db.execute(select(Payment).where(Payment.id == UUID(str(ext_id))))
+                ).scalar_one_or_none()
+                if p_row:
+                    biz_uuid = p_row.business_id
+            except ValueError:
+                pass
+        if not biz_uuid and order_uuid:
+            p_row = (
+                await db.execute(select(Payment).where(Payment.gateway_transaction_id == str(order_uuid)))
+            ).scalar_one_or_none()
+            if p_row:
+                biz_uuid = p_row.business_id
+
+    if biz_uuid:
+        service = PaymentService(db=db, business_id=biz_uuid)
+        verified = await service.handle_webhook_callback(provider=prov, payload=payload, headers=headers)
+        return {"status": "verified" if verified else "ignored", "provider": prov}
+
+    # Test / live event where payment row is not yet matched (e.g. Paymegate Dashboard "Test Webhook")
+    if prov == "paymegate":
+        result = await PaymegateAdapter().verify_webhook(payload=payload, headers=headers, merchant_config={})
+        return {
+            "status": "received",
+            "provider": prov,
+            "event": payload.get("type"),
+            "verified": result.is_successful,
+            "orderUUID": result.transaction_id,
+        }
+
+    return {"status": "received", "provider": prov}
+
+
 @router.post("/payments/{provider}/{business_id}")
 async def payment_gateway_webhook(
     provider: str,
