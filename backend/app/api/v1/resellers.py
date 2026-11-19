@@ -136,7 +136,7 @@ async def apply_as_reseller_public(
     ).scalar_one_or_none()
     if existing_email:
         return {
-            "status": "already_registered",
+            "status": "already_registered" if existing_email.is_active else "pending_approval",
             "referral_code": existing_email.referral_code,
             "referral_url": f"https://randevu.vip/?ref={existing_email.referral_code}",
             "commission_rate_percent": float(existing_email.commission_rate_percent or 20.0),
@@ -158,12 +158,12 @@ async def apply_as_reseller_public(
         password_hash=hash_password(secrets.token_urlsafe(12)),
         referral_code=norm_code,
         commission_rate_percent=20.0,
-        is_active=True,
+        is_active=False,
     )
     db.add(reseller)
     await db.flush()
     return {
-        "status": "approved",
+        "status": "pending_approval",
         "referral_code": norm_code,
         "referral_url": f"https://randevu.vip/?ref={norm_code}",
         "commission_rate_percent": 20.0,

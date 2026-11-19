@@ -8,7 +8,7 @@ import Modal from '../components/common/Modal';
 import { Users, DollarSign, Percent, Globe, Copy, Plus, CheckCircle2 } from 'lucide-react';
 
 const Resellers = () => {
-  const { resellers, fetchResellers, createReseller, recordResellerPayout } = useDataStore();
+  const { resellers, fetchResellers, createReseller, updateResellerStatus, recordResellerPayout } = useDataStore();
   const { language } = useAuthStore();
   const isAz = (language || 'az') !== 'en';
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -119,8 +119,8 @@ const Resellers = () => {
     },
     {
       header: isAz ? 'Status' : 'Status',
-      accessor: 'status',
-      render: (row) => <StatusBadge status={row.status || 'active'} />,
+      accessor: 'is_active',
+      render: (row) => <StatusBadge status={row.is_active ? 'active' : 'pending'} />,
     },
   ];
 
@@ -358,6 +358,28 @@ const Resellers = () => {
               <button className="btn btn-ghost" onClick={() => setSelectedReseller(null)}>
                 {isAz ? 'Bağla' : 'Close'}
               </button>
+              {!selectedReseller.is_active ? (
+                <button
+                  className="btn btn-primary"
+                  onClick={async () => {
+                    await updateResellerStatus(selectedReseller.id, true);
+                    setSelectedReseller(null);
+                  }}
+                >
+                  {isAz ? 'Partnyoru Təsdiqlə və Aktivləşdir' : 'Approve & Activate Partner'}
+                </button>
+              ) : (
+                <button
+                  className="btn btn-secondary"
+                  style={{ color: 'var(--error)' }}
+                  onClick={async () => {
+                    await updateResellerStatus(selectedReseller.id, false);
+                    setSelectedReseller(null);
+                  }}
+                >
+                  {isAz ? 'Partnyoru Dayandır' : 'Suspend Partner'}
+                </button>
+              )}
             </div>
           </div>
         )}

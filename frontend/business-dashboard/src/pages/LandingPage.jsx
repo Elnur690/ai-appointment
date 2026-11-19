@@ -322,8 +322,9 @@ const TRANSLATIONS = {
     modalCodeLabel: 'İstədiyiniz Partnyor Kodu (məs: BAKU-DIGITAL)',
     modalSubmit: 'Müraciəti Təsdiqlə və Linki Al',
     modalCancel: 'Bağla',
-    modalSuccessTitle: 'Təbriklər! Partnyor Hesabınız Aktivdir',
-    modalSuccessDesc: 'Bu linki müştərilərinizə göndərin — qeydiyyatdan keçən hər biznes avtomatik sizin balansınıza yazılır:',
+    modalSuccessTitle: 'Müraciətiniz qəbul edildi — Admin təsdiqi gözlənilir',
+    modalSuccessDesc:
+      'Müraciətiniz komandamıza göndərildi. Admin tərəfindən təsdiqləndikdən sonra aşağıdakı referal linkiniz aktivləşdiriləcək:',
     faqTitle: 'Tez-tez Verilən Suallar (FAQ)',
     faqs: [
       {
@@ -550,8 +551,9 @@ const TRANSLATIONS = {
     modalCodeLabel: 'Preferred Referral Code (e.g. BAKU-AGENCY)',
     modalSubmit: 'Submit Application & Get Referral Link',
     modalCancel: 'Close',
-    modalSuccessTitle: 'Welcome Aboard! Your Seller Account is Active',
-    modalSuccessDesc: 'Share your unique referral link with businesses — every signup is automatically attributed to you:',
+    modalSuccessTitle: 'Application Received — Pending Admin Approval',
+    modalSuccessDesc:
+      'Your partner application has been submitted. Once approved by our Admin team, your referral link below will become active:',
     faqTitle: 'Frequently Asked Questions (FAQ)',
     faqs: [
       {
