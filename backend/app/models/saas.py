@@ -1,6 +1,7 @@
 import uuid
+from datetime import datetime
 from typing import Any
-from sqlalchemy import String, Numeric, Boolean
+from sqlalchemy import String, Numeric, Boolean, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -48,12 +49,37 @@ class SaasOwner(Base, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+DEFAULT_REFUND_RULES = {
+    "auto_refund_enabled": True,
+    "auto_refund_window_hours": 48,
+    "auto_refund_max_amount_azn": 100.0,
+    "require_reason": True,
+    "allow_business_self_cancel": True,
+}
+
+
 class PlatformConfig(Base, TimestampMixin):
     __tablename__ = "platform_configs"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=generate_uuid7)
     config_key: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, default="global")
     payment_gateways: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=DEFAULT_PLATFORM_GATEWAYS)
+    refund_rules: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True, default=DEFAULT_REFUND_RULES)
+
+
+class RefundRequest(Base, TimestampMixin):
+    __tablename__ = "refund_requests"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=generate_uuid7)
+    business_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("businesses.id"), nullable=False, index=True)
+    payment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("payments.id"), nullable=False, index=True)
+    amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(10), nullable=False, default="AZN")
+    reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")  # pending, auto_approved, approved, rejected, failed
+    admin_note: Mapped[str | None] = mapped_column(String, nullable=True)
+    creem_refund_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Plan(Base, TimestampMixin):

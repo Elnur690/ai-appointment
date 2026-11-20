@@ -660,6 +660,225 @@ async def get_subscription_billing_portal(
     return {"portal_url": portal_url}
 
 
+class CancelAccountRequest(BaseModel):
+    reason: Optional[str] = None
+    request_refund: bool = False
+
+
+class RefundRequestCreate(BaseModel):
+    payment_id: Optional[str] = None
+    reason: Optional[str] = None
+
+
+async def _process_refund_request(
+    db: AsyncSession,
+    biz: Business,
+    payment: Payment,
+    reason: str | None,
+) -> dict[str, Any]:
+    from app.models.saas import PlatformConfig, RefundRequest, DEFAULT_REFUND_RULES
+    from app.integrations.payments.creem import CreemAdapter
+
+    cfg = (await db.execute(select(PlatformConfig).where(PlatformConfig.config_key == "global"))).scalar_one_or_none()
+    rules = dict(DEFAULT_REFUND_RULES)
+    if cfg and isinstance(cfg.refund_rules, dict):
+        rules.update(cfg.refund_rules)
+
+    if rules.get("require_reason", True) and not (reason and reason.strip()):
+        raise HTTPException(status_code=400, detail="Please provide a reason for your refund request")
+
+    existing = (
+        await db.execute(
+            select(RefundRequest).where(
+                RefundRequest.payment_id == payment.id,
+                RefundRequest.status.in_(["pending", "auto_approved", "approved"]),
+            )
+        )
+    ).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=400, detail="A refund request already exists for this payment")
+
+    now = datetime.now(timezone.utc)
+    created_at = payment.created_at if payment.created_at else now
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+    age_hours = (now - created_at).total_seconds() / 3600.0
+    amt_float = float(payment.amount)
+
+    qualifies_auto = (
+        bool(rules.get("auto_refund_enabled", True))
+        and age_hours <= float(rules.get("auto_refund_window_hours", 48))
+        and amt_float <= float(rules.get("auto_refund_max_amount_azn", 100.0))
+    )
+
+    creem_refund_id: str | None = None
+    req_status = "pending"
+    resolved_at = None
+
+    if qualifies_auto:
+        if payment.method == PaymentMethod.creem and payment.gateway_transaction_id and settings.CREEM_API_KEY:
+            try:
+                rf_res = await CreemAdapter().refund_payment(payment.gateway_transaction_id, reason)
+                creem_refund_id = str(rf_res.get("id") or "")
+            except Exception as exc:
+                # Fall back to manual admin review if gateway refund API fails
+                qualifies_auto = False
+                req_status = "pending"
+        if qualifies_auto:
+            req_status = "auto_approved"
+            resolved_at = now
+            payment.status = PaymentStatus.refunded
+
+    rr = RefundRequest(
+        business_id=biz.id,
+        payment_id=payment.id,
+        amount=amt_float,
+        currency=payment.currency or "AZN",
+        reason=reason.strip() if reason else None,
+        status=req_status,
+        creem_refund_id=creem_refund_id,
+        resolved_at=resolved_at,
+    )
+    db.add(rr)
+    await db.commit()
+    await db.refresh(rr)
+    return {
+        "id": str(rr.id),
+        "payment_id": str(rr.payment_id),
+        "amount": float(rr.amount),
+        "currency": rr.currency,
+        "status": rr.status,
+        "reason": rr.reason,
+        "created_at": rr.created_at.isoformat() if rr.created_at else None,
+    }
+
+
+@router.post("/cancel-account")
+async def cancel_business_account(
+    req: CancelAccountRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("owner"))],
+    business_id: Annotated[str, Depends(get_business_context)],
+):
+    """Cancel the business account, terminate active Creem subscription, and optionally request a refund."""
+    from app.models.saas import PlatformConfig, DEFAULT_REFUND_RULES
+    from app.models.subscription import Subscription, SubscriptionStatus
+    from app.integrations.payments.creem import CreemAdapter
+
+    cfg = (await db.execute(select(PlatformConfig).where(PlatformConfig.config_key == "global"))).scalar_one_or_none()
+    rules = dict(DEFAULT_REFUND_RULES)
+    if cfg and isinstance(cfg.refund_rules, dict):
+        rules.update(cfg.refund_rules)
+    if not rules.get("allow_business_self_cancel", True):
+        raise HTTPException(status_code=403, detail="Self-service account cancellation is disabled; please contact support")
+
+    biz = (await db.execute(select(Business).where(Business.id == UUID(business_id)))).scalar_one_or_none()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    sub = (await db.execute(select(Subscription).where(Subscription.business_id == biz.id))).scalars().first()
+    if sub and sub.creem_subscription_id and settings.CREEM_API_KEY:
+        try:
+            await CreemAdapter().cancel_subscription(sub.creem_subscription_id)
+        except Exception:
+            pass
+    if sub:
+        sub.status = SubscriptionStatus.cancelled
+
+    biz.subscription_status = "cancelled"
+    biz.is_active = False
+    await db.flush()
+
+    refund_result = None
+    if req.request_refund:
+        latest_payment = (
+            await db.execute(
+                select(Payment)
+                .where(Payment.business_id == biz.id, Payment.status == PaymentStatus.completed)
+                .order_by(Payment.created_at.desc())
+            )
+        ).scalars().first()
+        if latest_payment:
+            refund_result = await _process_refund_request(
+                db=db,
+                biz=biz,
+                payment=latest_payment,
+                reason=req.reason or "Account cancelled",
+            )
+    else:
+        await db.commit()
+
+    return {"status": "account_cancelled", "refund": refund_result}
+
+
+@router.get("/refunds")
+async def list_business_refunds(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("owner"))],
+    business_id: Annotated[str, Depends(get_business_context)],
+):
+    """List refund requests submitted by this business."""
+    from app.models.saas import RefundRequest
+
+    rows = (
+        await db.execute(
+            select(RefundRequest)
+            .where(RefundRequest.business_id == UUID(business_id))
+            .order_by(RefundRequest.created_at.desc())
+        )
+    ).scalars().all()
+    return [
+        {
+            "id": str(r.id),
+            "payment_id": str(r.payment_id),
+            "amount": float(r.amount),
+            "currency": r.currency,
+            "reason": r.reason,
+            "status": r.status,
+            "admin_note": r.admin_note,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/refunds/request")
+async def request_business_refund(
+    req: RefundRequestCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("owner"))],
+    business_id: Annotated[str, Depends(get_business_context)],
+):
+    """Submit a refund request for a completed payment (auto-refunded if within Admin auto-refund rules, else pending)."""
+    biz = (await db.execute(select(Business).where(Business.id == UUID(business_id)))).scalar_one_or_none()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    if req.payment_id:
+        payment = (
+            await db.execute(
+                select(Payment).where(
+                    Payment.id == UUID(req.payment_id),
+                    Payment.business_id == biz.id,
+                    Payment.status == PaymentStatus.completed,
+                )
+            )
+        ).scalar_one_or_none()
+    else:
+        payment = (
+            await db.execute(
+                select(Payment)
+                .where(Payment.business_id == biz.id, Payment.status == PaymentStatus.completed)
+                .order_by(Payment.created_at.desc())
+            )
+        ).scalars().first()
+
+    if not payment:
+        raise HTTPException(status_code=404, detail="No eligible completed payment found for refund")
+
+    return await _process_refund_request(db=db, biz=biz, payment=payment, reason=req.reason)
+
+
 @router.get("/public/discover")
 async def discover_public_businesses(
     db: Annotated[AsyncSession, Depends(get_db)],

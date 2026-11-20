@@ -76,6 +76,7 @@ async def init_db() -> None:
         "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS trial_features_override JSONB;",
         "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS creem_subscription_id VARCHAR;",
         "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS creem_customer_id VARCHAR;",
+        "ALTER TABLE platform_configs ADD COLUMN IF NOT EXISTS refund_rules JSONB;",
         "ALTER TYPE paymentmethod ADD VALUE IF NOT EXISTS 'creem';",
     ]
     for stmt_sql in alter_statements:

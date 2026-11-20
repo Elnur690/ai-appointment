@@ -108,7 +108,9 @@ class CreemAdapter(PaymentAdapter):
             if not checkout_url:
                 raise ValueError("Creem did not return checkout_url")
 
-            return PaymentLinkResult(payment_url=checkout_url, transaction_id=checkout_id)
+            sep = "&" if "?" in checkout_url else "?"
+            themed_url = f"{checkout_url}{sep}theme=dark" if "theme=" not in checkout_url else checkout_url
+            return PaymentLinkResult(payment_url=themed_url, transaction_id=checkout_id)
 
     async def verify_webhook(
         self,
@@ -275,3 +277,22 @@ class CreemAdapter(PaymentAdapter):
                 raise ValueError(f"Creem billing portal failed ({resp.status_code}): {resp.text}")
             data = resp.json()
             return str(data.get("customer_portal_link") or data.get("url") or "")
+
+    async def refund_payment(self, transaction_id: str, reason: str | None = None) -> dict:
+        """Issue a full refund via Creem POST /v1/refunds (transaction or checkout id)."""
+        api_key = (settings.CREEM_API_KEY or "").strip()
+        if not api_key:
+            raise ValueError("CREEM_API_KEY is not configured")
+        base_url = self._get_base_url(api_key, {})
+        payload: dict = {"transaction_id": transaction_id}
+        if reason:
+            payload["reason"] = reason[:250]
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                f"{base_url}/refunds",
+                headers={"x-api-key": api_key, "Content-Type": "application/json"},
+                json=payload,
+            )
+            if resp.status_code not in (200, 201):
+                raise ValueError(f"Creem refund failed ({resp.status_code}): {resp.text}")
+            return resp.json()

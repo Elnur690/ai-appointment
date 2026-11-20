@@ -16,8 +16,11 @@ import {
 } from 'lucide-react';
 
 const Settings = () => {
-  const { fetchBusinessProfile, language } = useAuthStore();
+  const { fetchBusinessProfile, logout, language } = useAuthStore();
   const isAz = (language || 'az') !== 'en';
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelWithRefund, setCancelWithRefund] = useState(false);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const [businessId, setBusinessId] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [planName, setPlanName] = useState('Starter');
@@ -1008,6 +1011,80 @@ const Settings = () => {
                 {isAz ? 'Təqvim Linkini (.ics) Kopyala' : 'Copy Calendar Feed URL (.ics)'}
               </button>
             </>
+          )}
+        </div>
+
+        {/* 8. Cancel Business Account (Danger Zone) */}
+        <div
+          className="glass-card"
+          style={{ padding: '1.5rem', border: '1px solid rgba(239, 68, 68, 0.35)' }}
+        >
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--error)', marginBottom: '0.5rem' }}>
+            {isAz ? 'Hesabı Ləğv Et' : 'Cancel Account'}
+          </h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginBottom: '1rem' }}>
+            {isAz
+              ? 'Hesabınızı ləğv etdikdə aktiv abunəliyiniz dayandırılır və istəsəniz son ödəniş üçün geri ödəniş (refund) tələbi göndərə bilərsiniz.'
+              : 'Cancelling your account stops any active recurring subscription and optionally submits a refund request for your latest payment.'}
+          </p>
+          {!cancelConfirmOpen ? (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ color: 'var(--error)', borderColor: 'rgba(239, 68, 68, 0.45)' }}
+              onClick={() => setCancelConfirmOpen(true)}
+            >
+              {isAz ? 'Hesabımı Ləğv Etmək İstəyirəm' : 'Cancel My Account'}
+            </button>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <textarea
+                className="form-control"
+                rows={2}
+                placeholder={isAz ? 'Ləğv etmə səbəbiniz (istəyə bağlı)...' : 'Reason for cancelling (optional)...'}
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+              />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.86rem', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={cancelWithRefund}
+                  onChange={(e) => setCancelWithRefund(e.target.checked)}
+                />
+                <span>
+                  {isAz
+                    ? 'Son ödənişim üçün geri ödəniş (refund) də tələb et'
+                    : 'Also request a refund for my latest completed payment'}
+                </span>
+              </label>
+              <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setCancelConfirmOpen(false)}
+                >
+                  {isAz ? 'Vazgeç' : 'Keep Account'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={async () => {
+                    try {
+                      await api.post('/businesses/cancel-account', {
+                        reason: cancelReason,
+                        request_refund: cancelWithRefund,
+                      });
+                      logout();
+                      window.location.href = '/login';
+                    } catch (err) {
+                      setChannelStatusMsg(err.response?.data?.detail || 'Could not cancel account.');
+                    }
+                  }}
+                >
+                  {isAz ? 'Bəli, Hesabı Ləğv Et' : 'Confirm Account Cancellation'}
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>

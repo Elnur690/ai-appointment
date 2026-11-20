@@ -13,7 +13,7 @@ from app.core.config import settings
 from app.core.dependencies import require_role
 from app.core.security import hash_password
 from app.models.business import Business, BusinessOwner, Branch
-from app.models.saas import Plan, PlatformConfig, DEFAULT_PLATFORM_GATEWAYS
+from app.models.saas import Plan, PlatformConfig, RefundRequest, DEFAULT_PLATFORM_GATEWAYS, DEFAULT_REFUND_RULES
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.customer import Customer
 from app.models.conversation import Conversation, Message, MessageDirection
@@ -449,6 +449,129 @@ async def toggle_platform_payment_gateway(
     flag_modified(cfg, "payment_gateways")
     await db.flush()
     return entry
+
+
+class RefundRulesUpdate(BaseModel):
+    auto_refund_enabled: bool = True
+    auto_refund_window_hours: int = 48
+    auto_refund_max_amount_azn: float = 100.0
+    require_reason: bool = True
+    allow_business_self_cancel: bool = True
+
+
+class RefundDecisionRequest(BaseModel):
+    admin_note: Optional[str] = None
+
+
+@router.get("/refund-rules")
+async def get_refund_rules(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    """Get platform-wide refund and auto-refund rules."""
+    cfg = await _get_or_create_platform_config(db)
+    merged = dict(DEFAULT_REFUND_RULES)
+    if isinstance(cfg.refund_rules, dict):
+        merged.update(cfg.refund_rules)
+    return merged
+
+
+@router.put("/refund-rules")
+async def update_refund_rules(
+    req: RefundRulesUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    """Update platform-wide refund and auto-refund rules."""
+    cfg = await _get_or_create_platform_config(db)
+    cfg.refund_rules = req.model_dump()
+    flag_modified(cfg, "refund_rules")
+    await db.commit()
+    return cfg.refund_rules
+
+
+@router.get("/refunds")
+async def list_all_refund_requests(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    """List all refund requests across all businesses for SaaS Admin review."""
+    rows = (
+        await db.execute(
+            select(RefundRequest, Business.name)
+            .join(Business, RefundRequest.business_id == Business.id)
+            .order_by(RefundRequest.created_at.desc())
+        )
+    ).all()
+    return [
+        {
+            "id": str(r.id),
+            "business_id": str(r.business_id),
+            "business_name": b_name,
+            "payment_id": str(r.payment_id),
+            "amount": float(r.amount),
+            "currency": r.currency,
+            "reason": r.reason,
+            "status": r.status,
+            "admin_note": r.admin_note,
+            "creem_refund_id": r.creem_refund_id,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "resolved_at": r.resolved_at.isoformat() if r.resolved_at else None,
+        }
+        for r, b_name in rows
+    ]
+
+
+@router.post("/refunds/{refund_id}/approve")
+async def approve_refund_request(
+    refund_id: str,
+    req: RefundDecisionRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    """Approve a pending refund request and trigger Creem refund if paid via Creem."""
+    from app.models.payment import PaymentMethod
+    from app.integrations.payments.creem import CreemAdapter
+
+    rr = (await db.execute(select(RefundRequest).where(RefundRequest.id == UUID(refund_id)))).scalar_one_or_none()
+    if not rr:
+        raise HTTPException(status_code=404, detail="Refund request not found")
+    if rr.status in {"approved", "auto_approved"}:
+        return {"status": rr.status}
+
+    payment = (await db.execute(select(Payment).where(Payment.id == rr.payment_id))).scalar_one_or_none()
+    if payment and payment.method == PaymentMethod.creem and payment.gateway_transaction_id and settings.CREEM_API_KEY:
+        try:
+            rf_res = await CreemAdapter().refund_payment(payment.gateway_transaction_id, rr.reason)
+            rr.creem_refund_id = str(rf_res.get("id") or "")
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Creem refund failed: {exc}")
+
+    if payment:
+        payment.status = PaymentStatus.refunded
+    rr.status = "approved"
+    rr.admin_note = req.admin_note
+    rr.resolved_at = datetime.now(timezone.utc)
+    await db.commit()
+    return {"status": "approved", "id": str(rr.id)}
+
+
+@router.post("/refunds/{refund_id}/reject")
+async def reject_refund_request(
+    refund_id: str,
+    req: RefundDecisionRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    """Reject a pending refund request with an optional admin note."""
+    rr = (await db.execute(select(RefundRequest).where(RefundRequest.id == UUID(refund_id)))).scalar_one_or_none()
+    if not rr:
+        raise HTTPException(status_code=404, detail="Refund request not found")
+    rr.status = "rejected"
+    rr.admin_note = req.admin_note
+    rr.resolved_at = datetime.now(timezone.utc)
+    await db.commit()
+    return {"status": "rejected", "id": str(rr.id)}
 
 
 @router.get("/businesses", response_model=List[BusinessResponse])

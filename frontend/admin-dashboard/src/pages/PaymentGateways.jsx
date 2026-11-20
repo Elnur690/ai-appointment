@@ -21,10 +21,42 @@ const PaymentGateways = () => {
   const [testLoading, setTestLoading] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [testError, setTestError] = useState('');
+  const [refundRules, setRefundRules] = useState({
+    auto_refund_enabled: true,
+    auto_refund_window_hours: 48,
+    auto_refund_max_amount_azn: 100,
+    require_reason: true,
+    allow_business_self_cancel: true,
+  });
+  const [refundRulesMsg, setRefundRulesMsg] = useState('');
+  const [refundRequests, setRefundRequests] = useState([]);
+
+  const loadRefundData = async () => {
+    const [rulesRes, listRes] = await Promise.all([
+      apiClient.get('/saas-admin/refund-rules').catch(() => ({ data: null })),
+      apiClient.get('/saas-admin/refunds').catch(() => ({ data: [] })),
+    ]);
+    if (rulesRes.data) setRefundRules(rulesRes.data);
+    setRefundRequests(Array.isArray(listRes.data) ? listRes.data : []);
+  };
 
   useEffect(() => {
     fetchPaymentGateways();
+    loadRefundData();
   }, [fetchPaymentGateways]);
+
+  const handleSaveRefundRules = async (e) => {
+    e.preventDefault();
+    setRefundRulesMsg('');
+    await apiClient.put('/saas-admin/refund-rules', refundRules);
+    setRefundRulesMsg(isAz ? 'Geri ödəniş qaydaları yadda saxlanıldı.' : 'Refund rules saved.');
+    setTimeout(() => setRefundRulesMsg(''), 3000);
+  };
+
+  const handleRefundDecision = async (id, action) => {
+    await apiClient.post(`/saas-admin/refunds/${id}/${action}`, {});
+    await loadRefundData();
+  };
 
   const handleRunLiveTest = async (e) => {
     e.preventDefault();
@@ -242,6 +274,143 @@ const PaymentGateways = () => {
               <ExternalLink size={16} />
               {isAz ? 'Ödəniş Səhifəsini Aç' : 'Open Live Checkout'}
             </a>
+          </div>
+        )}
+      </div>
+
+      {/* Refund & Auto-Refund Rules */}
+      <div className="glass-card" style={{ padding: '1.75rem', marginTop: '2rem' }}>
+        <h2 style={{ fontSize: '1.25rem', marginBottom: '0.35rem' }}>
+          {isAz ? 'Geri Ödəniş (Refund) və Avto-Refund Qaydaları' : 'Refund & Auto-Refund Policy Rules'}
+        </h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
+          {isAz
+            ? 'Hansı geri ödəniş tələblərinin avtomatik təsdiqlənəcəyini və hansılarının Admin təsdiqinə düşəcəyini tənzimləyin.'
+            : 'Control which refund requests qualify for instant auto-refund vs. manual SaaS Admin approval.'}
+        </p>
+        {refundRulesMsg && (
+          <div style={{ color: 'var(--success)', marginBottom: '1rem', fontSize: '0.9rem' }}>{refundRulesMsg}</div>
+        )}
+        <form onSubmit={handleSaveRefundRules}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">
+                {isAz ? 'Avto-Refund Müddəti (Saat)' : 'Auto-Refund Window (Hours)'}
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="720"
+                className="form-control"
+                value={refundRules.auto_refund_window_hours}
+                onChange={(e) =>
+                  setRefundRules({ ...refundRules, auto_refund_window_hours: Number(e.target.value) || 0 })
+                }
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">
+                {isAz ? 'Maksimum Avto-Refund (AZN)' : 'Max Auto-Refund Amount (AZN)'}
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                className="form-control"
+                value={refundRules.auto_refund_max_amount_azn}
+                onChange={(e) =>
+                  setRefundRules({ ...refundRules, auto_refund_max_amount_azn: Number(e.target.value) || 0 })
+                }
+              />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={Boolean(refundRules.auto_refund_enabled)}
+                onChange={(e) => setRefundRules({ ...refundRules, auto_refund_enabled: e.target.checked })}
+              />
+              <span>{isAz ? 'Avto-Refund Aktivdir' : 'Enable Auto-Refund'}</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={Boolean(refundRules.require_reason)}
+                onChange={(e) => setRefundRules({ ...refundRules, require_reason: e.target.checked })}
+              />
+              <span>{isAz ? 'Səbəb Tələb Olunsun' : 'Require Reason'}</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={Boolean(refundRules.allow_business_self_cancel)}
+                onChange={(e) => setRefundRules({ ...refundRules, allow_business_self_cancel: e.target.checked })}
+              />
+              <span>{isAz ? 'Biznes Öz Hesabını Ləğv Edə Bilsin' : 'Allow Self-Service Account Cancellation'}</span>
+            </label>
+          </div>
+          <button type="submit" className="btn btn-primary">
+            {isAz ? 'Qaydaları Yadda Saxla' : 'Save Refund Rules'}
+          </button>
+        </form>
+      </div>
+
+      {/* Refund Requests Queue */}
+      <div className="glass-card" style={{ padding: '1.75rem', marginTop: '1.5rem' }}>
+        <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>
+          {isAz ? 'Geri Ödəniş Tələbləri (Approve / Reject)' : 'Refund Requests Queue'}
+        </h2>
+        {refundRequests.length === 0 ? (
+          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
+            {isAz ? 'Hələ geri ödəniş tələbi yoxdur.' : 'No refund requests submitted yet.'}
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {refundRequests.map((rr) => (
+              <div
+                key={rr.id}
+                style={{
+                  padding: '1rem',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-color)',
+                  background: 'rgba(255,255,255,0.02)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '1rem',
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 700 }}>
+                    {rr.business_name} • {Number(rr.amount).toFixed(2)} {rr.currency}
+                  </div>
+                  <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
+                    Status: <strong>{rr.status}</strong> {rr.reason ? `• ${rr.reason}` : ''}
+                  </div>
+                </div>
+                {rr.status === 'pending' && (
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => handleRefundDecision(rr.id, 'approve')}
+                    >
+                      {isAz ? 'Təsdiqlə (Refund)' : 'Approve'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ color: 'var(--error)' }}
+                      onClick={() => handleRefundDecision(rr.id, 'reject')}
+                    >
+                      {isAz ? 'Rədd Et' : 'Reject'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>

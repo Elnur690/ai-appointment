@@ -16,6 +16,11 @@ const Payments = () => {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutMessage, setCheckoutMessage] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
+  const [refundReason, setRefundReason] = useState('');
+  const [refundPaymentId, setRefundPaymentId] = useState('');
+  const [refundMsg, setRefundMsg] = useState('');
+  const [refunds, setRefunds] = useState([]);
   const [form, setForm] = useState({ amount: '', currency: 'AZN', method: 'cash', status: 'paid', notes: '' });
 
   const paymentMethods = [
@@ -32,16 +37,43 @@ const Payments = () => {
   ];
 
   const loadPayments = async () => {
-    const [payRes, sumRes, subRes] = await Promise.all([
+    const [payRes, sumRes, subRes, rfRes] = await Promise.all([
       api.get('/payments/').catch(() => ({ data: [] })),
       api.get('/payments/summary').catch(() => ({ data: { total_revenue: 0, count: 0 } })),
       api.get('/businesses/subscription').catch(() => ({ data: null })),
+      api.get('/businesses/refunds').catch(() => ({ data: [] })),
     ]);
     setPayments(payRes.data || []);
     setSummary(sumRes.data || { total_revenue: 0, count: 0 });
+    setRefunds(Array.isArray(rfRes.data) ? rfRes.data : []);
     if (subRes.data) {
       setSubscription(subRes.data);
       setSelectedPlanId((prev) => prev || subRes.data.current_plan_id || subRes.data.plans?.[0]?.id || '');
+    }
+  };
+
+  const handleRequestRefund = async (e) => {
+    e.preventDefault();
+    setRefundMsg('');
+    try {
+      const res = await api.post('/businesses/refunds/request', {
+        payment_id: refundPaymentId || null,
+        reason: refundReason,
+      });
+      setIsRefundModalOpen(false);
+      setRefundReason('');
+      setRefundMsg(
+        res.data?.status === 'auto_approved'
+          ? isAz
+            ? 'Geri ödənişiniz qaydalara uyğun olaraq avtomatik təsdiqləndi!'
+            : 'Your refund was automatically approved!'
+          : isAz
+          ? 'Geri ödəniş tələbiniz Admin baxışına göndərildi.'
+          : 'Your refund request was submitted for Admin review.'
+      );
+      await loadPayments();
+    } catch (err) {
+      setRefundMsg(err.response?.data?.detail || 'Could not submit refund request.');
     }
   };
 
@@ -257,7 +289,45 @@ const Payments = () => {
                 {isAz ? 'Ləğv Et' : 'Cancel'}
               </button>
             )}
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setRefundPaymentId('');
+                setIsRefundModalOpen(true);
+              }}
+            >
+              {isAz ? 'Geri Ödəniş İstə' : 'Request Refund'}
+            </button>
           </div>
+        </div>
+      )}
+
+      {refundMsg && (
+        <div
+          style={{
+            padding: '0.75rem 1rem',
+            borderRadius: '8px',
+            background: 'rgba(212, 175, 55, 0.14)',
+            border: '1px solid var(--primary)',
+            marginBottom: '1rem',
+            fontSize: '0.9rem',
+          }}
+        >
+          {refundMsg}
+        </div>
+      )}
+
+      {refunds.length > 0 && (
+        <div className="glass-card" style={{ padding: '1rem 1.25rem', marginBottom: '1.5rem' }}>
+          <div style={{ fontWeight: 700, marginBottom: '0.5rem' }}>
+            {isAz ? 'Geri Ödəniş Tələbləri' : 'Refund Requests'}
+          </div>
+          {refunds.slice(0, 5).map((rr) => (
+            <div key={rr.id} style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+              {Number(rr.amount).toFixed(2)} {rr.currency} • <strong>{rr.status}</strong> {rr.reason ? `(${rr.reason})` : ''}
+            </div>
+          ))}
         </div>
       )}
 
@@ -320,6 +390,51 @@ const Payments = () => {
             </button>
             <button type="submit" className="btn btn-primary">
               {isAz ? 'Ödənişi Yadda Saxla' : 'Record Payment'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={isRefundModalOpen}
+        onClose={() => setIsRefundModalOpen(false)}
+        title={isAz ? 'Geri Ödəniş (Refund) Tələbi' : 'Request a Refund'}
+      >
+        <form onSubmit={handleRequestRefund}>
+          <div className="form-group">
+            <label className="form-label">{isAz ? 'Ödəniş Seçin (İstəyə bağlı)' : 'Select Payment (Optional)'}</label>
+            <select
+              className="form-control"
+              value={refundPaymentId}
+              onChange={(e) => setRefundPaymentId(e.target.value)}
+            >
+              <option value="">{isAz ? 'Son tamamlanmış ödəniş' : 'Latest completed payment'}</option>
+              {payments
+                .filter((p) => p.status === 'completed' || p.status === 'paid')
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.amount} — {p.customer || p.gateway}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+            <label className="form-label">{isAz ? 'Səbəb *' : 'Reason *'}</label>
+            <textarea
+              className="form-control"
+              rows={3}
+              required
+              placeholder={isAz ? 'Geri ödəniş səbəbinizi qeyd edin...' : 'Please explain why you are requesting a refund...'}
+              value={refundReason}
+              onChange={(e) => setRefundReason(e.target.value)}
+            />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setIsRefundModalOpen(false)}>
+              {isAz ? 'Bağla' : 'Close'}
+            </button>
+            <button type="submit" className="btn btn-primary">
+              {isAz ? 'Tələbi Göndər' : 'Submit Request'}
             </button>
           </div>
         </form>
