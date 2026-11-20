@@ -28,6 +28,13 @@ DEFAULT_PLATFORM_GATEWAYS = {
         "enabled": True,
         "requires_credentials": True,
     },
+    "creem": {
+        "provider": "creem",
+        "name": "Creem (Cards & Subscriptions)",
+        "description": "Global online card checkout and built-in recurring subscriptions via Creem API v1 (docs.creem.io).",
+        "enabled": True,
+        "requires_credentials": True,
+    },
 }
 
 

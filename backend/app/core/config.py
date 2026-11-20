@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     PAYMEGATE_WEBHOOK_SECRET: str = ""
     PAYRIFF_MERCHANT_ID: str = ""
     PAYRIFF_SECRET_KEY: str = ""
+    CREEM_API_KEY: str = ""
+    CREEM_WEBHOOK_SECRET: str = ""
+    CREEM_TEST_MODE: bool = False
 
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587

@@ -304,19 +304,117 @@ async def platform_payment_gateway_webhook(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Handle platform-level payment gateway webhooks (e.g. Paymegate / Payriff) without business_id in URL."""
-    from app.models.payment import Payment
+    """Handle platform-level payment gateway webhooks (Creem, Payriff, Paymegate) without business_id in URL."""
+    import json
+    from datetime import datetime, timedelta, timezone
+    from app.models.payment import Payment, PaymentStatus
+    from app.models.business import Business
+    from app.models.subscription import Subscription, SubscriptionStatus
+    from app.integrations.payments.creem import CreemAdapter
     from app.integrations.payments.paymegate import PaymegateAdapter
 
-    payload = await request.json()
+    raw_body = await request.body()
+    payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
     headers = dict(request.headers)
     prov = provider.lower().strip()
     if prov == "paymengate":
         prov = "paymegate"
 
-    # Try resolving business_id from metadata or existing Payment row
-    biz_uuid: UUID | None = None
-    metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+    obj = payload.get("object") if isinstance(payload.get("object"), dict) else {}
+    metadata = (
+        obj.get("metadata")
+        if isinstance(obj.get("metadata"), dict)
+        else (payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {})
+    )
+
+    if prov == "creem":
+        creem_res = await CreemAdapter().verify_webhook(
+            payload=payload,
+            headers=headers,
+            merchant_config={},
+            raw_body=raw_body,
+        )
+        event_type = str(payload.get("eventType") or payload.get("type") or "").lower()
+        raw_biz = metadata.get("businessId") or metadata.get("business_id")
+        biz_uuid: UUID | None = None
+        if raw_biz:
+            try:
+                biz_uuid = UUID(str(raw_biz))
+            except ValueError:
+                biz_uuid = None
+
+        ext_id = obj.get("request_id") or metadata.get("paymentId")
+        payment = None
+        if ext_id:
+            try:
+                payment = (await db.execute(select(Payment).where(Payment.id == UUID(str(ext_id))))).scalar_one_or_none()
+            except ValueError:
+                payment = None
+        if not payment and creem_res.transaction_id:
+            payment = (
+                await db.execute(select(Payment).where(Payment.gateway_transaction_id == creem_res.transaction_id))
+            ).scalar_one_or_none()
+
+        if payment and not biz_uuid:
+            biz_uuid = payment.business_id
+
+        if creem_res.is_successful:
+            if payment:
+                payment.status = PaymentStatus.completed
+                if payment.appointment_id:
+                    from app.models.appointment import Appointment, AppointmentStatus
+                    appt = (await db.execute(select(Appointment).where(Appointment.id == payment.appointment_id))).scalar_one_or_none()
+                    if appt:
+                        appt.status = AppointmentStatus.confirmed
+
+            if biz_uuid and metadata.get("type") == "saas_subscription":
+                biz = (await db.execute(select(Business).where(Business.id == biz_uuid))).scalar_one_or_none()
+                if biz:
+                    now = datetime.now(timezone.utc)
+                    plan_uuid = biz.plan_id
+                    if metadata.get("plan_id") or metadata.get("planId"):
+                        try:
+                            plan_uuid = UUID(str(metadata.get("plan_id") or metadata.get("planId")))
+                            biz.plan_id = plan_uuid
+                        except ValueError:
+                            pass
+                    biz.subscription_status = "active"
+                    biz.is_active = True
+                    biz.trial_ends_at = None
+                    if plan_uuid:
+                        sub = (await db.execute(select(Subscription).where(Subscription.business_id == biz.id))).scalars().first()
+                        if sub:
+                            sub.plan_id = plan_uuid
+                            sub.status = SubscriptionStatus.active
+                            sub.current_period_start = now
+                            sub.current_period_end = now + timedelta(days=30)
+                        else:
+                            db.add(
+                                Subscription(
+                                    business_id=biz.id,
+                                    plan_id=plan_uuid,
+                                    status=SubscriptionStatus.active,
+                                    current_period_start=now,
+                                    current_period_end=now + timedelta(days=30),
+                                )
+                            )
+            await db.commit()
+            return {"status": "verified", "provider": "creem", "event": event_type}
+
+        if biz_uuid and event_type in {"subscription.past_due", "subscription.unpaid", "subscription.canceled", "subscription.expired"}:
+            biz = (await db.execute(select(Business).where(Business.id == biz_uuid))).scalar_one_or_none()
+            if biz:
+                biz.subscription_status = "past_due" if "past_due" in event_type or "unpaid" in event_type else "suspended"
+            sub = (await db.execute(select(Subscription).where(Subscription.business_id == biz_uuid))).scalars().first()
+            if sub:
+                sub.status = SubscriptionStatus.past_due if "past_due" in event_type or "unpaid" in event_type else SubscriptionStatus.cancelled
+            await db.commit()
+            return {"status": "updated", "provider": "creem", "event": event_type}
+
+        return {"status": "received", "provider": "creem", "event": event_type}
+
+    # Try resolving business_id from metadata or existing Payment row (Payriff / Paymegate)
+    biz_uuid = None
     raw_biz = metadata.get("businessId") or metadata.get("business_id") or payload.get("business_id")
     if raw_biz:
         try:

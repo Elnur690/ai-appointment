@@ -13,6 +13,7 @@ class PaymentMethod(str, enum.Enum):
     paymegate = "paymegate"
     paymengate = "paymengate"
     epoint = "epoint"
+    creem = "creem"
 
 class PaymentStatus(str, enum.Enum):
     pending = "pending"

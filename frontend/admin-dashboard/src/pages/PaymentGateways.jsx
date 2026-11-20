@@ -6,6 +6,7 @@ import { CreditCard, Banknote, ShieldCheck, CheckCircle2, XCircle, ExternalLink 
 
 const GATEWAY_ICONS = {
   cash: Banknote,
+  creem: CreditCard,
   payriff: CreditCard,
   paymegate: ShieldCheck,
   paymengate: ShieldCheck,
@@ -133,8 +134,8 @@ const PaymentGateways = () => {
                         ? `.env konfiqurasiyası: Aktiv (${gw.env_hint})`
                         : `.env configured (${gw.env_hint})`
                       : isAz
-                      ? `.env açarı təyin edilməyib (${gw.provider === 'paymegate' ? 'PAYMEGATE_API_KEY' : 'PAYRIFF_SECRET_KEY'})`
-                      : `Set ${gw.provider === 'paymegate' ? 'PAYMEGATE_API_KEY' : 'PAYRIFF_SECRET_KEY'} in .env`
+                      ? `.env açarı təyin edilməyib (${gw.provider === 'creem' ? 'CREEM_API_KEY' : gw.provider === 'paymegate' ? 'PAYMEGATE_API_KEY' : 'PAYRIFF_SECRET_KEY'})`
+                      : `Set ${gw.provider === 'creem' ? 'CREEM_API_KEY' : gw.provider === 'paymegate' ? 'PAYMEGATE_API_KEY' : 'PAYRIFF_SECRET_KEY'} in .env`
                     : isAz
                     ? 'Daxili kassa / nağd ödəniş üsulu'
                     : 'Built-in Ledger Method'}
@@ -160,15 +161,15 @@ const PaymentGateways = () => {
         })}
       </div>
 
-      {/* Live Paymegate Payment Test (with Live AZN -> USD Conversion) */}
+      {/* Live Creem Payment Test (with Live AZN -> USD Conversion) */}
       <div className="glass-card" style={{ padding: '1.75rem', marginTop: '2rem', border: '1px solid rgba(212, 175, 55, 0.35)' }}>
         <h2 style={{ fontSize: '1.25rem', marginBottom: '0.35rem' }}>
-          {isAz ? 'Canlı Ödəniş Testi (Paymegate USD)' : 'Live Payment Test (Paymegate USD)'}
+          {isAz ? 'Canlı Ödəniş Testi (Creem USD)' : 'Live Payment Test (Creem USD)'}
         </h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
           {isAz
-            ? 'İstənilən məbləğ daxil edib real Paymegate ödəniş linki yaradın. AZN daxil etdikdə canlı məzənnə ilə avtomatik USD-yə çevrilir.'
-            : 'Enter any amount to generate a real Paymegate checkout order. AZN amounts are automatically converted to USD using the live exchange rate.'}
+            ? 'İstənilən məbləğ daxil edib real Creem ödəniş linki yaradın. AZN daxil etdikdə canlı məzənnə ilə avtomatik USD-yə çevrilir.'
+            : 'Enter any amount to generate a real Creem checkout session. AZN amounts are automatically converted to USD using the live exchange rate.'}
         </p>
 
         <form onSubmit={handleRunLiveTest} style={{ display: 'flex', gap: '0.85rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>

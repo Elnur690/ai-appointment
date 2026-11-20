@@ -336,13 +336,13 @@ async def list_platform_payment_gateways(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
-    """List all platform payment gateways (1. Cash, 2. Payriff, 3. Paymegate) and their enabled + .env status."""
+    """List all platform payment gateways (Cash, Creem, Payriff, Paymegate) and their enabled + .env status."""
     cfg = await _get_or_create_platform_config(db)
-    order = ["cash", "payriff", "paymegate"]
+    order = ["cash", "creem", "payriff", "paymegate"]
 
     def _mask_secret(val: str) -> str:
         s = (val or "").strip()
-        if not s or s.startswith("change_me"):
+        if not s or s.startswith("change_me") or s == "creem_your_api_key":
             return ""
         return f"••••{s[-4:]}" if len(s) >= 4 else "••••"
 
@@ -351,7 +351,11 @@ async def list_platform_payment_gateways(
         if k not in cfg.payment_gateways:
             continue
         item = dict(cfg.payment_gateways[k])
-        if k == "paymegate":
+        if k == "creem":
+            masked = _mask_secret(settings.CREEM_API_KEY)
+            item["env_configured"] = bool(masked)
+            item["env_hint"] = masked
+        elif k == "paymegate":
             masked = _mask_secret(settings.PAYMEGATE_API_KEY)
             item["env_configured"] = bool(masked)
             item["env_hint"] = masked
@@ -373,20 +377,20 @@ class AdminPaymentTestRequest(BaseModel):
 
 
 @router.post("/payment-gateways/test")
-async def test_live_paymegate_checkout(
+async def test_live_payment_checkout(
     req: AdminPaymentTestRequest,
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
-    """Create a live Paymegate checkout order for any amount (auto-converting AZN -> USD at live FX rate)."""
+    """Create a live Creem checkout session for any amount (auto-converting AZN -> USD at live FX rate)."""
     from decimal import Decimal
     from uuid import uuid4
     from app.integrations.payments.fx import convert_to_usd
-    from app.integrations.payments.paymegate import PaymegateAdapter
+    from app.integrations.payments.creem import CreemAdapter
 
     if req.amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be greater than 0")
-    if not (settings.PAYMEGATE_API_KEY or "").strip():
-        raise HTTPException(status_code=400, detail="PAYMEGATE_API_KEY is not set in .env")
+    if not (settings.CREEM_API_KEY or "").strip():
+        raise HTTPException(status_code=400, detail="CREEM_API_KEY is not set in .env")
 
     orig_currency = (req.currency or "AZN").strip().upper()
     if orig_currency not in {"AZN", "USD"}:
@@ -396,7 +400,7 @@ async def test_live_paymegate_checkout(
     usd_amount, fx_rate = await convert_to_usd(orig_amount, orig_currency)
 
     test_payment_id = uuid4()
-    res = await PaymegateAdapter().create_payment_link(
+    res = await CreemAdapter().create_payment_link(
         payment_id=test_payment_id,
         amount=orig_amount,
         currency=orig_currency,
@@ -404,7 +408,6 @@ async def test_live_paymegate_checkout(
         merchant_config={
             "type": "admin_test",
             "customer_email": user.get("email") or settings.SAAS_ADMIN_EMAIL,
-            "customer_name": "Randevu.vip SaaS Admin Test",
         },
         return_url=f"https://admin.{settings.PLATFORM_DOMAIN}/payment-gateways",
     )

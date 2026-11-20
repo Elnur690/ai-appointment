@@ -74,6 +74,7 @@ async def init_db() -> None:
         "ALTER TABLE plans ADD COLUMN IF NOT EXISTS trial_features JSONB;",
         "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMP WITH TIME ZONE;",
         "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS trial_features_override JSONB;",
+        "ALTER TYPE paymentmethod ADD VALUE IF NOT EXISTS 'creem';",
     ]
     for stmt_sql in alter_statements:
         try:

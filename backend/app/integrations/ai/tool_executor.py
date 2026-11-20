@@ -266,10 +266,10 @@ class ToolExecutor:
         checkout_url: str | None = None
         if deposit_req.is_deposit_required:
             from app.core.config import settings
-            from app.integrations.payments.paymegate import PaymegateAdapter
+            from app.integrations.payments.creem import CreemAdapter
             from app.integrations.payments.payriff import PayriffAdapter
 
-            dep_method = PaymentMethod.paymegate if settings.PAYMEGATE_API_KEY else PaymentMethod.payriff
+            dep_method = PaymentMethod.creem if settings.CREEM_API_KEY else PaymentMethod.payriff
             dep_payment = Payment(
                 business_id=self.business_id,
                 appointment_id=appt.id,
@@ -283,8 +283,8 @@ class ToolExecutor:
             await self.db.flush()
 
             try:
-                if settings.PAYMEGATE_API_KEY:
-                    link_res = await PaymegateAdapter().create_payment_link(
+                if settings.CREEM_API_KEY:
+                    link_res = await CreemAdapter().create_payment_link(
                         payment_id=dep_payment.id,
                         amount=deposit_req.deposit_amount,
                         currency=svc.currency or "AZN",

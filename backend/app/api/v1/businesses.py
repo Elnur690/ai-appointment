@@ -513,7 +513,7 @@ async def create_subscription_checkout(
 ):
     """Create a live Paymegate/Payriff checkout link for SaaS plan payment or upgrade."""
     from decimal import Decimal
-    from app.integrations.payments.paymegate import PaymegateAdapter
+    from app.integrations.payments.creem import CreemAdapter
     from app.integrations.payments.payriff import PayriffAdapter
 
     biz = (await db.execute(select(Business).where(Business.id == UUID(business_id)))).scalar_one_or_none()
@@ -539,7 +539,7 @@ async def create_subscription_checkout(
         appointment_id=None,
         amount=float(amount),
         currency="AZN",
-        method=PaymentMethod.paymegate if settings.PAYMEGATE_API_KEY else PaymentMethod.payriff,
+        method=PaymentMethod.creem if settings.CREEM_API_KEY else PaymentMethod.payriff,
         status=PaymentStatus.pending,
         notes=f"SaaS Subscription - {target_plan.name}",
     )
@@ -547,8 +547,8 @@ async def create_subscription_checkout(
     await db.flush()
 
     checkout_url: str | None = None
-    if settings.PAYMEGATE_API_KEY:
-        link_res = await PaymegateAdapter().create_payment_link(
+    if settings.CREEM_API_KEY:
+        link_res = await CreemAdapter().create_payment_link(
             payment_id=sub_payment.id,
             amount=amount,
             currency="AZN",
@@ -557,6 +557,7 @@ async def create_subscription_checkout(
                 "business_id": str(biz.id),
                 "type": "saas_subscription",
                 "plan_id": str(target_plan.id),
+                "customer_email": user.get("email"),
             },
             return_url=f"https://app.{settings.PLATFORM_DOMAIN}/payments",
         )

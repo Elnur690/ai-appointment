@@ -10,13 +10,14 @@ from app.models.appointment import Appointment, AppointmentStatus
 from app.integrations.payments.payriff import PayriffAdapter
 from app.integrations.payments.paymegate import PaymegateAdapter
 from app.integrations.payments.epoint import EpointAdapter
+from app.integrations.payments.creem import CreemAdapter
 from app.integrations.payments.adapter import PaymentAdapter, PaymentLinkResult
 
 logger = logging.getLogger(__name__)
 
 
 class PaymentService:
-    """Manages cash payments and online payment gateway processing (Payriff & Paymegate)."""
+    """Manages cash payments and online payment gateway processing (Creem & Payriff)."""
 
     def __init__(self, db: AsyncSession, business_id: UUID):
         self.db = db
@@ -24,9 +25,12 @@ class PaymentService:
         self.payriff_adapter = PayriffAdapter()
         self.paymegate_adapter = PaymegateAdapter()
         self.epoint_adapter = EpointAdapter()
+        self.creem_adapter = CreemAdapter()
 
     def _get_adapter(self, provider: str) -> PaymentAdapter:
         norm = provider.lower().strip()
+        if norm == "creem":
+            return self.creem_adapter
         if norm == "payriff":
             return self.payriff_adapter
         if norm in {"paymegate", "paymengate"}:
@@ -57,6 +61,8 @@ class PaymentService:
         config = await self.get_gateway_config(provider)
         norm = "paymegate" if provider.lower().strip() in {"paymegate", "paymengate"} else provider.lower().strip()
         merchant_creds = dict(config.merchant_credentials) if config and config.merchant_credentials else {}
+        if norm == "creem" and not merchant_creds.get("api_key") and not settings.CREEM_API_KEY:
+            raise ValueError("Creem API key is not configured.")
         if norm == "paymegate" and not merchant_creds.get("api_key") and not settings.PAYMEGATE_API_KEY:
             raise ValueError("Paymegate API key is not configured.")
         if norm == "payriff" and not merchant_creds.get("secret_key") and not settings.PAYRIFF_SECRET_KEY:
@@ -67,7 +73,7 @@ class PaymentService:
             appointment_id=appointment_id,
             amount=amount,
             currency="AZN",
-            method=PaymentMethod(norm if norm in {"payriff", "paymegate", "epoint"} else "paymegate"),
+            method=PaymentMethod(norm if norm in {"creem", "payriff", "paymegate", "epoint"} else "creem"),
             status=PaymentStatus.pending,
             notes=description,
         )
