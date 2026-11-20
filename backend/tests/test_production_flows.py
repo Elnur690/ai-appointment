@@ -4,6 +4,7 @@ from decimal import Decimal
 from app.services.no_show_protection_service import NoShowProtectionService
 from app.integrations.payments.paymegate import PaymegateAdapter
 from app.services.reseller_service import ResellerService
+from app.core.email_validation import is_disposable_or_invalid_email
 
 
 class TestProductionFlows(unittest.IsolatedAsyncioTestCase):
@@ -94,6 +95,13 @@ class TestProductionFlows(unittest.IsolatedAsyncioTestCase):
     def test_reseller_referral_code_normalization(self):
         rs = ResellerService()
         self.assertEqual(rs.normalize_referral_code("  Baku Agency 01! "), "BAKU-AGENCY-01")
+
+    def test_disposable_email_blocking(self):
+        self.assertFalse(is_disposable_or_invalid_email("user@tempmail.com")[0])
+        self.assertFalse(is_disposable_or_invalid_email("user@10minutemail.com")[0])
+        self.assertFalse(is_disposable_or_invalid_email("user@yopmail.com")[0])
+        self.assertTrue(is_disposable_or_invalid_email("owner@gmail.com")[0])
+        self.assertTrue(is_disposable_or_invalid_email("info@bakuclinic.az")[0])
 
 
 if __name__ == "__main__":

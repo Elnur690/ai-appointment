@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.email_validation import assert_allowed_registration_email
 from app.core.dependencies import require_role
 from app.core.security import hash_password
 from app.models.reseller import Reseller, ResellerPayout
@@ -132,6 +133,7 @@ async def apply_as_reseller_public(
         return {"status": "submitted"}
 
     email_clean = data.email.strip().lower()
+    assert_allowed_registration_email(email_clean)
     existing_email = (
         await db.execute(select(Reseller).where(Reseller.email == email_clean))
     ).scalar_one_or_none()

@@ -8,6 +8,7 @@ from pydantic import BaseModel, EmailStr
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.email_validation import assert_allowed_registration_email
 from app.core.dependencies import get_current_active_user
 from app.core.security import (
     hash_password,
@@ -159,6 +160,7 @@ async def register_business(
 ):
     """Self-register a new Business on randevu.vip (with optional Reseller referral code attribution)."""
     email_clean = request.email.strip().lower()
+    assert_allowed_registration_email(email_clean)
     existing = (
         await db.execute(select(BusinessOwner).where(BusinessOwner.email == email_clean))
     ).scalar_one_or_none()
