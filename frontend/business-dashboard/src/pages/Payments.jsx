@@ -50,7 +50,14 @@ const Payments = () => {
     setCheckoutLoading(true);
     try {
       const res = await api.post('/businesses/subscription/checkout', { plan_id: selectedPlanId });
-      if (res.data?.checkout_url) {
+      if (res.data?.upgraded_directly) {
+        setCheckoutMessage(
+          isAz
+            ? `Paketiniz dərhal ${res.data?.plan_name} planına yüksəldildi!`
+            : `Your subscription was upgraded directly to ${res.data?.plan_name}!`
+        );
+        await loadPayments();
+      } else if (res.data?.checkout_url) {
         window.open(res.data.checkout_url, '_blank', 'noopener,noreferrer');
       } else {
         setCheckoutMessage(
@@ -63,6 +70,29 @@ const Payments = () => {
       setCheckoutMessage(err.response?.data?.detail || 'Checkout failed.');
     } finally {
       setCheckoutLoading(false);
+    }
+  };
+
+  const handleOpenBillingPortal = async () => {
+    setCheckoutMessage('');
+    try {
+      const res = await api.post('/businesses/subscription/portal');
+      if (res.data?.portal_url) {
+        window.open(res.data.portal_url, '_blank', 'noopener,noreferrer');
+      }
+    } catch (err) {
+      setCheckoutMessage(err.response?.data?.detail || 'Billing portal unavailable.');
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    setCheckoutMessage('');
+    try {
+      await api.post('/businesses/subscription/cancel');
+      setCheckoutMessage(isAz ? 'Abunəlik ləğv edildi.' : 'Subscription cancelled.');
+      await loadPayments();
+    } catch (err) {
+      setCheckoutMessage(err.response?.data?.detail || 'Could not cancel subscription.');
     }
   };
 
@@ -212,6 +242,21 @@ const Payments = () => {
                 ? 'Abunəliyi Ödə / Yenilə'
                 : 'Pay / Upgrade Plan'}
             </button>
+            {subscription.can_manage_billing && (
+              <button type="button" className="btn btn-secondary" onClick={handleOpenBillingPortal}>
+                {isAz ? 'Kart & Fakturalar' : 'Billing Portal'}
+              </button>
+            )}
+            {subscription.has_active_creem_subscription && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ color: 'var(--error)' }}
+                onClick={handleCancelSubscription}
+              >
+                {isAz ? 'Ləğv Et' : 'Cancel'}
+              </button>
+            )}
           </div>
         </div>
       )}

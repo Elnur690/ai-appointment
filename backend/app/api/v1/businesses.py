@@ -480,18 +480,26 @@ async def get_business_subscription(
     business_id: Annotated[str, Depends(get_business_context)],
 ):
     """Return current subscription plan, status, trial expiry, and available upgrade plans."""
+    from app.models.subscription import Subscription, SubscriptionStatus
+
     biz = (await db.execute(select(Business).where(Business.id == UUID(business_id)))).scalar_one_or_none()
     if not biz:
         raise HTTPException(status_code=404, detail="Business not found")
 
     plans = (await db.execute(select(Plan).where(Plan.is_active.is_(True)).order_by(Plan.price.asc()))).scalars().all()
     current_plan = next((p for p in plans if p.id == biz.plan_id), None)
+    sub = (await db.execute(select(Subscription).where(Subscription.business_id == biz.id))).scalars().first()
+    has_creem_sub = bool(sub and sub.creem_subscription_id and sub.status == SubscriptionStatus.active)
+
     return {
         "current_plan_id": str(biz.plan_id) if biz.plan_id else None,
         "current_plan_name": current_plan.name if current_plan else "Starter",
         "current_plan_price": float(current_plan.price) if current_plan else 29.0,
         "subscription_status": biz.subscription_status or "trial",
         "trial_ends_at": biz.trial_ends_at.isoformat() if biz.trial_ends_at else None,
+        "current_period_end": sub.current_period_end.isoformat() if sub and sub.current_period_end else None,
+        "has_active_creem_subscription": has_creem_sub,
+        "can_manage_billing": bool(sub and sub.creem_customer_id),
         "plans": [
             {
                 "id": str(p.id),
@@ -548,6 +556,28 @@ async def create_subscription_checkout(
 
     checkout_url: str | None = None
     if settings.CREEM_API_KEY:
+        from app.models.subscription import Subscription, SubscriptionStatus
+        sub = (await db.execute(select(Subscription).where(Subscription.business_id == biz.id))).scalars().first()
+        if sub and sub.creem_subscription_id and sub.status == SubscriptionStatus.active and biz.plan_id != target_plan.id:
+            creem = CreemAdapter()
+            prod_id = await creem.create_recurring_product(
+                name=f"Randevu.vip {target_plan.name}",
+                amount=amount,
+                currency="AZN",
+            )
+            await creem.upgrade_subscription(sub.creem_subscription_id, prod_id)
+            biz.plan_id = target_plan.id
+            sub.plan_id = target_plan.id
+            await db.commit()
+            return {
+                "payment_id": str(sub_payment.id),
+                "plan_name": target_plan.name,
+                "amount": float(amount),
+                "currency": "AZN",
+                "checkout_url": None,
+                "upgraded_directly": True,
+            }
+
         link_res = await CreemAdapter().create_payment_link(
             payment_id=sub_payment.id,
             amount=amount,
@@ -583,6 +613,51 @@ async def create_subscription_checkout(
         "currency": "AZN",
         "checkout_url": checkout_url,
     }
+
+
+@router.post("/subscription/cancel")
+async def cancel_business_subscription(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("owner"))],
+    business_id: Annotated[str, Depends(get_business_context)],
+):
+    """Cancel the business's active Creem recurring subscription."""
+    from app.models.subscription import Subscription, SubscriptionStatus
+    from app.integrations.payments.creem import CreemAdapter
+
+    biz = (await db.execute(select(Business).where(Business.id == UUID(business_id)))).scalar_one_or_none()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    sub = (await db.execute(select(Subscription).where(Subscription.business_id == biz.id))).scalars().first()
+    if sub and sub.creem_subscription_id and settings.CREEM_API_KEY:
+        await CreemAdapter().cancel_subscription(sub.creem_subscription_id)
+
+    if sub:
+        sub.status = SubscriptionStatus.cancelled
+    biz.subscription_status = "cancelled"
+    await db.commit()
+    return {"status": "cancelled"}
+
+
+@router.post("/subscription/portal")
+async def get_subscription_billing_portal(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("owner"))],
+    business_id: Annotated[str, Depends(get_business_context)],
+):
+    """Return a hosted Creem Customer Portal URL for managing cards and invoices."""
+    from app.models.subscription import Subscription
+    from app.integrations.payments.creem import CreemAdapter
+
+    sub = (
+        await db.execute(select(Subscription).where(Subscription.business_id == UUID(business_id)))
+    ).scalars().first()
+    if not sub or not sub.creem_customer_id:
+        raise HTTPException(status_code=400, detail="No active Creem customer billing profile found")
+
+    portal_url = await CreemAdapter().create_billing_portal_url(sub.creem_customer_id)
+    return {"portal_url": portal_url}
 
 
 @router.get("/public/discover")

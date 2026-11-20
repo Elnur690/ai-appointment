@@ -202,3 +202,76 @@ class CreemAdapter(PaymentAdapter):
         except Exception as exc:
             logger.warning(f"Creem check_status error: {exc}")
         return "pending"
+
+    async def create_recurring_product(self, name: str, amount: Decimal, currency: str = "AZN") -> str:
+        """Create a monthly recurring Creem product and return its product_id."""
+        api_key = (settings.CREEM_API_KEY or "").strip()
+        if not api_key:
+            raise ValueError("CREEM_API_KEY is not configured")
+        base_url = self._get_base_url(api_key, {})
+        usd_amount, _ = await convert_to_usd(Decimal(str(amount)), currency)
+        price_cents = max(100, int((usd_amount * Decimal("100")).to_integral_value()))
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                f"{base_url}/products",
+                headers={"x-api-key": api_key, "Content-Type": "application/json"},
+                json={
+                    "name": name[:100],
+                    "description": f"{name} Monthly Plan",
+                    "price": price_cents,
+                    "currency": "USD",
+                    "billing_type": "recurring",
+                    "billing_period": "every-month",
+                },
+            )
+            if resp.status_code not in (200, 201):
+                raise ValueError(f"Creem product creation failed ({resp.status_code}): {resp.text}")
+            return str(resp.json()["id"])
+
+    async def upgrade_subscription(self, subscription_id: str, product_id: str) -> dict:
+        """Upgrade or switch a Creem subscription via POST /v1/subscriptions/{id}/upgrade."""
+        api_key = (settings.CREEM_API_KEY or "").strip()
+        if not api_key:
+            raise ValueError("CREEM_API_KEY is not configured")
+        base_url = self._get_base_url(api_key, {})
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                f"{base_url}/subscriptions/{subscription_id}/upgrade",
+                headers={"x-api-key": api_key, "Content-Type": "application/json"},
+                json={"product_id": product_id, "update_behavior": "proration-charge-immediately"},
+            )
+            if resp.status_code not in (200, 201):
+                raise ValueError(f"Creem subscription upgrade failed ({resp.status_code}): {resp.text}")
+            return resp.json()
+
+    async def cancel_subscription(self, subscription_id: str) -> dict:
+        """Cancel a Creem subscription via POST /v1/subscriptions/{id}/cancel."""
+        api_key = (settings.CREEM_API_KEY or "").strip()
+        if not api_key:
+            raise ValueError("CREEM_API_KEY is not configured")
+        base_url = self._get_base_url(api_key, {})
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                f"{base_url}/subscriptions/{subscription_id}/cancel",
+                headers={"x-api-key": api_key, "Content-Type": "application/json"},
+            )
+            if resp.status_code not in (200, 201):
+                raise ValueError(f"Creem subscription cancel failed ({resp.status_code}): {resp.text}")
+            return resp.json()
+
+    async def create_billing_portal_url(self, customer_id: str) -> str:
+        """Create a Creem Customer Portal link via POST /v1/customers/billing."""
+        api_key = (settings.CREEM_API_KEY or "").strip()
+        if not api_key:
+            raise ValueError("CREEM_API_KEY is not configured")
+        base_url = self._get_base_url(api_key, {})
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                f"{base_url}/customers/billing",
+                headers={"x-api-key": api_key, "Content-Type": "application/json"},
+                json={"customer_id": customer_id},
+            )
+            if resp.status_code not in (200, 201):
+                raise ValueError(f"Creem billing portal failed ({resp.status_code}): {resp.text}")
+            data = resp.json()
+            return str(data.get("customer_portal_link") or data.get("url") or "")

@@ -382,12 +382,26 @@ async def platform_payment_gateway_webhook(
                     biz.is_active = True
                     biz.trial_ends_at = None
                     if plan_uuid:
+                        creem_sub_id = (
+                            (obj.get("subscription") or {}).get("id")
+                            if isinstance(obj.get("subscription"), dict)
+                            else (obj.get("id") if event_type.startswith("subscription.") else obj.get("subscription"))
+                        )
+                        creem_cust_id = (
+                            (obj.get("customer") or {}).get("id")
+                            if isinstance(obj.get("customer"), dict)
+                            else obj.get("customer_id")
+                        )
                         sub = (await db.execute(select(Subscription).where(Subscription.business_id == biz.id))).scalars().first()
                         if sub:
                             sub.plan_id = plan_uuid
                             sub.status = SubscriptionStatus.active
                             sub.current_period_start = now
                             sub.current_period_end = now + timedelta(days=30)
+                            if creem_sub_id:
+                                sub.creem_subscription_id = str(creem_sub_id)
+                            if creem_cust_id:
+                                sub.creem_customer_id = str(creem_cust_id)
                         else:
                             db.add(
                                 Subscription(
@@ -396,18 +410,49 @@ async def platform_payment_gateway_webhook(
                                     status=SubscriptionStatus.active,
                                     current_period_start=now,
                                     current_period_end=now + timedelta(days=30),
+                                    creem_subscription_id=str(creem_sub_id) if creem_sub_id else None,
+                                    creem_customer_id=str(creem_cust_id) if creem_cust_id else None,
                                 )
                             )
             await db.commit()
             return {"status": "verified", "provider": "creem", "event": event_type}
 
-        if biz_uuid and event_type in {"subscription.past_due", "subscription.unpaid", "subscription.canceled", "subscription.expired"}:
+        if biz_uuid and event_type == "subscription.trialing":
             biz = (await db.execute(select(Business).where(Business.id == biz_uuid))).scalar_one_or_none()
             if biz:
-                biz.subscription_status = "past_due" if "past_due" in event_type or "unpaid" in event_type else "suspended"
+                biz.subscription_status = "trial"
+                biz.is_active = True
             sub = (await db.execute(select(Subscription).where(Subscription.business_id == biz_uuid))).scalars().first()
             if sub:
-                sub.status = SubscriptionStatus.past_due if "past_due" in event_type or "unpaid" in event_type else SubscriptionStatus.cancelled
+                sub.status = SubscriptionStatus.trial
+            await db.commit()
+            return {"status": "updated", "provider": "creem", "event": event_type}
+
+        if event_type in {"refund.created", "dispute.created"}:
+            if payment:
+                payment.status = PaymentStatus.refunded
+                await db.commit()
+            return {"status": "refunded", "provider": "creem", "event": event_type}
+
+        if biz_uuid and event_type in {
+            "subscription.past_due",
+            "subscription.unpaid",
+            "subscription.canceled",
+            "subscription.expired",
+            "subscription.paused",
+        }:
+            biz = (await db.execute(select(Business).where(Business.id == biz_uuid))).scalar_one_or_none()
+            is_past_due = event_type in {"subscription.past_due", "subscription.unpaid"}
+            is_expired = event_type == "subscription.expired"
+            if biz:
+                biz.subscription_status = "past_due" if is_past_due else "suspended"
+            sub = (await db.execute(select(Subscription).where(Subscription.business_id == biz_uuid))).scalars().first()
+            if sub:
+                sub.status = (
+                    SubscriptionStatus.past_due
+                    if is_past_due
+                    else (SubscriptionStatus.expired if is_expired else SubscriptionStatus.cancelled)
+                )
             await db.commit()
             return {"status": "updated", "provider": "creem", "event": event_type}
 

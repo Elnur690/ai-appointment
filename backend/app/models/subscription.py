@@ -1,7 +1,7 @@
 import uuid
 import enum
 from datetime import datetime
-from sqlalchemy import ForeignKey, DateTime, Enum
+from sqlalchemy import ForeignKey, DateTime, Enum, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, generate_uuid7
@@ -23,5 +23,7 @@ class Subscription(Base, TimestampMixin):
     current_period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     current_period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     ai_messages_used: Mapped[int] = mapped_column(default=0)
+    creem_subscription_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    creem_customer_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
     business: Mapped["Business"] = relationship("Business", back_populates="subscriptions")
