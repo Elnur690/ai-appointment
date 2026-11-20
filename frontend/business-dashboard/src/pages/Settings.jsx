@@ -50,10 +50,15 @@ const Settings = () => {
   });
   const [saveMessage, setSaveMessage] = useState('');
   const [channelStatusMsg, setChannelStatusMsg] = useState('');
+  const [waGroups, setWaGroups] = useState([]);
+  const [selectedGroupJid, setSelectedGroupJid] = useState('');
+  const [manualGroupJid, setManualGroupJid] = useState('');
 
   const [aiTone, setAiTone] = useState({
     language: 'az',
     tone: 'professional',
+    greeting_message: '',
+    excluded_phone_numbers: '',
     custom_instructions: '',
     instagram_page_id: '',
     instagram_access_token: '',
@@ -95,6 +100,8 @@ const Settings = () => {
         setAiTone({
           language: s.language || 'az',
           tone: s.tone || 'professional',
+          greeting_message: s.greeting_message || '',
+          excluded_phone_numbers: s.excluded_phone_numbers || '',
           custom_instructions: s.custom_instructions || '',
           instagram_page_id: s.instagram_page_id || '',
           instagram_access_token: s.instagram_access_token || '',
@@ -115,7 +122,50 @@ const Settings = () => {
         });
       })
       .catch(() => {});
+
+    api
+      .get('/businesses/whatsapp/groups')
+      .then((res) => {
+        setWaGroups(Array.isArray(res.data?.groups) ? res.data.groups : []);
+        if (res.data?.selected_group_jid) {
+          setSelectedGroupJid(res.data.selected_group_jid);
+          setManualGroupJid(res.data.selected_group_jid);
+        }
+      })
+      .catch(() => {});
   }, []);
+
+  const handleRefreshGroups = async () => {
+    try {
+      const res = await api.get('/businesses/whatsapp/groups');
+      setWaGroups(Array.isArray(res.data?.groups) ? res.data.groups : []);
+      if (res.data?.selected_group_jid) {
+        setSelectedGroupJid(res.data.selected_group_jid);
+      }
+    } catch {
+      setWaGroups([]);
+    }
+  };
+
+  const handleSelectDedicatedGroup = async (jidToSave, groupName) => {
+    if (!jidToSave) return;
+    setChannelStatusMsg('');
+    try {
+      const res = await api.post('/businesses/whatsapp/groups/select', {
+        group_jid: jidToSave,
+        group_name: groupName || null,
+      });
+      setSelectedGroupJid(res.data.group_jid);
+      setManualGroupJid(res.data.group_jid);
+      setChannelStatusMsg(
+        isAz
+          ? `Xüsusi WhatsApp idarəetmə qrupu təyin edildi: ${res.data.group_name || res.data.group_jid}`
+          : `Dedicated WhatsApp management group set: ${res.data.group_name || res.data.group_jid}`
+      );
+    } catch (err) {
+      setChannelStatusMsg(err.response?.data?.detail || 'Could not set dedicated group.');
+    }
+  };
 
   const toggleDepositService = (svcId) => {
     setAiTone((prev) => {
@@ -306,19 +356,56 @@ const Settings = () => {
 
           <div className="form-group">
             <label className="form-label">
-              {isAz ? 'Xüsusi AI Təlimatları və Salamlama' : 'Custom AI Instructions / Greeting'}
+              {isAz ? 'Salamlama Mesajı (İlk Mesaj Üçün)' : 'Custom Greeting Message'}
+            </label>
+            <input
+              type="text"
+              className="form-control"
+              placeholder={
+                isAz
+                  ? 'məs: Salam! Xoş gəlmisiniz, sizə necə kömək edə bilərəm?'
+                  : 'e.g. Hello! Welcome to our studio, how can I help you today?'
+              }
+              value={aiTone.greeting_message}
+              onChange={(e) => setAiTone({ ...aiTone, greeting_message: e.target.value })}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">
+              {isAz ? 'Xüsusi AI Təlimatları' : 'Custom AI Instructions'}
             </label>
             <textarea
               className="form-control"
               rows={3}
               placeholder={
                 isAz
-                  ? 'AI köməkçinin müştəriləri necə qarşılaması və cavablandırması üçün əlavə təlimatlar...'
-                  : 'Optional instructions for how the AI should greet and assist customers...'
+                  ? 'AI köməkçinin müştəriləri necə cavablandırması üçün əlavə təlimatlar...'
+                  : 'Optional instructions for how the AI should assist customers...'
               }
               value={aiTone.custom_instructions}
               onChange={(e) => setAiTone({ ...aiTone, custom_instructions: e.target.value })}
             />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">
+              {isAz
+                ? 'AI Botun Cavab Verməyəcəyi Nömrələr (İstisnalar)'
+                : 'Excluded Phone Numbers (AI Bot Will Not Reply)'}
+            </label>
+            <textarea
+              className="form-control"
+              rows={2}
+              placeholder="+994501112233, +994559998877"
+              value={aiTone.excluded_phone_numbers}
+              onChange={(e) => setAiTone({ ...aiTone, excluded_phone_numbers: e.target.value })}
+            />
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+              {isAz
+                ? 'Vergül və ya yeni sətirlə ayırın. Digər bütün nömrələrə AI bot cavab verəcək.'
+                : 'Separate by comma or new line. All other numbers are handled by the AI bot.'}
+            </div>
           </div>
         </div>
 
@@ -671,13 +758,66 @@ const Settings = () => {
             type="button"
             className="btn btn-primary"
             onClick={handleGenerateQr}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', justifyContent: 'center' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', justifyContent: 'center', marginBottom: '1.25rem' }}
           >
             <QrCode size={18} />
             <span>
               {isAz ? 'Statusu Yoxla / WhatsApp QR Kodu Yarat' : 'Check Status / Generate WhatsApp QR Code'}
             </span>
           </button>
+
+          <div style={{ paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <label className="form-label" style={{ marginBottom: 0 }}>
+                {isAz ? 'Xüsusi İdarəetmə Qrupu (Yalnız bu qrupda işləyir)' : 'Dedicated Management Group'}
+              </label>
+              <button type="button" className="btn btn-secondary" style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }} onClick={handleRefreshGroups}>
+                {isAz ? 'Qrupları Yenilə' : 'Refresh'}
+              </button>
+            </div>
+            {waGroups.length > 0 ? (
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem' }}>
+                <select
+                  className="form-control"
+                  value={selectedGroupJid}
+                  onChange={(e) => {
+                    const jid = e.target.value;
+                    const found = waGroups.find((g) => g.id === jid);
+                    handleSelectDedicatedGroup(jid, found?.subject);
+                  }}
+                >
+                  <option value="">{isAz ? 'Qrup seçin...' : 'Select a WhatsApp group...'}</option>
+                  {waGroups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.subject}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem' }}>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="12036302...@g.us"
+                  value={manualGroupJid}
+                  onChange={(e) => setManualGroupJid(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => handleSelectDedicatedGroup(manualGroupJid, 'Dedicated Management Group')}
+                >
+                  {isAz ? 'Təyin Et' : 'Save'}
+                </button>
+              </div>
+            )}
+            {selectedGroupJid && (
+              <div style={{ fontSize: '0.78rem', color: 'var(--success)' }}>
+                {isAz ? 'Aktiv İdarəetmə Qrupu:' : 'Active Group:'} <code>{selectedGroupJid}</code>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 4. Instagram Direct Onboarding (Plan Gated) */}

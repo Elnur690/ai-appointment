@@ -166,6 +166,12 @@ class ConversationHandler:
             tone_config=(biz.default_ai_tone_config or {}) if biz else {},
             current_datetime=datetime.now(timezone.utc).isoformat(),
         )
+        greeting_msg = ((biz.default_ai_tone_config or {}).get("greeting_message") or "").strip() if biz else ""
+        if greeting_msg:
+            system_prompt += (
+                f"\n\n=== PREFERRED GREETING ===\n"
+                f"When greeting a customer for the first time in a conversation, start with this greeting:\n\"{greeting_msg}\""
+            )
         if kb_rows:
             kb_text = "\n".join(
                 f"- Q: {k.question_context} | A: {k.answer_content}"

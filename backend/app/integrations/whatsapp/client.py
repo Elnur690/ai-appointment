@@ -73,6 +73,23 @@ class EvolutionAPIClient:
         response = await client.get(f"/instance/connect/{instance_name}")
         response.raise_for_status()
         return response.json()
+
+    async def fetch_groups(self, instance_name: str) -> list[dict]:
+        """Fetch all WhatsApp groups the paired business number belongs to."""
+        client = await self._get_client()
+        response = await client.get(
+            f"/group/fetchAllGroups/{instance_name}",
+            params={"getParticipants": "false"},
+        )
+        response.raise_for_status()
+        data = response.json()
+        if isinstance(data, list):
+            return [
+                {"id": str(g.get("id") or ""), "subject": str(g.get("subject") or g.get("id") or "WhatsApp Group")}
+                for g in data
+                if g.get("id")
+            ]
+        return []
         
     async def close(self):
         if self._client and not self._client.is_closed:

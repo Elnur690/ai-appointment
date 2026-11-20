@@ -468,6 +468,98 @@ async def get_whatsapp_pairing_qr(
         }
 
 
+class DedicatedGroupSelectRequest(BaseModel):
+    group_jid: str
+    group_name: Optional[str] = None
+
+
+@router.get("/whatsapp/groups")
+async def list_whatsapp_groups(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("owner"))],
+    business_id: Annotated[str, Depends(get_business_context)],
+):
+    """Fetch WhatsApp groups from Evolution API and return the currently selected dedicated management group."""
+    from app.models.whatsapp import WhatsAppGroup
+
+    biz_uuid = UUID(business_id)
+    branch = (await db.execute(select(Branch).where(Branch.business_id == biz_uuid))).scalars().first()
+    instance_name = (branch.whatsapp_instance_id if branch and branch.whatsapp_instance_id else None) or f"randevu_{business_id[:8]}_main"
+
+    selected = (
+        await db.execute(
+            select(WhatsAppGroup).where(WhatsAppGroup.business_id == biz_uuid, WhatsAppGroup.is_active.is_(True))
+        )
+    ).scalars().first()
+
+    groups: list[dict] = []
+    evo_client = EvolutionAPIClient(base_url=settings.EVOLUTION_API_URL, api_key=settings.EVOLUTION_API_KEY)
+    try:
+        groups = await evo_client.fetch_groups(instance_name)
+    except Exception:
+        groups = []
+    finally:
+        await evo_client.close()
+
+    return {
+        "selected_group_jid": selected.group_jid if selected else None,
+        "selected_group_name": selected.group_name if selected else None,
+        "groups": groups,
+    }
+
+
+@router.post("/whatsapp/groups/select")
+async def select_dedicated_whatsapp_group(
+    req: DedicatedGroupSelectRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("owner"))],
+    business_id: Annotated[str, Depends(get_business_context)],
+):
+    """Set the single dedicated WhatsApp Management Group for this business."""
+    from app.models.whatsapp import WhatsAppGroup, WhatsAppGroupScope
+
+    jid = req.group_jid.strip()
+    if not jid:
+        raise HTTPException(status_code=400, detail="group_jid is required")
+    if "@" not in jid:
+        jid = f"{jid}@g.us"
+
+    biz_uuid = UUID(business_id)
+    branch = (await db.execute(select(Branch).where(Branch.business_id == biz_uuid))).scalars().first()
+
+    # Deactivate any existing groups for this business so only 1 dedicated group is active
+    existing_all = (
+        await db.execute(select(WhatsAppGroup).where(WhatsAppGroup.business_id == biz_uuid))
+    ).scalars().all()
+    target_row = None
+    for g in existing_all:
+        if g.group_jid == jid:
+            g.is_active = True
+            if req.group_name:
+                g.group_name = req.group_name
+            target_row = g
+        else:
+            g.is_active = False
+
+    if not target_row:
+        target_row = WhatsAppGroup(
+            business_id=biz_uuid,
+            branch_id=branch.id if branch else None,
+            group_jid=jid,
+            group_name=req.group_name or "Dedicated Management Group",
+            scope=WhatsAppGroupScope.all_branches,
+            is_active=True,
+        )
+        db.add(target_row)
+
+    await db.commit()
+    return {
+        "status": "selected",
+        "group_jid": target_row.group_jid,
+        "group_name": target_row.group_name,
+    }
+
+
 class SubscriptionCheckoutRequest(BaseModel):
     plan_id: str | None = None
     plan_name: str | None = None

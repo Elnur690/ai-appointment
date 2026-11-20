@@ -156,19 +156,24 @@ async def evolution_webhook(
 
     try:
         # ------------------------------------------------------------------
-        # FLOW A: WHATSAPP MANAGEMENT GROUP (Owner / Staff)
+        # FLOW A: DEDICATED WHATSAPP MANAGEMENT GROUP (Owner / Staff)
         # ------------------------------------------------------------------
         if parsed.is_group and parsed.group_jid:
             group_row = (
                 await db.execute(
                     select(WhatsAppGroup).where(
+                        WhatsAppGroup.business_id == biz.id,
                         WhatsAppGroup.group_jid == parsed.group_jid,
                         WhatsAppGroup.is_active.is_(True),
                     )
                 )
             ).scalar_one_or_none()
 
-            # Determine sender role (owner vs staff) and auto-register group if sent by owner/staff
+            # Strictly ignore all other groups not chosen as the dedicated group in Dashboard
+            if not group_row:
+                return {"status": "ignored", "reason": "not_dedicated_group"}
+
+            # Determine sender role (owner vs staff)
             owner_match = (
                 await db.execute(
                     select(BusinessOwner).where(
@@ -186,19 +191,6 @@ async def evolution_webhook(
                 )
             ).scalar_one_or_none()
             sender_role = "owner" if (owner_match or not staff_match) else "staff"
-
-            if not group_row:
-                group_row = WhatsAppGroup(
-                    business_id=biz.id,
-                    branch_id=branch.id,
-                    group_jid=parsed.group_jid,
-                    group_name=f"{biz.name} Management",
-                    added_by=parsed.sender_phone,
-                    scope=WhatsAppGroupScope.all_branches if sender_role == "owner" else WhatsAppGroupScope.single_branch,
-                    is_active=True,
-                )
-                db.add(group_row)
-                await db.flush()
 
             msg_text = (parsed.message_text or "").strip()
             if not msg_text:
@@ -311,6 +303,28 @@ async def evolution_webhook(
         # ------------------------------------------------------------------
         # FLOW B: CUSTOMER 1-TO-1 WHATSAPP AI RECEPTIONIST
         # ------------------------------------------------------------------
+        # Check business-configured excluded phone numbers (numbers that must NOT receive AI bot replies)
+        tone_cfg = biz.default_ai_tone_config or {}
+        raw_excluded = tone_cfg.get("excluded_phone_numbers") or ""
+        if isinstance(raw_excluded, str):
+            excluded_list = [re.sub(r"\D", "", item) for item in re.split(r"[,\n;]+", raw_excluded) if item.strip()]
+        elif isinstance(raw_excluded, list):
+            excluded_list = [re.sub(r"\D", "", str(item)) for item in raw_excluded if str(item).strip()]
+        else:
+            excluded_list = []
+
+        sender_digits = re.sub(r"\D", "", parsed.sender_phone or "")
+        if sender_digits and any(
+            ex and (sender_digits == ex or sender_digits.endswith(ex) or ex.endswith(sender_digits))
+            for ex in excluded_list
+        ):
+            return {
+                "status": "ignored",
+                "channel": "whatsapp",
+                "reason": "excluded_number",
+                "sender_phone": parsed.sender_phone,
+            }
+
         guardrail_result = None
         if parsed.message_text:
             guardrail_result = guardrail_service.evaluate_message(
