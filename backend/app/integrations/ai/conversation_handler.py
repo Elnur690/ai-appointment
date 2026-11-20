@@ -13,6 +13,7 @@ from app.models.business import Business, Branch
 from app.models.customer import Customer
 from app.models.conversation import Conversation, Message, MessageDirection
 from app.models.service import Service
+from app.models.knowledge import KnowledgeEntry, KnowledgeEntryStatus
 
 
 @dataclass
@@ -135,6 +136,17 @@ class ConversationHandler:
                 select(Service).where(Service.business_id == self.business_id, Service.is_active == True)
             )
         ).scalars().all()
+        kb_rows = (
+            await self.db.execute(
+                select(KnowledgeEntry)
+                .where(
+                    KnowledgeEntry.business_id == self.business_id,
+                    KnowledgeEntry.status == KnowledgeEntryStatus.ACTIVE,
+                )
+                .order_by(KnowledgeEntry.created_at.desc())
+                .limit(25)
+            )
+        ).scalars().all()
 
         system_prompt = build_customer_system_prompt(
             business_name=biz.name if biz else "Business",
@@ -154,6 +166,22 @@ class ConversationHandler:
             tone_config=(biz.default_ai_tone_config or {}) if biz else {},
             current_datetime=datetime.now(timezone.utc).isoformat(),
         )
+        if kb_rows:
+            kb_text = "\n".join(
+                f"- Q: {k.question_context} | A: {k.answer_content}"
+                for k in kb_rows
+            )
+            system_prompt += (
+                "\n\n=== BUSINESS KNOWLEDGE BASE (RAG / LEARNED ANSWERS) ===\n"
+                f"{kb_text}\n"
+                "If the customer's question is NOT covered by the services above or this Knowledge Base, "
+                "call `request_human_agent` with the question so the business owner can answer it."
+            )
+        else:
+            system_prompt += (
+                "\n\nIf the customer asks a business-specific question whose answer is not in the services above, "
+                "call `request_human_agent` with the question so the business owner can answer it."
+            )
 
         tools = get_customer_tools()
         tool_executor = ToolExecutor(self.db, self.branch_id, self.business_id, cust.id)

@@ -661,6 +661,11 @@ const Settings = () => {
                 ? 'QR kodu skan edin — AI köməkçiniz dərhal mətn və səsli mesajlara cavab verməyə başlayacaq.'
                 : 'Scan the QR code — your AI receptionist immediately starts answering texts & voice notes.'}
             </li>
+            <li>
+              {isAz
+                ? 'Biznes nömrənizi şəxsi nömrənizlə bir WhatsApp qrupuna əlavə edin: qrupda növbəti müştərini, gəliri və abunəliyi soruşa, həmçinin #Q-XXX kodu ilə cavab yazıb AI-a öyrədə bilərsiniz.'
+                : 'Add your business number and personal number to a WhatsApp group: ask about your next customer, revenue, or subscription, and reply with #Q-XXX to answer customers and train your AI.'}
+            </li>
           </ol>
           <button
             type="button"

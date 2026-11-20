@@ -101,7 +101,30 @@ async def evolution_webhook(
     apikey: str | None = Header(default=None),
     db: AsyncSession = Depends(get_db),
 ):
-    """Receive Evolution API WhatsApp webhooks."""
+    """
+    Receive Evolution API WhatsApp webhooks:
+    1. Business Owner / Staff in WhatsApp Management Group:
+       - Reply `#Q-XXX <answer>` to answer an escalated customer question, forward to customer, and save to RAG.
+       - Ask management queries ("next customer?", "subscription status?", "today's schedule?", "revenue?").
+    2. Customer 1-to-1 WhatsApp chat:
+       - Run Gemini AI Receptionist with RAG Knowledge Base & booking tools and reply via Evolution API.
+       - Escalate unanswered questions to the Business WhatsApp Group with a `#Q-XXX` ticket ID.
+    """
+    import json
+    import re
+    import secrets
+    from app.models.business import BusinessOwner
+    from app.models.staff import Staff
+    from app.models.whatsapp import WhatsAppGroup, WhatsAppGroupScope, EscalationTicket
+    from app.models.knowledge import KnowledgeEntry, KnowledgeEntryType, KnowledgeEntryStatus
+    from app.integrations.whatsapp.client import EvolutionAPIClient
+    from app.integrations.whatsapp.message_sender import WhatsAppMessageSender
+    from app.integrations.ai.gemini import GeminiProvider
+    from app.integrations.ai.provider import AIMessage, FinishReason
+    from app.integrations.ai.tools import get_internal_group_tools
+    from app.integrations.ai.internal_tool_executor import InternalGroupToolExecutor
+    from app.integrations.ai.conversation_handler import ConversationHandler
+
     if apikey and settings.EVOLUTION_API_KEY and apikey != settings.EVOLUTION_API_KEY:
         if settings.ENVIRONMENT == "prod":
             raise HTTPException(status_code=401, detail="Invalid Evolution API webhook key")
@@ -111,45 +134,276 @@ async def evolution_webhook(
     if not parsed or parsed.is_from_me:
         return {"status": "ignored"}
 
-    guardrail_result = None
-    if parsed.message_text:
-        guardrail_result = guardrail_service.evaluate_message(
-            message_text=parsed.message_text,
-            language="az",
-            is_solo_business=False,
-        )
+    biz = None
+    branch = None
+    if parsed.instance_name:
+        branch = (
+            await db.execute(select(Branch).where(Branch.whatsapp_instance_id == parsed.instance_name))
+        ).scalar_one_or_none()
+        if branch:
+            biz = (await db.execute(select(Business).where(Business.id == branch.business_id))).scalar_one_or_none()
+    if not biz:
+        biz = (await db.execute(select(Business).where(Business.is_active == True))).scalars().first()
+        if biz and not branch:
+            branch = (await db.execute(select(Branch).where(Branch.business_id == biz.id))).scalars().first()
+
+    if not biz or not branch:
+        return {"status": "ignored", "reason": "no_matching_business"}
+
+    instance_name = parsed.instance_name or branch.whatsapp_instance_id or f"randevu_{str(biz.id)[:8]}_main"
+    evo_client = EvolutionAPIClient(base_url=settings.EVOLUTION_API_URL, api_key=settings.EVOLUTION_API_KEY)
+    wa_sender = WhatsAppMessageSender(evo_client)
 
     try:
-        biz = None
-        if parsed.instance_name:
-            branch_match = (
-                await db.execute(select(Branch).where(Branch.whatsapp_instance_id == parsed.instance_name))
+        # ------------------------------------------------------------------
+        # FLOW A: WHATSAPP MANAGEMENT GROUP (Owner / Staff)
+        # ------------------------------------------------------------------
+        if parsed.is_group and parsed.group_jid:
+            group_row = (
+                await db.execute(
+                    select(WhatsAppGroup).where(
+                        WhatsAppGroup.group_jid == parsed.group_jid,
+                        WhatsAppGroup.is_active.is_(True),
+                    )
+                )
             ).scalar_one_or_none()
-            if branch_match:
-                biz = (
-                    await db.execute(select(Business).where(Business.id == branch_match.business_id))
+
+            # Determine sender role (owner vs staff) and auto-register group if sent by owner/staff
+            owner_match = (
+                await db.execute(
+                    select(BusinessOwner).where(
+                        BusinessOwner.business_id == biz.id,
+                        BusinessOwner.phone == parsed.sender_phone,
+                    )
+                )
+            ).scalar_one_or_none()
+            staff_match = (
+                await db.execute(
+                    select(Staff).where(
+                        Staff.business_id == biz.id,
+                        Staff.phone == parsed.sender_phone,
+                    )
+                )
+            ).scalar_one_or_none()
+            sender_role = "owner" if (owner_match or not staff_match) else "staff"
+
+            if not group_row:
+                group_row = WhatsAppGroup(
+                    business_id=biz.id,
+                    branch_id=branch.id,
+                    group_jid=parsed.group_jid,
+                    group_name=f"{biz.name} Management",
+                    added_by=parsed.sender_phone,
+                    scope=WhatsAppGroupScope.all_branches if sender_role == "owner" else WhatsAppGroupScope.single_branch,
+                    is_active=True,
+                )
+                db.add(group_row)
+                await db.flush()
+
+            msg_text = (parsed.message_text or "").strip()
+            if not msg_text:
+                return {"status": "ok", "channel": "whatsapp_group", "action": "empty"}
+
+            # A1. Check if replying to an escalated question ticket: `#Q-1234 answer...`
+            tag_match = re.search(r"#?(Q-\d{3,6})\b[:\-\s]*(.+)", msg_text, flags=re.IGNORECASE | re.DOTALL)
+            if tag_match:
+                ticket_code = tag_match.group(1).upper()
+                answer_text = tag_match.group(2).strip()
+                ticket = (
+                    await db.execute(
+                        select(EscalationTicket).where(
+                            EscalationTicket.business_id == biz.id,
+                            EscalationTicket.ticket_code == ticket_code,
+                        )
+                    )
                 ).scalar_one_or_none()
-        if not biz:
-            biz = (await db.execute(select(Business).where(Business.is_active == True))).scalars().first()
 
-        if biz:
-            await _persist_incoming_message(
-                db=db,
-                biz=biz,
-                parsed=parsed,
-                guardrail_out_of_scope=bool(guardrail_result and guardrail_result.is_out_of_scope),
+                if ticket and answer_text:
+                    ticket.status = "answered"
+                    ticket.answer_text = answer_text
+                    ticket.answered_at = datetime.now(timezone.utc)
+
+                    # Re-enable AI and save Q&A into RAG KnowledgeEntry
+                    if ticket.conversation_id:
+                        conv = (
+                            await db.execute(select(Conversation).where(Conversation.id == ticket.conversation_id))
+                        ).scalar_one_or_none()
+                        if conv:
+                            conv.ai_active = True
+                            db.add(
+                                Message(
+                                    conversation_id=conv.id,
+                                    direction=MessageDirection.outbound,
+                                    sender_role="owner",
+                                    content=answer_text,
+                                    message_type="text",
+                                )
+                            )
+
+                    kb_entry = KnowledgeEntry(
+                        business_id=biz.id,
+                        branch_id=ticket.branch_id,
+                        entry_type=KnowledgeEntryType.CORRECTION,
+                        status=KnowledgeEntryStatus.ACTIVE,
+                        title=ticket.question_text[:200],
+                        question_context=ticket.question_text,
+                        answer_content=answer_text,
+                        conversation_id=ticket.conversation_id,
+                    )
+                    db.add(kb_entry)
+                    await db.commit()
+
+                    await wa_sender.send_response(
+                        instance_name=instance_name,
+                        to_phone=ticket.customer_phone,
+                        text=answer_text,
+                    )
+                    await wa_sender.send_response(
+                        instance_name=instance_name,
+                        to_phone=parsed.group_jid,
+                        text=f"✅ #{ticket_code} cavabı müştəriyə göndərildi və AI Bilik Bazasına (RAG) əlavə edildi.",
+                    )
+                    return {"status": "ok", "channel": "whatsapp_group", "ticket_resolved": ticket_code}
+
+            # A2. General Business Owner / Staff management query in the group
+            if settings.GEMINI_API_KEY and not settings.GEMINI_API_KEY.startswith("dev-"):
+                ai = GeminiProvider(api_key=settings.GEMINI_API_KEY, model_name=settings.GEMINI_MODEL)
+                internal_exec = InternalGroupToolExecutor(
+                    db=db,
+                    business_id=biz.id,
+                    branch_id=group_row.branch_id or branch.id,
+                    sender_role=sender_role,
+                    scope=group_row.scope.value if hasattr(group_row.scope, "value") else str(group_row.scope),
+                )
+                sys_prompt = (
+                    f"You are the internal Randevu.vip executive assistant for '{biz.name}'. "
+                    "Answer the business owner/staff concisely in the same language they wrote (Azerbaijani by default). "
+                    "Use the provided tools to check next customer, schedule, revenue, no-shows, or subscription status."
+                )
+                msgs = [AIMessage(role="user", content=msg_text)]
+                tools = get_internal_group_tools()
+                for _ in range(4):
+                    ai_res = await ai.generate_response(messages=msgs, system_prompt=sys_prompt, tools=tools)
+                    msgs.append(AIMessage(role="assistant", content=ai_res.text, tool_calls=ai_res.tool_calls))
+                    if ai_res.finish_reason == FinishReason.TOOL_CALL and ai_res.tool_calls:
+                        for tc in ai_res.tool_calls:
+                            t_res = await internal_exec.execute(tc)
+                            msgs.append(
+                                AIMessage(
+                                    role="tool",
+                                    content=json.dumps(t_res),
+                                    tool_call_id=tc.id,
+                                    tool_name=tc.name,
+                                )
+                            )
+                    else:
+                        break
+                reply_text = msgs[-1].content if msgs and msgs[-1].content else None
+                if reply_text:
+                    await wa_sender.send_response(
+                        instance_name=instance_name,
+                        to_phone=parsed.group_jid,
+                        text=reply_text,
+                    )
+            await db.commit()
+            return {"status": "ok", "channel": "whatsapp_group", "group_jid": parsed.group_jid}
+
+        # ------------------------------------------------------------------
+        # FLOW B: CUSTOMER 1-TO-1 WHATSAPP AI RECEPTIONIST
+        # ------------------------------------------------------------------
+        guardrail_result = None
+        if parsed.message_text:
+            guardrail_result = guardrail_service.evaluate_message(
+                message_text=parsed.message_text,
+                language="az",
+                is_solo_business=False,
             )
-    except Exception as exc:
-        logger.warning(f"WhatsApp webhook persistence skipped: {exc}")
 
-    return {
-        "status": "ok",
-        "channel": "whatsapp",
-        "instance": parsed.instance_name,
-        "sender_phone": parsed.sender_phone,
-        "is_group": parsed.is_group,
-        "out_of_scope": guardrail_result.is_out_of_scope if guardrail_result else False,
-    }
+        conv = await _persist_incoming_message(
+            db=db,
+            biz=biz,
+            parsed=parsed,
+            guardrail_out_of_scope=bool(guardrail_result and guardrail_result.is_out_of_scope),
+        )
+
+        escalate = bool(guardrail_result and guardrail_result.is_out_of_scope)
+        ai_reply: str | None = None
+
+        if not escalate and parsed.message_text and settings.GEMINI_API_KEY and not settings.GEMINI_API_KEY.startswith("dev-"):
+            ai = GeminiProvider(api_key=settings.GEMINI_API_KEY, model_name=settings.GEMINI_MODEL)
+            handler = ConversationHandler(
+                db=db,
+                ai_provider=ai,
+                business_id=biz.id,
+                branch_id=branch.id,
+            )
+            conv_res = await handler.handle_incoming_message(
+                customer_phone=parsed.sender_phone,
+                message_text=parsed.message_text,
+                customer_name=parsed.sender_name,
+            )
+            ai_reply = conv_res.response_text
+            if conv_res.human_handoff_requested:
+                escalate = True
+
+        if ai_reply:
+            await wa_sender.send_response(
+                instance_name=instance_name,
+                to_phone=parsed.sender_phone,
+                text=ai_reply,
+            )
+
+        if escalate and parsed.message_text:
+            ticket_code = f"Q-{100 + secrets.randbelow(900)}"
+            ticket = EscalationTicket(
+                ticket_code=ticket_code,
+                business_id=biz.id,
+                branch_id=branch.id,
+                conversation_id=conv.id if conv else None,
+                customer_id=conv.customer_id if conv else None,
+                customer_phone=parsed.sender_phone,
+                question_text=parsed.message_text,
+                status="open",
+            )
+            db.add(ticket)
+            await db.flush()
+
+            grp = (
+                await db.execute(
+                    select(WhatsAppGroup).where(WhatsAppGroup.business_id == biz.id, WhatsAppGroup.is_active.is_(True))
+                )
+            ).scalars().first()
+            target_jid = grp.group_jid if grp else None
+            if not target_jid:
+                owner = (
+                    await db.execute(select(BusinessOwner).where(BusinessOwner.business_id == biz.id))
+                ).scalars().first()
+                target_jid = owner.phone if owner and owner.phone else None
+
+            if target_jid:
+                esc_msg = (
+                    f"❓ [#{ticket_code}] Müştəri sualı ({parsed.sender_phone}):\n"
+                    f"\"{parsed.message_text}\"\n\n"
+                    f"Cavab vermək üçün yazın:\n"
+                    f"#{ticket_code} Sizin cavabınız"
+                )
+                await wa_sender.send_response(
+                    instance_name=instance_name,
+                    to_phone=target_jid,
+                    text=esc_msg,
+                )
+
+        await db.commit()
+        return {
+            "status": "ok",
+            "channel": "whatsapp",
+            "instance": instance_name,
+            "sender_phone": parsed.sender_phone,
+            "is_group": parsed.is_group,
+            "escalated": escalate,
+        }
+    finally:
+        await evo_client.close()
 
 
 @router.get("/instagram")

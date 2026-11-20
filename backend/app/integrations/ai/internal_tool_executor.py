@@ -6,7 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.integrations.ai.provider import ToolCall
 from app.models.appointment import Appointment, AppointmentStatus
+from app.models.business import Business
+from app.models.customer import Customer
+from app.models.saas import Plan
+from app.models.service import Service
 from app.models.staff import Staff
+from app.models.subscription import Subscription
 from app.models.payment import Payment, PaymentStatus
 
 logger = logging.getLogger(__name__)
@@ -30,10 +35,12 @@ class InternalGroupToolExecutor:
     
     async def execute(self, tool_call: ToolCall) -> dict:
         handlers = {
+            'get_next_customer': self._get_next_customer,
             'get_today_schedule': self._get_today_schedule,
             'get_upcoming_appointments': self._get_upcoming_appointments,
             'get_daily_revenue_summary': self._get_daily_revenue_summary,
             'get_no_shows': self._get_no_shows,
+            'get_subscription_status': self._get_subscription_status,
             'get_branch_summary': self._get_branch_summary,
         }
         handler = handlers.get(tool_call.name)
@@ -122,6 +129,58 @@ class InternalGroupToolExecutor:
         result = await self.db.execute(stmt)
         no_shows = result.scalars().all()
         return {'no_show_count': len(no_shows)}
+
+    async def _get_next_customer(self) -> dict:
+        now = datetime.now(timezone.utc)
+        stmt = (
+            select(Appointment, Customer, Service, Staff)
+            .join(Customer, Appointment.customer_id == Customer.id)
+            .join(Service, Appointment.service_id == Service.id)
+            .join(Staff, Appointment.staff_id == Staff.id)
+            .where(
+                and_(
+                    Appointment.business_id == self.business_id,
+                    Appointment.start_time >= now,
+                    Appointment.status.in_([AppointmentStatus.confirmed, AppointmentStatus.pending]),
+                )
+            )
+            .order_by(Appointment.start_time.asc())
+            .limit(1)
+        )
+        if self.scope == "single_branch" and self.branch_id:
+            stmt = stmt.where(Appointment.branch_id == self.branch_id)
+        row = (await self.db.execute(stmt)).first()
+        if not row:
+            return {'next_customer': None, 'message': 'No upcoming customers scheduled.'}
+        appt, cust, svc, st = row
+        return {
+            'next_customer': {
+                'customer_name': cust.name or cust.phone_number,
+                'customer_phone': cust.phone_number,
+                'service': svc.name,
+                'staff': st.name,
+                'start_time': appt.start_time.strftime('%Y-%m-%d %H:%M'),
+                'status': appt.status.value,
+            }
+        }
+
+    async def _get_subscription_status(self) -> dict:
+        if self.sender_role != 'owner':
+            return {'error': 'Subscription details are restricted to business owners.'}
+        biz = (await self.db.execute(select(Business).where(Business.id == self.business_id))).scalar_one_or_none()
+        if not biz:
+            return {'error': 'Business not found'}
+        plan = (await self.db.execute(select(Plan).where(Plan.id == biz.plan_id))).scalar_one_or_none() if biz.plan_id else None
+        sub = (await self.db.execute(select(Subscription).where(Subscription.business_id == self.business_id))).scalars().first()
+        return {
+            'business_name': biz.name,
+            'plan_name': plan.name if plan else 'Starter',
+            'plan_price_azn': float(plan.price) if plan else 29.0,
+            'subscription_status': biz.subscription_status or 'trial',
+            'trial_ends_at': biz.trial_ends_at.strftime('%Y-%m-%d') if biz.trial_ends_at else None,
+            'current_period_end': sub.current_period_end.strftime('%Y-%m-%d') if sub and sub.current_period_end else None,
+            'ai_message_quota': int(plan.ai_message_quota) if plan else 1000,
+        }
 
     async def _get_branch_summary(self, branch_id: str | None = None) -> dict:
         return {'status': 'active', 'business_id': str(self.business_id)}

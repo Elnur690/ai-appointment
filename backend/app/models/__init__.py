@@ -6,7 +6,7 @@ from app.models.service import Service
 from app.models.customer import Customer
 from app.models.appointment import Appointment, AppointmentStatus, AppointmentSource
 from app.models.conversation import Conversation, Message, ConversationContextType, MessageDirection
-from app.models.whatsapp import WhatsAppGroup, WhatsAppGroupScope
+from app.models.whatsapp import WhatsAppGroup, WhatsAppGroupScope, EscalationTicket
 from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.payment import Payment, PaymentGatewayConfig, PaymentMethod, PaymentStatus
 from app.models.knowledge import KnowledgeEntry, KnowledgeEntryType, KnowledgeEntryStatus
@@ -38,6 +38,7 @@ __all__ = [
     "MessageDirection",
     "WhatsAppGroup",
     "WhatsAppGroupScope",
+    "EscalationTicket",
     "Subscription",
     "SubscriptionStatus",
     "Payment",

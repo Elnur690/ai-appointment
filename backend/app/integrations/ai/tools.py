@@ -69,10 +69,55 @@ def get_customer_tools() -> list[ToolDefinition]:
         ),
         ToolDefinition(
             name="request_human_agent",
-            description="Request handoff to a human staff member.",
+            description="Request handoff to a human staff member or escalate an unanswered question to the business WhatsApp group.",
             parameters=[
                 ToolParameter(name="reason", type=ToolParameterType.STRING, description="Reason for requesting human assistance.", required=False),
             ]
+        ),
+    ]
+
+
+def get_internal_group_tools() -> list[ToolDefinition]:
+    """Return tools available to the business owner/staff inside their WhatsApp Management Group."""
+    return [
+        ToolDefinition(
+            name="get_next_customer",
+            description="Get the next upcoming customer appointment (customer name, phone, service, staff, time).",
+            parameters=[],
+        ),
+        ToolDefinition(
+            name="get_today_schedule",
+            description="Get today's appointment schedule and count.",
+            parameters=[],
+        ),
+        ToolDefinition(
+            name="get_upcoming_appointments",
+            description="Get confirmed upcoming appointments over the next N days.",
+            parameters=[
+                ToolParameter(name="days", type=ToolParameterType.INTEGER, description="Number of days ahead (default 3).", required=False),
+            ],
+        ),
+        ToolDefinition(
+            name="get_daily_revenue_summary",
+            description="Get total completed revenue in AZN (owner only).",
+            parameters=[],
+        ),
+        ToolDefinition(
+            name="get_no_shows",
+            description="Get no-show appointment count for the last N days.",
+            parameters=[
+                ToolParameter(name="days", type=ToolParameterType.INTEGER, description="Number of past days (default 7).", required=False),
+            ],
+        ),
+        ToolDefinition(
+            name="get_subscription_status",
+            description="Get the business's current Randevu.vip subscription plan, status, trial/period end date, and AI quota.",
+            parameters=[],
+        ),
+        ToolDefinition(
+            name="get_branch_summary",
+            description="Get basic status summary of the business/branch.",
+            parameters=[],
         ),
     ]
 
