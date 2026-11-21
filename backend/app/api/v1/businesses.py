@@ -143,15 +143,15 @@ async def _sync_gateway_configs(db: AsyncSession, biz_uuid: UUID, cfg: dict[str,
 
     payriff_mid = (cfg.get("payriff_merchant_id") or "").strip()
     payriff_sec = (cfg.get("payriff_secret_key") or "").strip()
-    if payriff_mid:
-        existing_pr = (
-            await db.execute(
-                select(PaymentGatewayConfig).where(
-                    PaymentGatewayConfig.business_id == biz_uuid,
-                    PaymentGatewayConfig.provider == "payriff",
-                )
+    existing_pr = (
+        await db.execute(
+            select(PaymentGatewayConfig).where(
+                PaymentGatewayConfig.business_id == biz_uuid,
+                PaymentGatewayConfig.provider == "payriff",
             )
-        ).scalar_one_or_none()
+        )
+    ).scalar_one_or_none()
+    if payriff_mid:
         prev_sec = (existing_pr.merchant_credentials or {}).get("secret_key", "") if existing_pr else ""
         enc_sec = prev_sec if payriff_sec.startswith("••••") else encrypt_secret(payriff_sec)
         creds = {"merchant_id": payriff_mid, "secret_key": enc_sec or prev_sec}
@@ -169,18 +169,20 @@ async def _sync_gateway_configs(db: AsyncSession, biz_uuid: UUID, cfg: dict[str,
             )
         if creds["secret_key"]:
             cfg["payriff_secret_key"] = mask_secret(creds["secret_key"])
+    elif existing_pr:
+        existing_pr.is_active = False
 
     epoint_pub = (cfg.get("epoint_public_key") or "").strip()
     epoint_priv = (cfg.get("epoint_private_key") or "").strip()
-    if epoint_pub:
-        existing_ep = (
-            await db.execute(
-                select(PaymentGatewayConfig).where(
-                    PaymentGatewayConfig.business_id == biz_uuid,
-                    PaymentGatewayConfig.provider == "epoint",
-                )
+    existing_ep = (
+        await db.execute(
+            select(PaymentGatewayConfig).where(
+                PaymentGatewayConfig.business_id == biz_uuid,
+                PaymentGatewayConfig.provider == "epoint",
             )
-        ).scalar_one_or_none()
+        )
+    ).scalar_one_or_none()
+    if epoint_pub:
         prev_priv = (existing_ep.merchant_credentials or {}).get("private_key", "") if existing_ep else ""
         enc_priv = prev_priv if epoint_priv.startswith("••••") else encrypt_secret(epoint_priv)
         creds = {"public_key": epoint_pub, "private_key": enc_priv or prev_priv}
@@ -198,6 +200,8 @@ async def _sync_gateway_configs(db: AsyncSession, biz_uuid: UUID, cfg: dict[str,
             )
         if creds["private_key"]:
             cfg["epoint_private_key"] = mask_secret(creds["private_key"])
+    elif existing_ep:
+        existing_ep.is_active = False
 
 
 @router.get("/", response_model=BusinessResponse)
