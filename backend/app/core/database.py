@@ -72,6 +72,7 @@ async def init_db() -> None:
         "ALTER TABLE plans ADD COLUMN IF NOT EXISTS allows_free_trial BOOLEAN DEFAULT TRUE;",
         "ALTER TABLE plans ADD COLUMN IF NOT EXISTS trial_days INTEGER DEFAULT 14;",
         "ALTER TABLE plans ADD COLUMN IF NOT EXISTS trial_features JSONB;",
+        "ALTER TABLE plans ADD COLUMN IF NOT EXISTS allowed_payment_providers JSONB;",
         "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMP WITH TIME ZONE;",
         "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS trial_features_override JSONB;",
         "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS creem_subscription_id VARCHAR;",

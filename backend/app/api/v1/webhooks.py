@@ -825,7 +825,18 @@ async def payment_gateway_webhook(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid business ID")
 
-    payload = await request.json()
+    content_type = (request.headers.get("content-type") or "").lower()
+    if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+        form_data = await request.form()
+        payload = {k: v for k, v in form_data.items()}
+    else:
+        try:
+            payload = await request.json()
+        except Exception:
+            raw_txt = (await request.body()).decode("utf-8", errors="ignore")
+            from urllib.parse import parse_qs
+            parsed_qs = parse_qs(raw_txt)
+            payload = {k: v[0] for k, v in parsed_qs.items()} if parsed_qs else {}
     headers = dict(request.headers)
     service = PaymentService(db=db, business_id=biz_uuid)
     verified = await service.handle_webhook_callback(provider=provider, payload=payload, headers=headers)

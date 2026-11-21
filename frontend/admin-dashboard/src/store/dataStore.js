@@ -129,6 +129,9 @@ export const useDataStore = create((set, get) => ({
         allows_instagram: Boolean(p.allows_instagram || p.allows_omnichannel_messaging),
         allows_telegram: Boolean(p.allows_telegram || p.allows_omnichannel_messaging),
         allows_online_payments: Boolean(p.allows_online_payments),
+        allowed_payment_providers: Array.isArray(p.allowed_payment_providers)
+          ? p.allowed_payment_providers
+          : ['cash', 'payriff', 'epoint'],
         allows_voice_messages: Boolean(p.allows_voice_messages),
         allows_custom_domain: Boolean(p.allows_custom_domain),
         features: p.features || {},
@@ -198,6 +201,9 @@ export const useDataStore = create((set, get) => ({
       allows_winback_campaigns: Boolean(plan.allows_winback_campaigns),
       allows_discovery: Boolean(plan.allows_discovery),
       allows_online_payments: Boolean(plan.allows_online_payments),
+      allowed_payment_providers: Array.isArray(plan.allowed_payment_providers)
+        ? plan.allowed_payment_providers
+        : ['cash', 'payriff', 'epoint'],
       allows_gcal_sync: Boolean(plan.allows_gcal_sync),
       allows_apple_cal_sync: Boolean(plan.allows_apple_cal_sync),
       allows_custom_domain: Boolean(plan.allows_custom_domain),

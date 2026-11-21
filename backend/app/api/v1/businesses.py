@@ -87,6 +87,11 @@ def _build_business_response(biz: Business) -> BusinessResponse:
         if plan
         else False,
         "allows_online_payments": bool(getattr(plan, "allows_online_payments", True)) if plan else True,
+        "allowed_payment_providers": list(
+            getattr(plan, "allowed_payment_providers", None) or ["cash", "payriff", "epoint"]
+        )
+        if plan
+        else ["cash", "payriff", "epoint"],
         "allows_no_show_deposits": bool(getattr(plan, "allows_no_show_deposits", False)) if plan else False,
         "allows_gcal_sync": bool(getattr(plan, "allows_gcal_sync", False)) if plan else False,
         "allows_apple_cal_sync": bool(getattr(plan, "allows_apple_cal_sync", False)) if plan else False,
@@ -114,6 +119,8 @@ def _build_business_response(biz: Business) -> BusinessResponse:
         "whatsapp": f"{api_base}/whatsapp",
         "instagram": f"{api_base}/instagram",
         "telegram": f"{api_base}/telegram/{biz.id}",
+        "payriff": f"{api_base}/payments/payriff/{biz.id}",
+        "epoint": f"{api_base}/payments/epoint/{biz.id}",
     }
     return BusinessResponse(
         id=str(biz.id),
@@ -131,8 +138,8 @@ def _build_business_response(biz: Business) -> BusinessResponse:
 
 
 async def _sync_gateway_configs(db: AsyncSession, biz_uuid: UUID, cfg: dict[str, Any]) -> None:
-    """Sync Payriff and Paymegate credentials into PaymentGatewayConfig table and register Paymegate webhook."""
-    from app.integrations.payments.paymegate import PaymegateAdapter
+    """Encrypt and store business-owned Payriff & EPoint credentials in PaymentGatewayConfig."""
+    from app.core.security import encrypt_secret, mask_secret
 
     payriff_mid = (cfg.get("payriff_merchant_id") or "").strip()
     payriff_sec = (cfg.get("payriff_secret_key") or "").strip()
@@ -145,7 +152,9 @@ async def _sync_gateway_configs(db: AsyncSession, biz_uuid: UUID, cfg: dict[str,
                 )
             )
         ).scalar_one_or_none()
-        creds = {"merchant_id": payriff_mid, "secret_key": payriff_sec}
+        prev_sec = (existing_pr.merchant_credentials or {}).get("secret_key", "") if existing_pr else ""
+        enc_sec = prev_sec if payriff_sec.startswith("••••") else encrypt_secret(payriff_sec)
+        creds = {"merchant_id": payriff_mid, "secret_key": enc_sec or prev_sec}
         if existing_pr:
             existing_pr.merchant_credentials = creds
             existing_pr.is_active = True
@@ -158,36 +167,37 @@ async def _sync_gateway_configs(db: AsyncSession, biz_uuid: UUID, cfg: dict[str,
                     is_active=True,
                 )
             )
+        if creds["secret_key"]:
+            cfg["payriff_secret_key"] = mask_secret(creds["secret_key"])
 
-    pmg_key = (cfg.get("paymegate_api_key") or cfg.get("paymengate_api_key") or "").strip()
-    pmg_sec = (cfg.get("paymegate_webhook_secret") or cfg.get("paymengate_secret_key") or "").strip()
-    if pmg_key:
-        existing_pmg = (
+    epoint_pub = (cfg.get("epoint_public_key") or "").strip()
+    epoint_priv = (cfg.get("epoint_private_key") or "").strip()
+    if epoint_pub:
+        existing_ep = (
             await db.execute(
                 select(PaymentGatewayConfig).where(
                     PaymentGatewayConfig.business_id == biz_uuid,
-                    PaymentGatewayConfig.provider == "paymegate",
+                    PaymentGatewayConfig.provider == "epoint",
                 )
             )
         ).scalar_one_or_none()
-        creds = {"api_key": pmg_key, "webhook_secret": pmg_sec}
-        if existing_pmg:
-            existing_pmg.merchant_credentials = creds
-            existing_pmg.is_active = True
+        prev_priv = (existing_ep.merchant_credentials or {}).get("private_key", "") if existing_ep else ""
+        enc_priv = prev_priv if epoint_priv.startswith("••••") else encrypt_secret(epoint_priv)
+        creds = {"public_key": epoint_pub, "private_key": enc_priv or prev_priv}
+        if existing_ep:
+            existing_ep.merchant_credentials = creds
+            existing_ep.is_active = True
         else:
             db.add(
                 PaymentGatewayConfig(
                     business_id=biz_uuid,
-                    provider="paymegate",
+                    provider="epoint",
                     merchant_credentials=creds,
                     is_active=True,
                 )
             )
-        try:
-            webhook_url = f"https://api.{settings.PLATFORM_DOMAIN}/api/v1/webhooks/payments/paymegate/{biz_uuid}"
-            await PaymegateAdapter().register_webhook(api_key=pmg_key, webhook_url=webhook_url)
-        except Exception:
-            pass
+        if creds["private_key"]:
+            cfg["epoint_private_key"] = mask_secret(creds["private_key"])
 
 
 @router.get("/", response_model=BusinessResponse)

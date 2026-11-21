@@ -80,6 +80,7 @@ class PlanResponse(BaseModel):
     allows_winback_campaigns: bool = False
     allows_discovery: bool = False
     allows_online_payments: bool = False
+    allowed_payment_providers: list[str] = ["cash", "payriff", "epoint"]
     allows_gcal_sync: bool = False
     allows_apple_cal_sync: bool = False
     allows_custom_domain: bool = False
@@ -118,6 +119,7 @@ class PlanCreate(BaseModel):
     allows_winback_campaigns: bool = False
     allows_discovery: bool = False
     allows_online_payments: bool = False
+    allowed_payment_providers: list[str] = ["cash", "payriff", "epoint"]
     allows_gcal_sync: bool = False
     allows_apple_cal_sync: bool = False
     allows_custom_domain: bool = False
@@ -156,6 +158,7 @@ class PlanUpdate(BaseModel):
     allows_winback_campaigns: Optional[bool] = None
     allows_discovery: Optional[bool] = None
     allows_online_payments: Optional[bool] = None
+    allowed_payment_providers: Optional[list[str]] = None
     allows_gcal_sync: Optional[bool] = None
     allows_apple_cal_sync: Optional[bool] = None
     allows_custom_domain: Optional[bool] = None
@@ -257,6 +260,7 @@ def _plan_to_response(p: Plan) -> PlanResponse:
         allows_winback_campaigns=bool(p.allows_winback_campaigns),
         allows_discovery=bool(p.allows_discovery),
         allows_online_payments=bool(p.allows_online_payments),
+        allowed_payment_providers=list(getattr(p, "allowed_payment_providers", None) or ["cash", "payriff", "epoint"]),
         allows_gcal_sync=bool(p.allows_gcal_sync),
         allows_apple_cal_sync=bool(p.allows_apple_cal_sync),
         allows_custom_domain=bool(p.allows_custom_domain),

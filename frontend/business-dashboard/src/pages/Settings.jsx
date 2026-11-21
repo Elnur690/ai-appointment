@@ -29,6 +29,7 @@ const Settings = () => {
     allows_instagram: false,
     allows_telegram: false,
     allows_online_payments: true,
+    allowed_payment_providers: ['cash', 'payriff', 'epoint'],
     allows_no_show_deposits: false,
     allows_custom_domain: false,
   });
@@ -37,6 +38,8 @@ const Settings = () => {
     whatsapp: 'https://api.randevu.vip/api/v1/webhooks/whatsapp',
     instagram: 'https://api.randevu.vip/api/v1/webhooks/instagram',
     telegram: 'https://api.randevu.vip/api/v1/webhooks/telegram',
+    payriff: '',
+    epoint: '',
   });
 
   const [customDomain, setCustomDomain] = useState('');
@@ -76,6 +79,10 @@ const Settings = () => {
     deposit_skip_regular_customers: true,
     deposit_regular_min_visits: 2,
     deposit_no_show_threshold: 2,
+    payriff_merchant_id: '',
+    payriff_secret_key: '',
+    epoint_public_key: '',
+    epoint_private_key: '',
   });
 
   useEffect(() => {
@@ -119,6 +126,10 @@ const Settings = () => {
           deposit_skip_regular_customers: s.deposit_skip_regular_customers !== false,
           deposit_regular_min_visits: s.deposit_regular_min_visits ?? 2,
           deposit_no_show_threshold: s.deposit_no_show_threshold ?? 2,
+          payriff_merchant_id: s.payriff_merchant_id || '',
+          payriff_secret_key: s.payriff_secret_key || '',
+          epoint_public_key: s.epoint_public_key || '',
+          epoint_private_key: s.epoint_private_key || '',
         });
       })
       .catch(() => {});
@@ -409,56 +420,166 @@ const Settings = () => {
           </div>
         </div>
 
-        {/* 2. Payment Methods (Enabled for All Plans) */}
+        {/* 2. Payment Methods (Direct Business Payouts: Cash, Payriff, EPoint) */}
         <div className="glass-card" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
             <CreditCard color="var(--primary)" size={24} />
             <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
-              {isAz ? 'Ödəniş Üsulları (Bütün Paketlərdə Aktiv)' : 'Payment Methods (Enabled for All)'}
+              {isAz ? 'Ödəniş Üsulları və Birbaşa Beh Qəbulu' : 'Payment Methods & Direct Deposits'}
             </h2>
           </div>
 
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>
             {isAz
-              ? 'Biznesiniz üçün həm yerində nağd, həm də onlayn kart / beh ödənişləri tam aktivdir və bütün ödənişlər maneəsiz icra olunur.'
-              : 'Both on-site cash payments and online card / deposit payments are fully enabled and processed seamlessly for your business.'}
+              ? 'Müştərilərin ödədiyi beh (depozit) və onlayn ödənişlər vasitəçisiz olaraq birbaşa sizin öz Payriff və ya EPoint hesabınıza köçürülür. Aşağıdakı açarlar şifrələnmiş şəkildə saxlanılır.'
+              : 'Customer deposits ("Beh") and online payments go directly to your own Payriff or EPoint merchant account with no platform middleman. Credentials below are stored encrypted at rest.'}
           </p>
 
-          <div
-            style={{
-              padding: '0.75rem 1rem',
-              borderRadius: '8px',
-              background: 'rgba(16, 185, 129, 0.12)',
-              marginBottom: '0.75rem',
-              fontSize: '0.9rem',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <span>{isAz ? '1. Nağd Ödəniş (Yerində / Kassada)' : '1. Cash Payment (On-Site / Register)'}</span>
-            <strong style={{ color: 'var(--success)' }}>{isAz ? 'Aktiv' : 'Active'}</strong>
-          </div>
+          {(entitlements.allowed_payment_providers || ['cash', 'payriff', 'epoint']).includes('cash') && (
+            <div
+              style={{
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                background: 'rgba(16, 185, 129, 0.12)',
+                marginBottom: '0.75rem',
+                fontSize: '0.9rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <span>{isAz ? 'Nağd Ödəniş (Yerində / Kassada)' : 'Cash Payment (On-Site / Register)'}</span>
+              <strong style={{ color: 'var(--success)' }}>{isAz ? 'Aktiv' : 'Active'}</strong>
+            </div>
+          )}
 
-          <div
-            style={{
-              padding: '0.75rem 1rem',
-              borderRadius: '8px',
-              background: 'rgba(16, 185, 129, 0.12)',
-              marginBottom: '0.75rem',
-              fontSize: '0.9rem',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <span>
-              {isAz
-                ? '2. Onlayn Kart və Beh (Depozit) Ödənişləri'
-                : '2. Online Card & Deposit Payments'}
-            </span>
-            <strong style={{ color: 'var(--success)' }}>{isAz ? 'Aktiv' : 'Active'}</strong>
-          </div>
+          {(entitlements.allowed_payment_providers || ['cash', 'payriff', 'epoint']).includes('payriff') && (
+            <div
+              style={{
+                padding: '1rem',
+                borderRadius: '10px',
+                border: '1px solid var(--border)',
+                background: 'rgba(255,255,255,0.02)',
+                marginBottom: '0.85rem',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                <strong style={{ fontSize: '0.95rem' }}>Payriff (AZN)</strong>
+                <span style={{ fontSize: '0.78rem', color: aiTone.payriff_merchant_id ? 'var(--success)' : 'var(--text-secondary)' }}>
+                  {aiTone.payriff_merchant_id
+                    ? isAz ? 'Qoşulub' : 'Configured'
+                    : isAz ? 'Məlumat tələb olunur' : 'Not configured'}
+                </span>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '0.6rem' }}>
+                <label className="form-label" style={{ fontSize: '0.82rem' }}>Payriff Merchant ID</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="ES1234567"
+                  value={aiTone.payriff_merchant_id}
+                  onChange={(e) => setAiTone({ ...aiTone, payriff_merchant_id: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '0.65rem' }}>
+                <label className="form-label" style={{ fontSize: '0.82rem' }}>Payriff Secret Key</label>
+                <input
+                  type="password"
+                  className="form-control"
+                  placeholder={isAz ? 'Payriff gizli açarınız (dəyişmirsinizsə toxunmayın)' : 'Your Payriff secret key'}
+                  value={aiTone.payriff_secret_key}
+                  onChange={(e) => setAiTone({ ...aiTone, payriff_secret_key: e.target.value })}
+                />
+              </div>
+
+              {webhookUrls.payriff && (
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                  <div style={{ marginBottom: '0.25rem' }}>
+                    {isAz ? 'Payriff kabinetində daxil ediləcək Callback / Webhook URL:' : 'Callback / Webhook URL to enter in Payriff dashboard:'}
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <code style={{ flex: 1, padding: '0.35rem 0.5rem', borderRadius: '6px', background: 'rgba(0,0,0,0.25)', wordBreak: 'break-all' }}>
+                      {webhookUrls.payriff}
+                    </code>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                      onClick={() => navigator.clipboard?.writeText(webhookUrls.payriff)}
+                    >
+                      {isAz ? 'Kopyala' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {(entitlements.allowed_payment_providers || ['cash', 'payriff', 'epoint']).includes('epoint') && (
+            <div
+              style={{
+                padding: '1rem',
+                borderRadius: '10px',
+                border: '1px solid var(--border)',
+                background: 'rgba(255,255,255,0.02)',
+                marginBottom: '0.85rem',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                <strong style={{ fontSize: '0.95rem' }}>EPoint (AZN)</strong>
+                <span style={{ fontSize: '0.78rem', color: aiTone.epoint_public_key ? 'var(--success)' : 'var(--text-secondary)' }}>
+                  {aiTone.epoint_public_key
+                    ? isAz ? 'Qoşulub' : 'Configured'
+                    : isAz ? 'Məlumat tələb olunur' : 'Not configured'}
+                </span>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '0.6rem' }}>
+                <label className="form-label" style={{ fontSize: '0.82rem' }}>EPoint Public Key</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="i000000001"
+                  value={aiTone.epoint_public_key}
+                  onChange={(e) => setAiTone({ ...aiTone, epoint_public_key: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '0.65rem' }}>
+                <label className="form-label" style={{ fontSize: '0.82rem' }}>EPoint Private Key</label>
+                <input
+                  type="password"
+                  className="form-control"
+                  placeholder={isAz ? 'EPoint private açarınız (dəyişmirsinizsə toxunmayın)' : 'Your EPoint private key'}
+                  value={aiTone.epoint_private_key}
+                  onChange={(e) => setAiTone({ ...aiTone, epoint_private_key: e.target.value })}
+                />
+              </div>
+
+              {webhookUrls.epoint && (
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                  <div style={{ marginBottom: '0.25rem' }}>
+                    {isAz ? 'EPoint kabinetində Result / Callback URL olaraq daxil edin:' : 'Result / Callback URL to enter in EPoint dashboard:'}
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <code style={{ flex: 1, padding: '0.35rem 0.5rem', borderRadius: '6px', background: 'rgba(0,0,0,0.25)', wordBreak: 'break-all' }}>
+                      {webhookUrls.epoint}
+                    </code>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                      onClick={() => navigator.clipboard?.writeText(webhookUrls.epoint)}
+                    >
+                      {isAz ? 'Kopyala' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
             {isAz

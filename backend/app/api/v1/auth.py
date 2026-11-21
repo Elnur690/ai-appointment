@@ -315,6 +315,7 @@ async def get_public_plans(
             "allows_telegram": bool(getattr(p, "allows_telegram", False) or p.allows_omnichannel_messaging),
             "allows_voice_messages": bool(p.allows_voice_messages),
             "allows_online_payments": bool(p.allows_online_payments),
+            "allowed_payment_providers": getattr(p, "allowed_payment_providers", None) or ["cash", "payriff", "epoint"],
             "allows_no_show_deposits": bool(p.allows_no_show_deposits),
             "allows_shift_management": bool(p.allows_shift_management),
             "allows_cadence_engine": bool(p.allows_cadence_engine),

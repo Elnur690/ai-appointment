@@ -62,7 +62,15 @@ class EpointAdapter(PaymentAdapter):
         merchant_config: dict,
     ) -> WebhookResult:
         data_b64 = payload.get("data", "")
+        sig = (payload.get("signature") or "").strip()
+        private_key = (merchant_config.get("private_key") or "").strip()
         try:
+            if private_key and sig and data_b64:
+                sign_str = private_key + data_b64 + private_key
+                expected_sig = base64.b64encode(hashlib.sha1(sign_str.encode("utf-8")).digest()).decode("utf-8")
+                if sig != expected_sig:
+                    logger.warning("EPoint webhook signature mismatch")
+                    return WebhookResult(transaction_id="", is_successful=False, amount=Decimal("0"), raw_data=payload)
             raw_bytes = base64.b64decode(data_b64)
             decoded = json.loads(raw_bytes.decode("utf-8"))
             order_id = decoded.get("order_id", "")

@@ -266,10 +266,35 @@ class ToolExecutor:
         checkout_url: str | None = None
         if deposit_req.is_deposit_required:
             from app.core.config import settings
-            from app.integrations.payments.creem import CreemAdapter
+            from app.core.security import decrypt_credentials_dict
+            from app.models.payment import PaymentGatewayConfig
             from app.integrations.payments.payriff import PayriffAdapter
+            from app.integrations.payments.epoint import EpointAdapter
 
-            dep_method = PaymentMethod.creem if settings.CREEM_API_KEY else PaymentMethod.payriff
+            allowed_providers = (
+                list(getattr(plan, "allowed_payment_providers", None) or ["cash", "payriff", "epoint"])
+                if plan
+                else ["cash", "payriff", "epoint"]
+            )
+            gw_configs = (
+                await self.db.execute(
+                    select(PaymentGatewayConfig).where(
+                        PaymentGatewayConfig.business_id == self.business_id,
+                        PaymentGatewayConfig.is_active.is_(True),
+                        PaymentGatewayConfig.provider.in_(["payriff", "epoint"]),
+                    )
+                )
+            ).scalars().all()
+            chosen_cfg = next(
+                (g for g in gw_configs if g.provider in allowed_providers),
+                None,
+            )
+
+            dep_method = (
+                PaymentMethod.payriff
+                if (not chosen_cfg or chosen_cfg.provider == "payriff")
+                else PaymentMethod.epoint
+            )
             dep_payment = Payment(
                 business_id=self.business_id,
                 appointment_id=appt.id,
@@ -282,31 +307,33 @@ class ToolExecutor:
             self.db.add(dep_payment)
             await self.db.flush()
 
-            try:
-                if settings.CREEM_API_KEY:
-                    link_res = await CreemAdapter().create_payment_link(
-                        payment_id=dep_payment.id,
-                        amount=deposit_req.deposit_amount,
-                        currency=svc.currency or "AZN",
-                        description=f"Beh / Deposit - {svc.name}",
-                        merchant_config={"business_id": str(self.business_id), "appointment_id": str(appt.id)},
-                        return_url=f"https://{settings.PLATFORM_DOMAIN}",
-                    )
-                    dep_payment.gateway_transaction_id = link_res.transaction_id
-                    checkout_url = link_res.payment_url
-                elif settings.PAYRIFF_SECRET_KEY:
-                    link_res = await PayriffAdapter().create_payment_link(
-                        payment_id=dep_payment.id,
-                        amount=deposit_req.deposit_amount,
-                        currency=svc.currency or "AZN",
-                        description=f"Beh / Deposit - {svc.name}",
-                        merchant_config={"business_id": str(self.business_id)},
-                        return_url=f"https://{settings.PLATFORM_DOMAIN}",
-                    )
-                    dep_payment.gateway_transaction_id = link_res.transaction_id
-                    checkout_url = link_res.payment_url
-            except Exception:
-                checkout_url = None
+            if chosen_cfg:
+                creds = decrypt_credentials_dict(chosen_cfg.merchant_credentials)
+                try:
+                    if chosen_cfg.provider == "payriff" and creds.get("merchant_id") and creds.get("secret_key"):
+                        link_res = await PayriffAdapter().create_payment_link(
+                            payment_id=dep_payment.id,
+                            amount=deposit_req.deposit_amount,
+                            currency=svc.currency or "AZN",
+                            description=f"Beh / Deposit - {svc.name}",
+                            merchant_config=creds,
+                            return_url=f"https://{settings.PLATFORM_DOMAIN}",
+                        )
+                        dep_payment.gateway_transaction_id = link_res.transaction_id
+                        checkout_url = link_res.payment_url
+                    elif chosen_cfg.provider == "epoint" and creds.get("public_key") and creds.get("private_key"):
+                        link_res = await EpointAdapter().create_payment_link(
+                            payment_id=dep_payment.id,
+                            amount=deposit_req.deposit_amount,
+                            currency=svc.currency or "AZN",
+                            description=f"Beh / Deposit - {svc.name}",
+                            merchant_config=creds,
+                            return_url=f"https://{settings.PLATFORM_DOMAIN}",
+                        )
+                        dep_payment.gateway_transaction_id = link_res.transaction_id
+                        checkout_url = link_res.payment_url
+                except Exception:
+                    checkout_url = None
 
         await self.db.commit()
         await self.db.refresh(appt)

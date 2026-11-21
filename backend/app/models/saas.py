@@ -103,6 +103,9 @@ class Plan(Base, TimestampMixin):
     allows_winback_campaigns: Mapped[bool] = mapped_column(Boolean, default=False)
     allows_discovery: Mapped[bool] = mapped_column(Boolean, default=False)
     allows_online_payments: Mapped[bool] = mapped_column(Boolean, default=False)
+    allowed_payment_providers: Mapped[list[str] | None] = mapped_column(
+        JSONB, nullable=True, default=lambda: ["cash", "payriff", "epoint"]
+    )
     allows_gcal_sync: Mapped[bool] = mapped_column(Boolean, default=False)
     allows_apple_cal_sync: Mapped[bool] = mapped_column(Boolean, default=False)
     allows_custom_domain: Mapped[bool] = mapped_column(Boolean, default=False)

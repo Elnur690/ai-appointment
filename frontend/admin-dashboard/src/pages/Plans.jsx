@@ -157,6 +157,7 @@ const Plans = () => {
     allows_winback_campaigns: false,
     allows_discovery: false,
     allows_online_payments: false,
+    allowed_payment_providers: ['cash', 'payriff', 'epoint'],
     allows_gcal_sync: false,
     allows_apple_cal_sync: false,
     allows_custom_domain: false,
@@ -204,6 +205,9 @@ const Plans = () => {
       allows_winback_campaigns: Boolean(plan.allows_winback_campaigns),
       allows_discovery: Boolean(plan.allows_discovery),
       allows_online_payments: Boolean(plan.allows_online_payments),
+      allowed_payment_providers: Array.isArray(plan.allowed_payment_providers)
+        ? plan.allowed_payment_providers
+        : ['cash', 'payriff', 'epoint'],
       allows_gcal_sync: Boolean(plan.allows_gcal_sync),
       allows_apple_cal_sync: Boolean(plan.allows_apple_cal_sync),
       allows_custom_domain: Boolean(plan.allows_custom_domain),
@@ -248,6 +252,9 @@ const Plans = () => {
         allows_winback_campaigns: Boolean(newPlan.allows_winback_campaigns),
         allows_discovery: Boolean(newPlan.allows_discovery),
         allows_online_payments: Boolean(newPlan.allows_online_payments),
+        allowed_payment_providers: Array.isArray(newPlan.allowed_payment_providers)
+          ? newPlan.allowed_payment_providers
+          : ['cash', 'payriff', 'epoint'],
         allows_gcal_sync: Boolean(newPlan.allows_gcal_sync),
         allows_apple_cal_sync: Boolean(newPlan.allows_apple_cal_sync),
         allows_custom_domain: Boolean(newPlan.allows_custom_domain),
@@ -600,6 +607,52 @@ const Plans = () => {
                 value={newPlan.max_whatsapp_numbers}
                 onChange={(e) => setNewPlan({ ...newPlan, max_whatsapp_numbers: e.target.value })}
               />
+            </div>
+          </div>
+
+          <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+            <label className="form-label">
+              {isAz ? 'İcazə Verilən Ödəniş Provayderləri (Beh / Depozit)' : 'Allowed Payment Providers (Customer Deposits)'}
+            </label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.35rem' }}>
+              {[
+                { key: 'cash', label: isAz ? 'Nağd (Yerində)' : 'Cash (On-Site)' },
+                { key: 'payriff', label: 'Payriff (AZ)' },
+                { key: 'epoint', label: 'EPoint (AZ)' },
+              ].map((prov) => {
+                const selected = (newPlan.allowed_payment_providers || []).includes(prov.key);
+                return (
+                  <label
+                    key={prov.key}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.45rem',
+                      padding: '0.45rem 0.75rem',
+                      borderRadius: '8px',
+                      border: `1px solid ${selected ? 'var(--primary)' : 'var(--border)'}`,
+                      background: selected ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => {
+                        const curr = Array.isArray(newPlan.allowed_payment_providers)
+                          ? newPlan.allowed_payment_providers
+                          : [];
+                        const next = curr.includes(prov.key)
+                          ? curr.filter((k) => k !== prov.key)
+                          : [...curr, prov.key];
+                        setNewPlan({ ...newPlan, allowed_payment_providers: next });
+                      }}
+                    />
+                    <span>{prov.label}</span>
+                  </label>
+                );
+              })}
             </div>
           </div>
 

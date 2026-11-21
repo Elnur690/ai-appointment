@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
 from app.core.config import settings
+from app.core.security import decrypt_credentials_dict
 from app.models.payment import Payment, PaymentGatewayConfig, PaymentMethod, PaymentStatus
 from app.models.appointment import Appointment, AppointmentStatus
 from app.integrations.payments.payriff import PayriffAdapter
@@ -60,7 +61,7 @@ class PaymentService:
     ) -> PaymentLinkResult:
         config = await self.get_gateway_config(provider)
         norm = "paymegate" if provider.lower().strip() in {"paymegate", "paymengate"} else provider.lower().strip()
-        merchant_creds = dict(config.merchant_credentials) if config and config.merchant_credentials else {}
+        merchant_creds = decrypt_credentials_dict(config.merchant_credentials) if config else {}
         if norm == "creem" and not merchant_creds.get("api_key") and not settings.CREEM_API_KEY:
             raise ValueError("Creem API key is not configured.")
         if norm == "paymegate" and not merchant_creds.get("api_key") and not settings.PAYMEGATE_API_KEY:
@@ -100,7 +101,7 @@ class PaymentService:
 
     async def handle_webhook_callback(self, provider: str, payload: dict, headers: dict) -> bool:
         config = await self.get_gateway_config(provider)
-        merchant_creds = dict(config.merchant_credentials) if config and config.merchant_credentials else {}
+        merchant_creds = decrypt_credentials_dict(config.merchant_credentials) if config else {}
 
         adapter = self._get_adapter(provider)
         verify_res = await adapter.verify_webhook(payload, headers, merchant_creds)
