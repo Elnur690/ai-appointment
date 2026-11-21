@@ -8,6 +8,7 @@ const GATEWAY_ICONS = {
   cash: Banknote,
   creem: CreditCard,
   payriff: CreditCard,
+  epoint: ShieldCheck,
   paymegate: ShieldCheck,
   paymengate: ShieldCheck,
 };
@@ -83,7 +84,7 @@ const PaymentGateways = () => {
           <h1>{isAz ? 'Ödəniş Şlüzlərinin İdarə Edilməsi' : 'Payment Gateways Control'}</h1>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isAz
-              ? 'Randevu.vip platformasındakı bütün bizneslər üçün ödəniş şlüzlərini (Nağd, Payriff, Paymegate) aktiv və ya deaktiv edin.'
+              ? 'Randevu.vip platformasındakı bütün bizneslər üçün ödəniş şlüzlərini (Nağd, Creem, Payriff, EPoint) aktiv və ya deaktiv edin.'
               : 'Enable or disable payment gateways platform-wide across all businesses on Randevu.vip.'}
           </p>
         </div>
@@ -166,8 +167,8 @@ const PaymentGateways = () => {
                         ? `.env konfiqurasiyası: Aktiv (${gw.env_hint})`
                         : `.env configured (${gw.env_hint})`
                       : isAz
-                      ? `.env açarı təyin edilməyib (${gw.provider === 'creem' ? 'CREEM_API_KEY' : gw.provider === 'paymegate' ? 'PAYMEGATE_API_KEY' : 'PAYRIFF_SECRET_KEY'})`
-                      : `Set ${gw.provider === 'creem' ? 'CREEM_API_KEY' : gw.provider === 'paymegate' ? 'PAYMEGATE_API_KEY' : 'PAYRIFF_SECRET_KEY'} in .env`
+                      ? `.env açarı təyin edilməyib (${gw.provider === 'creem' ? 'CREEM_API_KEY' : gw.provider === 'epoint' ? 'Biznes Paneli' : 'PAYRIFF_SECRET_KEY'})`
+                      : `Set ${gw.provider === 'creem' ? 'CREEM_API_KEY' : gw.provider === 'epoint' ? 'Business Dashboard' : 'PAYRIFF_SECRET_KEY'} in .env`
                     : isAz
                     ? 'Daxili kassa / nağd ödəniş üsulu'
                     : 'Built-in Ledger Method'}

@@ -10,7 +10,7 @@ const TRIAL_FEATURE_OPTIONS = [
   { key: 'allows_instagram', az: 'Instagram Direct AI', en: 'Instagram Direct AI' },
   { key: 'allows_telegram', az: 'Telegram Bot AI', en: 'Telegram Bot AI' },
   { key: 'allows_voice_messages', az: 'WhatsApp Səsli Mesajlar', en: 'WhatsApp Voice Notes' },
-  { key: 'allows_online_payments', az: 'Onlayn Ödənişlər (Payriff & Paymegate)', en: 'Online Gateways (Payriff & Paymegate)' },
+  { key: 'allows_online_payments', az: 'Onlayn Ödənişlər (Payriff & EPoint)', en: 'Online Gateways (Payriff & EPoint)' },
   { key: 'allows_no_show_deposits', az: 'No-Show Depozit Qorunması', en: 'No-Show Deposit Protection' },
   { key: 'allows_shift_management', az: 'Növbəli İş Qrafiki (Overtime)', en: 'Shift & Overtime Scheduling' },
   { key: 'allows_cadence_engine', az: 'Avtomatik Təkrar Randevu (Cadence)', en: 'Predictive Cadence Rebooking' },

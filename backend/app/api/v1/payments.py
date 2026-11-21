@@ -106,9 +106,21 @@ async def log_payment(
     user: Annotated[dict[str, Any], Depends(get_current_active_user)],
     business_id: Annotated[str, Depends(get_business_context)],
 ):
-    """Log a payment in PostgreSQL (all payment methods enabled)."""
+    """Log a payment in PostgreSQL (Cash, Payriff, EPoint)."""
     method_str = (payment.method or "cash").lower().strip()
-    if method_str in {"paymengate", "online", "card"}:
+    if method_str in {"online", "card"}:
+        from app.models.payment import PaymentGatewayConfig
+        gw = (
+            await db.execute(
+                select(PaymentGatewayConfig).where(
+                    PaymentGatewayConfig.business_id == UUID(business_id),
+                    PaymentGatewayConfig.is_active.is_(True),
+                    PaymentGatewayConfig.provider.in_(["epoint", "payriff"]),
+                )
+            )
+        ).scalars().first()
+        method_str = gw.provider if gw else "payriff"
+    elif method_str == "paymengate":
         method_str = "paymegate"
     if method_str not in {"cash", "payriff", "paymegate", "epoint"}:
         method_str = "cash"

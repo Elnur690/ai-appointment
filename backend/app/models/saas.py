@@ -22,12 +22,12 @@ DEFAULT_PLATFORM_GATEWAYS = {
         "enabled": True,
         "requires_credentials": True,
     },
-    "paymegate": {
-        "provider": "paymegate",
-        "name": "Paymegate Payment Gateway",
-        "description": "Online card & crypto checkout via official Paymegate Merchant API v1 (api.paymegate.com).",
+    "epoint": {
+        "provider": "epoint",
+        "name": "EPoint Payment Gateway",
+        "description": "Direct-to-business AZN card & deposit payments via EPoint API (epoint.az).",
         "enabled": True,
-        "requires_credentials": True,
+        "requires_credentials": False,
     },
     "creem": {
         "provider": "creem",

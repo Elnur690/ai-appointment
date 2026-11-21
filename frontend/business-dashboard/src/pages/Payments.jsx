@@ -30,6 +30,16 @@ const Payments = () => {
       enabled: true,
     },
     {
+      provider: 'payriff',
+      name: 'Payriff (AZN)',
+      enabled: true,
+    },
+    {
+      provider: 'epoint',
+      name: 'EPoint (AZN)',
+      enabled: true,
+    },
+    {
       provider: 'card',
       name: isAz ? 'Onlayn Kart / Beh Ödənişi' : 'Online Card / Deposit Payment',
       enabled: true,

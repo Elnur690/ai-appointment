@@ -340,9 +340,9 @@ async def list_platform_payment_gateways(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
-    """List all platform payment gateways (Cash, Creem, Payriff, Paymegate) and their enabled + .env status."""
+    """List all platform payment gateways (Cash, Creem, Payriff, EPoint) and their enabled + .env status."""
     cfg = await _get_or_create_platform_config(db)
-    order = ["cash", "creem", "payriff", "paymegate"]
+    order = ["cash", "creem", "payriff", "epoint"]
 
     def _mask_secret(val: str) -> str:
         s = (val or "").strip()
@@ -359,14 +359,9 @@ async def list_platform_payment_gateways(
             masked = _mask_secret(settings.CREEM_API_KEY)
             item["env_configured"] = bool(masked)
             item["env_hint"] = masked
-        elif k == "paymegate":
-            masked = _mask_secret(settings.PAYMEGATE_API_KEY)
-            item["env_configured"] = bool(masked)
-            item["env_hint"] = masked
-        elif k == "payriff":
-            masked = _mask_secret(settings.PAYRIFF_SECRET_KEY or settings.PAYRIFF_MERCHANT_ID)
-            item["env_configured"] = bool(masked)
-            item["env_hint"] = masked
+        elif k in {"payriff", "epoint"}:
+            item["env_configured"] = True
+            item["env_hint"] = "Business Dashboard"
         else:
             item["env_configured"] = True
             item["env_hint"] = ""

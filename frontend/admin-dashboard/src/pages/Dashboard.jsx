@@ -213,7 +213,7 @@ const Dashboard = () => {
           value={`${Number(analytics?.total_settled_revenue_azn || 0).toFixed(2)} AZN`}
           icon={CreditCard}
           trend="up"
-          trendValue={isAz ? 'Nağd, Payriff və Paymegate' : 'Cash, Payriff & Paymegate'}
+          trendValue={isAz ? 'Nağd, Payriff və EPoint' : 'Cash, Payriff & EPoint'}
         />
         <StatCard
           title={isAz ? 'Son Müştərilər və Partnyorlar' : 'End Customers & Resellers'}

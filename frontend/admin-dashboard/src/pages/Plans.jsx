@@ -28,8 +28,8 @@ const ALL_PLAN_FEATURES = [
   },
   {
     key: 'allows_online_payments',
-    az: 'Onlayn Ödəniş Şlüzləri (Payriff və Paymegate)',
-    en: 'Online Payment Gateways (Payriff & Paymegate)',
+    az: 'Onlayn Ödəniş Şlüzləri (Payriff və EPoint)',
+    en: 'Online Payment Gateways (Payriff & EPoint)',
   },
   {
     key: 'allows_no_show_deposits',
