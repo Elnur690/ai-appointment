@@ -586,6 +586,7 @@ const LandingPage = () => {
   const [showFullMatrix, setShowFullMatrix] = useState(false);
   const [missedPerDay, setMissedPerDay] = useState(2);
   const [avgBookingPrice, setAvgBookingPrice] = useState(45);
+  const [demoTab, setDemoTab] = useState('customer');
 
   // Seller / Reseller Application Modal state
   const sellerDialogRef = useRef(null);
@@ -998,18 +999,193 @@ const LandingPage = () => {
           >
             {t.heroPrimaryCta} <ArrowRight size={18} />
           </a>
-          <button
-            type="button"
-            onClick={openSellerModal}
-            className="btn btn-gold"
-            style={{ padding: '0.95rem 1.75rem', fontSize: '1rem' }}
+          <a
+            href="#live-demo"
+            className="btn btn-secondary"
+            style={{ padding: '0.95rem 1.75rem', fontSize: '1rem', textDecoration: 'none' }}
           >
-            <Handshake size={18} />
-            {t.heroSecondaryCta}
-          </button>
+            <MessageSquare size={18} />
+            {lang === 'en' ? 'See Live WhatsApp AI Demo' : 'Canlı WhatsApp AI Demosuna Bax'}
+          </a>
         </div>
 
-        <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 500 }}>{t.riskReversal}</div>
+        <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 500, marginBottom: '2.25rem' }}>
+          {t.riskReversal}
+        </div>
+
+        {/* 4-Metric Trust & Competitive Moat Strip */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 210px), 1fr))',
+            gap: '0.85rem',
+            maxWidth: '980px',
+            margin: '0 auto',
+          }}
+        >
+          {[
+            {
+              stat: '< 3s',
+              label: lang === 'en' ? '24/7 AI WhatsApp Reply' : '24/7 AI WhatsApp Cavabı',
+              color: 'var(--primary)',
+            },
+            {
+              stat: '0%',
+              label: lang === 'en' ? 'Cut on Direct Payriff / EPoint Beh' : 'Birbaşa Payriff / EPoint Beh Komissiyası',
+              color: 'var(--success)',
+            },
+            {
+              stat: '5 min',
+              label: lang === 'en' ? 'QR Code Setup — No Code' : 'QR Kodla Qoşulma — Kodsuz',
+              color: 'var(--gold)',
+            },
+            {
+              stat: '100%',
+              label: lang === 'en' ? 'Manage via Your WhatsApp Group' : 'Şəxsi WhatsApp Qrupundan İdarəetmə',
+              color: '#38bdf8',
+            },
+          ].map((m, idx) => (
+            <div
+              key={idx}
+              className="glass-card"
+              style={{ padding: '1rem 1.15rem', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              <div style={{ fontSize: '1.45rem', fontWeight: 800, color: m.color, lineHeight: 1.15 }}>{m.stat}</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{m.label}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Interactive 2-Tab Live WhatsApp Simulator ("Show, Don't Tell") */}
+      <section id="live-demo" className="landing-section" style={{ maxWidth: '1040px', margin: '0 auto', padding: '1.5rem 1.5rem 2.75rem' }}>
+        <div className="glass-card landing-card" style={{ padding: '2rem', border: '1px solid rgba(56, 189, 248, 0.35)' }}>
+          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <span className="badge badge-info" style={{ marginBottom: '0.6rem' }}>
+              <MessageSquare size={13} /> {lang === 'en' ? 'INTERACTIVE PREVIEW' : 'CANLI İŞ PRİNSİPİ'}
+            </span>
+            <h2 style={{ fontSize: 'clamp(1.4rem, 3vw, 1.85rem)', marginBottom: '0.45rem' }}>
+              {lang === 'en'
+                ? 'See How Randevu.vip Closes Bookings & Runs Your Business on WhatsApp'
+                : 'Randevu.vip WhatsApp-da Necə Müştəri Qəbul Edir və Biznesi İdarə Edir'}
+            </h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', maxWidth: '720px', margin: '0 auto' }}>
+              {lang === 'en'
+                ? 'Switch tabs below to see both the automated 24/7 customer booking flow and your private Owner WhatsApp Group.'
+                : 'Həm müştərinin gecə saatlarında avtomatik randevu almasını, həm də sizin şəxsi WhatsApp qrupunuzdan idarəetməni izləyin.'}
+            </p>
+          </div>
+
+          {/* Demo Tab Switcher */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '0.65rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+            <button
+              type="button"
+              onClick={() => setDemoTab('customer')}
+              className={demoTab === 'customer' ? 'btn btn-primary' : 'btn btn-secondary'}
+              style={{ fontSize: '0.88rem', padding: '0.6rem 1.15rem' }}
+            >
+              {lang === 'en' ? '1. Customer Booking + Direct Beh (23:40)' : '1. Müştəri Randevusu + Birbaşa Beh (23:40)'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setDemoTab('owner')}
+              className={demoTab === 'owner' ? 'btn btn-gold' : 'btn btn-secondary'}
+              style={{ fontSize: '0.88rem', padding: '0.6rem 1.15rem' }}
+            >
+              {lang === 'en' ? '2. Owner WhatsApp Group + AI Learning' : '2. Sahibkar WhatsApp Qrupu + AI Öyrənmə'}
+            </button>
+          </div>
+
+          {/* WhatsApp Chat Mockup */}
+          <div
+            style={{
+              maxWidth: '720px',
+              margin: '0 auto',
+              borderRadius: '16px',
+              background: 'rgba(7, 13, 22, 0.92)',
+              border: '1px solid rgba(16, 185, 129, 0.35)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                padding: '0.85rem 1.15rem',
+                background: 'rgba(16, 185, 129, 0.14)',
+                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                fontSize: '0.85rem',
+              }}
+            >
+              <strong style={{ color: '#fff' }}>
+                {demoTab === 'customer'
+                  ? lang === 'en'
+                    ? 'WhatsApp Business · Velvet Beauty Studio (AI Active)'
+                    : 'WhatsApp Business · Velvet Gözəllik Salonu (AI Aktiv)'
+                  : lang === 'en'
+                  ? 'Private Group · Velvet Salon Management (Owner + AI)'
+                  : 'Şəxsi Qrup · Velvet Salon İdarəetmə (Sahibkar + AI)'}
+              </strong>
+              <span style={{ color: '#6ee7b7', fontSize: '0.76rem', fontWeight: 600 }}>● Online 24/7</span>
+            </div>
+
+            <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', fontSize: '0.9rem' }}>
+              {demoTab === 'customer' ? (
+                <>
+                  <div style={{ alignSelf: 'flex-start', maxWidth: '82%', padding: '0.75rem 1rem', borderRadius: '12px 12px 12px 2px', background: 'rgba(255,255,255,0.08)' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Aysel · 23:40</div>
+                    {lang === 'en'
+                      ? 'Hi! Do you have any opening tomorrow around 14:00 for Balayage + Cut?'
+                      : 'Salam! Sabah saat 14:00 radələrində Balyaj + Saç kəsimi üçün boş yeriniz var?'}
+                  </div>
+                  <div style={{ alignSelf: 'flex-end', maxWidth: '85%', padding: '0.75rem 1rem', borderRadius: '12px 12px 2px 12px', background: 'rgba(16, 185, 129, 0.18)', border: '1px solid rgba(16, 185, 129, 0.35)' }}>
+                    <div style={{ fontSize: '0.72rem', color: '#6ee7b7', marginBottom: '0.2rem' }}>Randevu.vip AI · 23:40 (2s)</div>
+                    {lang === 'en'
+                      ? 'Hello Aysel! Yes — master Leyla is free tomorrow at 14:30 (120 AZN, 90 min). To lock your slot, please complete the 20 AZN deposit directly via our Payriff/EPoint link: https://pay.epoint.az/s/9f82a'
+                      : 'Salam Aysel xanım! Bəli — usta Leyla sabah saat 14:30-da boşdur (120 AZN, 90 dəq). Yerinizin təsdiqlənməsi üçün 20 AZN beh ödənişini birbaşa Payriff/EPoint linkindən edə bilərsiniz: https://pay.epoint.az/s/9f82a'}
+                  </div>
+                  <div style={{ alignSelf: 'center', padding: '0.45rem 0.9rem', borderRadius: '999px', background: 'rgba(16, 185, 129, 0.14)', color: '#6ee7b7', fontSize: '0.78rem', fontWeight: 600 }}>
+                    ✓ {lang === 'en'
+                      ? '20 AZN paid directly to Business EPoint account · Calendar synced · 24h & 2h reminders scheduled'
+                      : '20 AZN birbaşa Biznesin EPoint hesabına köçdü · Təqvim yeniləndi · 24 saat və 2 saat əvvəl xatırlatma quruldu'}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ alignSelf: 'flex-end', maxWidth: '82%', padding: '0.75rem 1rem', borderRadius: '12px 12px 2px 12px', background: 'rgba(99, 102, 241, 0.22)', border: '1px solid rgba(99, 102, 241, 0.4)' }}>
+                    <div style={{ fontSize: '0.72rem', color: '#a5b4fc', marginBottom: '0.2rem' }}>
+                      {lang === 'en' ? 'You (Business Owner) · 08:15' : 'Siz (Biznes Sahibi) · 08:15'}
+                    </div>
+                    {lang === 'en' ? 'Who is my first customer today and how much Beh was collected?' : 'Bu gün ilk müştərim kimdir və nə qədər beh yığılıb?'}
+                  </div>
+                  <div style={{ alignSelf: 'flex-start', maxWidth: '86%', padding: '0.75rem 1rem', borderRadius: '12px 12px 12px 2px', background: 'rgba(255,255,255,0.08)' }}>
+                    <div style={{ fontSize: '0.72rem', color: '#6ee7b7', marginBottom: '0.2rem' }}>Randevu.vip AI · 08:15</div>
+                    {lang === 'en'
+                      ? 'First booking: 10:00 — Nigar M. (Keratin, 90 AZN, 20 AZN Beh paid). Today total: 9 confirmed appointments, 140 AZN Beh received directly in your EPoint.'
+                      : 'İlk müştəri: 10:00 — Nigar M. (Keratin, 90 AZN, 20 AZN beh ödənilib). Bu gün cəmi: 9 təsdiqlənmiş randevu, 140 AZN beh birbaşa EPoint hesabınızda.'}
+                  </div>
+                  <div style={{ alignSelf: 'flex-start', maxWidth: '86%', padding: '0.75rem 1rem', borderRadius: '12px 12px 12px 2px', background: 'rgba(245, 158, 11, 0.14)', border: '1px solid rgba(245, 158, 11, 0.35)' }}>
+                    <div style={{ fontSize: '0.72rem', color: '#fde68a', marginBottom: '0.2rem' }}>
+                      {lang === 'en' ? 'Escalated Question #Q-104' : 'Yönləndirilmiş Sual #Q-104'}
+                    </div>
+                    {lang === 'en'
+                      ? 'Customer asks: "Is there free parking behind the salon?" Reply with #Q-104 to answer & teach me forever.'
+                      : 'Müştəri soruşur: "Salonun arxasında pulsuz parkinq var?" Cavab vermək və mənə öyrətmək üçün #Q-104 ilə yazın.'}
+                  </div>
+                  <div style={{ alignSelf: 'flex-end', maxWidth: '82%', padding: '0.75rem 1rem', borderRadius: '12px 12px 2px 12px', background: 'rgba(99, 102, 241, 0.22)', border: '1px solid rgba(99, 102, 241, 0.4)' }}>
+                    #Q-104 {lang === 'en' ? 'Yes, 2 hours free parking in the courtyard.' : 'Bəli, həyətdə müştərilər üçün 2 saat pulsuz parkinq var.'}
+                  </div>
+                  <div style={{ alignSelf: 'center', padding: '0.4rem 0.85rem', borderRadius: '999px', background: 'rgba(16, 185, 129, 0.14)', color: '#6ee7b7', fontSize: '0.76rem', fontWeight: 600 }}>
+                    ✓ {lang === 'en'
+                      ? 'Customer replied instantly & saved to AI Knowledge Base (RAG) permanently'
+                      : 'Müştəriyə dərhal cavab göndərildi və AI Yaddaşına (RAG) həmişəlik qeyd edildi'}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* Loss Aversion: Old Way vs New Way Comparison */}
@@ -1135,7 +1311,17 @@ const LandingPage = () => {
               <div style={{ fontSize: '0.9rem', color: '#fde68a', fontWeight: 600, marginBottom: '0.75rem' }}>
                 {t.roiYearlyRecovered} +{yearlyRecovered.toLocaleString()} AZN
               </div>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{t.roiNote}</p>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.15rem' }}>{t.roiNote}</p>
+              <a
+                href={registerUrl}
+                className="btn btn-primary"
+                style={{ width: '100%', justifyContent: 'center', textDecoration: 'none', padding: '0.85rem 1.25rem' }}
+              >
+                {lang === 'en'
+                  ? `Recover +${monthlyRecovered.toLocaleString()} AZN/mo — Start Free Trial`
+                  : `+${monthlyRecovered.toLocaleString()} AZN/ay Geri Qaytar — Pulsuz Başla`}{' '}
+                <ArrowRight size={16} />
+              </a>
             </div>
           </div>
         </div>
@@ -1176,6 +1362,61 @@ const LandingPage = () => {
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', lineHeight: 1.6, margin: 0 }}>
                 {f.desc}
               </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Real Industry Outcomes & Social Proof */}
+      <section className="landing-section" style={{ maxWidth: '1240px', margin: '0 auto', padding: '2.5rem 1.5rem 1rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <span className="badge badge-success" style={{ marginBottom: '0.6rem' }}>
+            <CheckCircle2 size={13} /> {lang === 'en' ? 'PROVEN BUSINESS OUTCOMES' : 'REAL BİZNES NƏTİCƏLƏRİ'}
+          </span>
+          <h2 style={{ fontSize: 'clamp(1.45rem, 3.2vw, 1.95rem)', marginBottom: '0.45rem' }}>
+            {lang === 'en' ? 'Built for High-Volume Local Service Businesses' : 'Yüksək Müştəri Axınlı Xidmət Biznesləri Üçün Yaradılıb'}
+          </h2>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.35rem' }}>
+          {[
+            {
+              metric: '-72% No-Show',
+              sector: lang === 'en' ? 'Beauty & Nail Salon · Baku' : 'Gözəllik və Dırnaq Salonu · Bakı',
+              quote:
+                lang === 'en'
+                  ? '“Before Randevu.vip, 3–4 clients cancelled last minute every week. Now the AI collects a 20 AZN Beh straight into our EPoint before confirming — empty chairs almost disappeared.”'
+                  : '“Randevu.vip-dən əvvəl həftədə 3-4 müştəri son dəqiqədə gəlmirdi. İndi AI təsdiqdən əvvəl 20 AZN behi birbaşa bizim EPoint hesabımıza yığır — boş saatlar demək olar ki, sıfırlandı.”',
+              author: 'Nərmin H. — Studio Founder',
+            },
+            {
+              metric: '+28 Night Bookings/mo',
+              sector: lang === 'en' ? 'Barbershop & Grooming · 6 Chairs' : 'Bərbərxana · 6 Kreslo',
+              quote:
+                lang === 'en'
+                  ? '“Men message on WhatsApp at 11 PM after work. Our AI replies in 2 seconds, books their exact barber, and I just ask our WhatsApp group in the morning for the day’s schedule.”'
+                  : '“Müştərilər işdən sonra saat 23:00-da yazırlar. AI 2 saniyəyə cavab verib istədikləri ustanı seçir, mən isə səhər WhatsApp qrupundan günün cədvəlini soruşuram.”',
+              author: 'Rəşad M. — Barbershop Owner',
+            },
+            {
+              metric: '4.5 hrs/day Saved',
+              sector: lang === 'en' ? 'Dental & Aesthetic Clinic' : 'Stomatoloji və Estetik Klinika',
+              quote:
+                lang === 'en'
+                  ? '“Our receptionist used to answer the same price and address questions 60 times a day. Whenever a new question comes in, we answer once in our group with #ID and the AI learns it forever.”'
+                  : '“Qeydiyyatçımız gündə 60 dəfə eyni qiymət və ünvan suallarına cavab verirdi. İndi yeni sual gələndə qrupda #ID ilə bir dəfə cavablayırıq və AI həmişəlik yadda saxlayır.”',
+              author: 'Dr. Leyla K. — Clinic Director',
+            },
+          ].map((card, i) => (
+            <div key={i} className="glass-card landing-card" style={{ padding: '1.65rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                <span className="badge badge-gold" style={{ fontWeight: 700 }}>{card.metric}</span>
+                <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>{card.sector}</span>
+              </div>
+              <p style={{ color: 'var(--text-primary)', fontSize: '0.92rem', lineHeight: 1.65, margin: 0, flex: 1 }}>
+                {card.quote}
+              </p>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>— {card.author}</div>
             </div>
           ))}
         </div>
@@ -1404,6 +1645,51 @@ const LandingPage = () => {
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', lineHeight: 1.6, margin: 0 }}>{item.a}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Final High-Conversion Closing CTA Banner */}
+      <section className="landing-section" style={{ maxWidth: '1040px', margin: '0 auto', padding: '2.5rem 1.5rem 1rem' }}>
+        <div
+          className="glass-card landing-card"
+          style={{
+            padding: '2.75rem 2rem',
+            textAlign: 'center',
+            border: '1px solid rgba(99, 102, 241, 0.45)',
+            background: 'linear-gradient(135deg, rgba(20, 27, 45, 0.96), rgba(16, 35, 38, 0.92))',
+          }}
+        >
+          <h2 style={{ fontSize: 'clamp(1.5rem, 3.4vw, 2.15rem)', fontWeight: 800, marginBottom: '0.75rem' }}>
+            {lang === 'en'
+              ? 'Stop Losing Nighttime Leads & No-Show Revenue Today'
+              : 'Gecə İtirilən Müştərilərə və Boş Qalan Saatlara Bu Gün Son Qoyun'}
+          </h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.98rem', maxWidth: '680px', margin: '0 auto 1.65rem', lineHeight: 1.6 }}>
+            {lang === 'en'
+              ? 'Connect your WhatsApp in 5 minutes, collect Beh directly into your own Payriff or EPoint account with 0% commission, and manage everything from your WhatsApp group.'
+              : '5 dəqiqəyə WhatsApp nömrənizi qoşun, beh ödənişlərini 0% komissiya ilə birbaşa öz Payriff və ya EPoint hesabınıza qəbul edin və bütün biznesi WhatsApp qrupundan idarə edin.'}
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '0.85rem', flexWrap: 'wrap', marginBottom: '0.9rem' }}>
+            <a
+              href={registerUrl}
+              className="btn btn-primary"
+              style={{ padding: '1rem 2.25rem', fontSize: '1.05rem', textDecoration: 'none' }}
+            >
+              {t.heroPrimaryCta} <ArrowRight size={18} />
+            </a>
+            <a
+              href="#pricing"
+              className="btn btn-secondary"
+              style={{ padding: '1rem 1.65rem', fontSize: '1rem', textDecoration: 'none' }}
+            >
+              {lang === 'en' ? 'Compare Plans' : 'Paketləri Müqayisə Et'}
+            </a>
+          </div>
+          <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+            {lang === 'en'
+              ? '14-Day Free Trial · Cancel Anytime · 14-Day Money-Back Guarantee'
+              : '14 Gün Pulsuz Sınaq · İstənilən Vaxt Ləğv · 14 Gün Geri Ödəniş Zəmanəti'}
+          </div>
         </div>
       </section>
 
