@@ -233,7 +233,7 @@ const LegalPolicyPage = ({ defaultPolicy = 'terms' }) => {
         style={{
           borderBottom: '1px solid var(--border)',
           padding: '1rem 1.5rem',
-          background: 'rgba(15, 23, 42, 0.85)',
+          background: 'var(--header-bg, rgba(15, 23, 42, 0.88))',
           backdropFilter: 'blur(12px)',
           position: 'sticky',
           top: 0,

@@ -748,122 +748,114 @@ const LandingPage = () => {
     <div style={{ minHeight: '100vh', color: 'var(--text-primary)', overflowX: 'hidden' }}>
       {/* Top Navigation */}
       <header className="landing-header">
-        <a
-          href="/"
-          onClick={(e) => {
-            setMobileMenuOpen(false);
-            handleBrandClick(e);
-          }}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.65rem',
-            textDecoration: 'none',
-            cursor: 'pointer',
-            flexShrink: 0,
-          }}
-          title="Randevu.vip — Ana Səhifə"
-        >
-          <BrandLogo size={36} fontSize="1.45rem" />
-        </a>
-
-        {/* Desktop Navigation */}
-        <nav className="landing-nav-desktop">
-          <a href="#features" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontWeight: 500, fontSize: '0.92rem' }}>
-            {t.navFeatures}
-          </a>
-          <a href="#roi" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontWeight: 500, fontSize: '0.92rem' }}>
-            {t.navRoi}
-          </a>
-          <a href="#pricing" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontWeight: 500, fontSize: '0.92rem' }}>
-            {t.navPricing}
-          </a>
-          <button
-            type="button"
-            onClick={openSellerModal}
-            className="btn btn-gold"
-            style={{ padding: '0.45rem 0.95rem', fontSize: '0.84rem' }}
-          >
-            <Handshake size={15} />
-            {t.navReseller}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
-            className="btn btn-secondary"
-            style={{ padding: '0.42rem 0.6rem', minHeight: 'auto' }}
-            title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-          </button>
-
-          {/* Language Switcher (AZ default | EN) */}
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid var(--border)',
-              borderRadius: '999px',
-              padding: '0.2rem',
+        <div className="landing-header-inner">
+          <a
+            href="/"
+            onClick={(e) => {
+              setMobileMenuOpen(false);
+              handleBrandClick(e);
             }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.65rem',
+              textDecoration: 'none',
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+            title="Randevu.vip — Ana Səhifə"
           >
+            <BrandLogo size={34} fontSize="1.35rem" />
+          </a>
+
+          {/* Desktop Navigation (3-Zone Balanced Single Row) */}
+          <nav className="landing-nav-desktop">
+            <div className="landing-nav-links">
+              <a href="#features">{t.navFeatures}</a>
+              <a href="#roi">{t.navRoi}</a>
+              <a href="#pricing">{t.navPricing}</a>
+              <a href="#reseller" style={{ color: 'var(--gold)', fontWeight: 600 }}>
+                {t.navReseller}
+              </a>
+            </div>
+
+            <div className="landing-nav-actions">
+              <button
+                type="button"
+                onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+                className="btn btn-secondary"
+                style={{ width: '36px', height: '36px', padding: 0, justifyContent: 'center', minHeight: 'auto' }}
+                title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+                aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+
+              {/* Language Switcher (AZ default | EN) */}
+              <div className="landing-lang-pill">
+                <button
+                  type="button"
+                  onClick={() => handleLanguageChange('az')}
+                  style={{
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '0.26rem 0.6rem',
+                    borderRadius: '999px',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    background: lang === 'az' ? 'var(--primary)' : 'transparent',
+                    color: lang === 'az' ? '#ffffff' : 'var(--text-secondary)',
+                  }}
+                >
+                  AZ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleLanguageChange('en')}
+                  style={{
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '0.26rem 0.6rem',
+                    borderRadius: '999px',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    background: lang === 'en' ? 'var(--primary)' : 'transparent',
+                    color: lang === 'en' ? '#ffffff' : 'var(--text-secondary)',
+                  }}
+                >
+                  EN
+                </button>
+              </div>
+
+              <a
+                href={loginUrl}
+                className="btn btn-secondary"
+                style={{ textDecoration: 'none', height: '36px', padding: '0 0.9rem', fontSize: '0.85rem', minHeight: 'auto' }}
+              >
+                {t.navSignIn}
+              </a>
+              <a
+                href={registerUrl}
+                className="btn btn-primary"
+                style={{ textDecoration: 'none', height: '36px', padding: '0 1rem', fontSize: '0.85rem', minHeight: 'auto' }}
+              >
+                {t.navStartTrial} <ArrowRight size={15} />
+              </a>
+            </div>
+          </nav>
+
+          {/* Mobile Header Controls (Theme + Compact Lang + Hamburger) */}
+          <div className="landing-nav-mobile-controls">
             <button
               type="button"
-              onClick={() => handleLanguageChange('az')}
-              style={{
-                border: 'none',
-                cursor: 'pointer',
-                padding: '0.32rem 0.68rem',
-                borderRadius: '999px',
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                background: lang === 'az' ? 'var(--primary)' : 'transparent',
-                color: lang === 'az' ? '#06080f' : 'var(--text-secondary)',
-              }}
+              onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+              className="landing-hamburger-btn"
+              title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             >
-              AZ
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             </button>
-            <button
-              type="button"
-              onClick={() => handleLanguageChange('en')}
-              style={{
-                border: 'none',
-                cursor: 'pointer',
-                padding: '0.32rem 0.68rem',
-                borderRadius: '999px',
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                background: lang === 'en' ? 'var(--primary)' : 'transparent',
-                color: lang === 'en' ? '#06080f' : 'var(--text-secondary)',
-              }}
-            >
-              EN
-            </button>
-          </div>
-
-          <a href={loginUrl} className="btn btn-secondary" style={{ textDecoration: 'none' }}>
-            {t.navSignIn}
-          </a>
-          <a href={registerUrl} className="btn btn-primary" style={{ textDecoration: 'none' }}>
-            {t.navStartTrial} <ArrowRight size={16} />
-          </a>
-        </nav>
-
-        {/* Mobile Header Controls (Compact Lang + Hamburger) */}
-        <div className="landing-nav-mobile-controls">
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid var(--border)',
-              borderRadius: '999px',
-              padding: '0.16rem',
-            }}
-          >
+            <div className="landing-lang-pill">
             <button
               type="button"
               onClick={() => handleLanguageChange('az')}
@@ -907,6 +899,7 @@ const LandingPage = () => {
           >
             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
+        </div>
         </div>
       </header>
 
