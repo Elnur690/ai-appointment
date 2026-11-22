@@ -774,6 +774,7 @@ const LandingPage = () => {
               <a href="#features">{t.navFeatures}</a>
               <a href="#roi">{t.navRoi}</a>
               <a href="#pricing">{t.navPricing}</a>
+              <a href="/contact">{lang === 'az' ? 'Əlaqə' : 'Contact'}</a>
               <a href="#reseller" style={{ color: 'var(--gold)', fontWeight: 600 }}>
                 {t.navReseller}
               </a>
@@ -2018,6 +2019,9 @@ const LandingPage = () => {
             </a>
             <a href="/acceptable-use" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>
               {lang === 'az' ? 'Məqbul İstifadə' : 'Acceptable Use'}
+            </a>
+            <a href="/contact" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>
+              {lang === 'az' ? 'Əlaqə' : 'Contact Us'}
             </a>
           </div>
 

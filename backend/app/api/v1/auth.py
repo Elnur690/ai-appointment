@@ -300,6 +300,57 @@ async def get_public_platform_config(db: Annotated[AsyncSession, Depends(get_db)
     }
 
 
+class ContactFormRequest(BaseModel):
+    name: str
+    email: EmailStr
+    phone: Optional[str] = None
+    subject: str = "General Inquiry"
+    message: str
+    website_honeypot: Optional[str] = None
+
+
+@router.post("/contact")
+async def submit_contact_inquiry(req: ContactFormRequest):
+    """Public Contact Us form endpoint (delivers inquiry to support@randevu.vip via Resend/SMTP)."""
+    if req.website_honeypot:
+        return {"status": "sent"}
+    if not req.name.strip() or not req.message.strip():
+        raise HTTPException(status_code=400, detail="Name and message are required")
+
+    target_email = settings.SAAS_ADMIN_EMAIL or "support@randevu.vip"
+    logger.info(f"Contact form inquiry from {req.name} <{req.email}> [{req.subject}]: {req.message[:200]}")
+
+    if settings.RESEND_API_KEY:
+        import httpx
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                await client.post(
+                    "https://api.resend.com/emails",
+                    headers={
+                        "Authorization": f"Bearer {settings.RESEND_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "from": settings.SMTP_FROM_EMAIL or "noreply@randevu.vip",
+                        "to": [target_email],
+                        "reply_to": str(req.email),
+                        "subject": f"[Randevu.vip Contact] {req.subject} — {req.name}",
+                        "html": (
+                            f"<h3>New Contact Form Inquiry</h3>"
+                            f"<p><strong>Name:</strong> {req.name}</p>"
+                            f"<p><strong>Email:</strong> {req.email}</p>"
+                            f"<p><strong>Phone:</strong> {req.phone or '—'}</p>"
+                            f"<p><strong>Subject:</strong> {req.subject}</p>"
+                            f"<hr/><p>{req.message.replace(chr(10), '<br/>')}</p>"
+                        ),
+                    },
+                )
+        except Exception as exc:
+            logger.warning(f"Resend contact email delivery failed: {exc}")
+
+    return {"status": "sent"}
+
+
 @router.get("/plans")
 async def get_public_plans(
     db: Annotated[AsyncSession, Depends(get_db)],

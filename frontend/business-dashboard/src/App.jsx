@@ -16,6 +16,7 @@ import LandingPage from './pages/LandingPage';
 import PartnerPortal from './pages/PartnerPortal';
 import PublicBooking from './pages/PublicBooking';
 import LegalPolicyPage from './pages/LegalPolicyPage';
+import ContactPage from './pages/ContactPage';
 
 const isApexMarketingHost = () => {
   if (typeof window === 'undefined') return false;
@@ -73,6 +74,7 @@ function App() {
           <Route path="/returns" element={<LegalPolicyPage defaultPolicy="refund" />} />
           <Route path="/cookies" element={<LegalPolicyPage defaultPolicy="cookies" />} />
           <Route path="/acceptable-use" element={<LegalPolicyPage defaultPolicy="acceptableUse" />} />
+          <Route path="/contact" element={<ContactPage />} />
           <Route path="*" element={<LandingPage />} />
         </Routes>
       </BrowserRouter>
@@ -89,6 +91,7 @@ function App() {
         <Route path="/returns" element={<LegalPolicyPage defaultPolicy="refund" />} />
         <Route path="/cookies" element={<LegalPolicyPage defaultPolicy="cookies" />} />
         <Route path="/acceptable-use" element={<LegalPolicyPage defaultPolicy="acceptableUse" />} />
+        <Route path="/contact" element={<ContactPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Login initialMode="register" />} />
         <Route path="/partner" element={<PartnerPortal />} />
