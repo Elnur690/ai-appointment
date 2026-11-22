@@ -466,6 +466,33 @@ class RefundDecisionRequest(BaseModel):
     admin_note: Optional[str] = None
 
 
+class SupportSettingsUpdate(BaseModel):
+    support_whatsapp_number: Optional[str] = None
+
+
+@router.get("/support-settings")
+async def get_support_settings(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    """Get platform WhatsApp support number configured for the landing page."""
+    cfg = await _get_or_create_platform_config(db)
+    return {"support_whatsapp_number": getattr(cfg, "support_whatsapp_number", None) or ""}
+
+
+@router.put("/support-settings")
+async def update_support_settings(
+    req: SupportSettingsUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    """Update platform WhatsApp support number shown as floating chat button on the landing page."""
+    cfg = await _get_or_create_platform_config(db)
+    cfg.support_whatsapp_number = (req.support_whatsapp_number or "").strip() or None
+    await db.commit()
+    return {"support_whatsapp_number": cfg.support_whatsapp_number or ""}
+
+
 @router.get("/refund-rules")
 async def get_refund_rules(
     db: Annotated[AsyncSession, Depends(get_db)],

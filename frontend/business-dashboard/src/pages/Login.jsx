@@ -520,7 +520,7 @@ const Login = ({ initialMode = 'login' }) => {
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
-              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
                 <label className="form-label">{t.referralLabel}</label>
                 <input
                   type="text"
@@ -530,6 +530,54 @@ const Login = ({ initialMode = 'login' }) => {
                   onChange={(e) => setReferralCode(e.target.value)}
                 />
               </div>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.55rem',
+                  fontSize: '0.82rem',
+                  color: 'var(--text-secondary)',
+                  marginBottom: '1.25rem',
+                  cursor: 'pointer',
+                  lineHeight: 1.45,
+                }}
+              >
+                <input type="checkbox" required style={{ marginTop: '3px', accentColor: 'var(--primary)' }} />
+                <span>
+                  {lang === 'en' ? (
+                    <>
+                      I agree to the{' '}
+                      <a href="/terms" target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>
+                        Terms of Service
+                      </a>
+                      ,{' '}
+                      <a href="/privacy" target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>
+                        Privacy Policy
+                      </a>
+                      , and{' '}
+                      <a href="/refund-policy" target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>
+                        Refund & Cancellation Policy
+                      </a>
+                      .
+                    </>
+                  ) : (
+                    <>
+                      <a href="/terms" target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>
+                        İstifadə Şərtləri
+                      </a>
+                      ,{' '}
+                      <a href="/privacy" target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>
+                        Məxfilik Siyasəti
+                      </a>{' '}
+                      və{' '}
+                      <a href="/refund-policy" target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>
+                        Geri Ödəniş Siyasəti
+                      </a>{' '}
+                      ilə razıyam.
+                    </>
+                  )}
+                </span>
+              </label>
               <button
                 type="submit"
                 disabled={submitting}

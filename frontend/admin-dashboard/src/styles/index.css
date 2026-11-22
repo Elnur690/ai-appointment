@@ -24,6 +24,31 @@
   --sidebar-collapsed-width: 80px;
 }
 
+[data-theme='light'] {
+  color-scheme: light;
+  --bg-color: #f8fafc;
+  --surface-color: #ffffff;
+  --card-bg: rgba(255, 255, 255, 0.95);
+  --border-color: rgba(15, 23, 42, 0.12);
+  --border: rgba(15, 23, 42, 0.12);
+  --border-hover: rgba(15, 23, 42, 0.25);
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+}
+
+[data-theme='light'] .glass-card {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.12);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.05);
+}
+
+[data-theme='light'] .form-control {
+  background: #ffffff;
+  color: #0f172a;
+  border-color: rgba(15, 23, 42, 0.2);
+}
+
 * {
   margin: 0;
   padding: 0;

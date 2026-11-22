@@ -290,6 +290,16 @@ async def verify_customer_otp(req: OtpVerifyRequest):
     return TokenResponse(access_token=access, role="customer")
 
 
+@router.get("/public-config")
+async def get_public_platform_config(db: Annotated[AsyncSession, Depends(get_db)]):
+    """Return public landing-page settings such as the platform WhatsApp support number."""
+    from app.models.saas import PlatformConfig
+    cfg = (await db.execute(select(PlatformConfig).where(PlatformConfig.config_key == "global"))).scalar_one_or_none()
+    return {
+        "support_whatsapp_number": (getattr(cfg, "support_whatsapp_number", None) or "") if cfg else "",
+    }
+
+
 @router.get("/plans")
 async def get_public_plans(
     db: Annotated[AsyncSession, Depends(get_db)],

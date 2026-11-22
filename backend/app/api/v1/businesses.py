@@ -703,8 +703,9 @@ async def create_subscription_checkout(
                     "type": "saas_subscription",
                     "plan_id": str(target_plan.id),
                 },
+                "cancel_url": f"https://app.{settings.PLATFORM_DOMAIN}/payments?payment=cancelled",
             },
-            return_url=f"https://app.{settings.PLATFORM_DOMAIN}/payments",
+            return_url=f"https://app.{settings.PLATFORM_DOMAIN}/payments?payment=success",
         )
         sub_payment.gateway_transaction_id = link_res.transaction_id
         checkout_url = link_res.payment_url

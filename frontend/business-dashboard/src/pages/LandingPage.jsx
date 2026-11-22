@@ -26,6 +26,8 @@ import {
   CheckCircle2,
   ArrowRight,
   Menu,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 const getAppOrigin = () => {
@@ -587,6 +589,32 @@ const LandingPage = () => {
   const [missedPerDay, setMissedPerDay] = useState(2);
   const [avgBookingPrice, setAvgBookingPrice] = useState(45);
   const [demoTab, setDemoTab] = useState('customer');
+  const [supportWhatsapp, setSupportWhatsapp] = useState('');
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem('randevu_theme') || 'dark';
+    } catch {
+      return 'dark';
+    }
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem('randevu_theme', theme);
+    } catch {}
+  }, [theme]);
+
+  useEffect(() => {
+    api
+      .get('/auth/public-config')
+      .then((res) => {
+        if (res.data?.support_whatsapp_number) {
+          setSupportWhatsapp(res.data.support_whatsapp_number);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Seller / Reseller Application Modal state
   const sellerDialogRef = useRef(null);
@@ -758,6 +786,17 @@ const LandingPage = () => {
           >
             <Handshake size={15} />
             {t.navReseller}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+            className="btn btn-secondary"
+            style={{ padding: '0.42rem 0.6rem', minHeight: 'auto' }}
+            title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
           {/* Language Switcher (AZ default | EN) */}
@@ -1995,6 +2034,40 @@ const LandingPage = () => {
           </div>
         </div>
       </footer>
+
+      {/* Floating WhatsApp Support Button (Configured from SaaS Admin) */}
+      {supportWhatsapp && (
+        <a
+          href={`https://wa.me/${supportWhatsapp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+            lang === 'en'
+              ? 'Hello Randevu.vip! I would like to learn more about setting up AI booking for my business.'
+              : 'Salam Randevu.vip! Biznesim üçün AI randevu sistemini qoşmaq haqqında məlumat almaq istəyirəm.'
+          )}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="WhatsApp Support"
+          style={{
+            position: 'fixed',
+            right: '1.35rem',
+            bottom: '1.35rem',
+            zIndex: 60,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.55rem',
+            padding: '0.8rem 1.2rem',
+            borderRadius: '999px',
+            background: 'linear-gradient(135deg, #25d366 0%, #128c7e 100%)',
+            color: '#ffffff',
+            fontWeight: 700,
+            fontSize: '0.9rem',
+            textDecoration: 'none',
+            boxShadow: '0 10px 30px rgba(18, 140, 126, 0.45)',
+          }}
+        >
+          <MessageSquare size={18} />
+          <span>{lang === 'en' ? 'WhatsApp Support' : 'WhatsApp Dəstək'}</span>
+        </a>
+      )}
     </div>
   );
 };

@@ -30,14 +30,32 @@ const PaymentGateways = () => {
   });
   const [refundRulesMsg, setRefundRulesMsg] = useState('');
   const [refundRequests, setRefundRequests] = useState([]);
+  const [supportWhatsapp, setSupportWhatsapp] = useState('');
+  const [supportMsg, setSupportMsg] = useState('');
 
   const loadRefundData = async () => {
-    const [rulesRes, listRes] = await Promise.all([
+    const [rulesRes, listRes, supRes] = await Promise.all([
       apiClient.get('/saas-admin/refund-rules').catch(() => ({ data: null })),
       apiClient.get('/saas-admin/refunds').catch(() => ({ data: [] })),
+      apiClient.get('/saas-admin/support-settings').catch(() => ({ data: null })),
     ]);
     if (rulesRes.data) setRefundRules(rulesRes.data);
     setRefundRequests(Array.isArray(listRes.data) ? listRes.data : []);
+    if (supRes.data) setSupportWhatsapp(supRes.data.support_whatsapp_number || '');
+  };
+
+  const handleSaveSupportWhatsapp = async (e) => {
+    e.preventDefault();
+    setSupportMsg('');
+    await apiClient.put('/saas-admin/support-settings', {
+      support_whatsapp_number: supportWhatsapp,
+    });
+    setSupportMsg(
+      isAz
+        ? 'WhatsApp dəstək nömrəsi yadda saxlanıldı (Ana səhifədə aktivdir).'
+        : 'WhatsApp support number saved (live on landing page).'
+    );
+    setTimeout(() => setSupportMsg(''), 3500);
   };
 
   useEffect(() => {
@@ -191,6 +209,32 @@ const PaymentGateways = () => {
             </div>
           );
         })}
+      </div>
+
+      {/* Platform WhatsApp Support Number (Floating Button on Landing Page) */}
+      <div className="glass-card" style={{ padding: '1.75rem', marginTop: '2rem', border: '1px solid rgba(16, 185, 129, 0.35)' }}>
+        <h2 style={{ fontSize: '1.2rem', marginBottom: '0.35rem' }}>
+          {isAz ? 'WhatsApp Dəstək Nömrəsi (Ana Səhifə)' : 'WhatsApp Support Number (Landing Page)'}
+        </h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginBottom: '1rem' }}>
+          {isAz
+            ? 'Burada daxil etdiyiniz nömrə randevu.vip ana səhifəsində üzən WhatsApp dəstək düyməsi kimi görünəcək.'
+            : 'The number entered here appears as a floating WhatsApp chat button on the randevu.vip landing page.'}
+        </p>
+        <form onSubmit={handleSaveSupportWhatsapp} style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <input
+            type="tel"
+            className="form-control"
+            style={{ maxWidth: '300px' }}
+            placeholder="+994501234567"
+            value={supportWhatsapp}
+            onChange={(e) => setSupportWhatsapp(e.target.value)}
+          />
+          <button type="submit" className="btn btn-primary">
+            {isAz ? 'Nömrəni Yadda Saxla' : 'Save Number'}
+          </button>
+          {supportMsg && <span style={{ color: 'var(--success)', fontSize: '0.86rem', fontWeight: 600 }}>{supportMsg}</span>}
+        </form>
       </div>
 
       {/* Live Suby.fi Payment Test (with Live AZN -> USD Conversion) */}

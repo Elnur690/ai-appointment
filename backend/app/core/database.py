@@ -81,6 +81,7 @@ async def init_db() -> None:
         "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS suby_customer_id VARCHAR;",
         "ALTER TABLE refund_requests ADD COLUMN IF NOT EXISTS suby_refund_id VARCHAR;",
         "ALTER TABLE platform_configs ADD COLUMN IF NOT EXISTS refund_rules JSONB;",
+        "ALTER TABLE platform_configs ADD COLUMN IF NOT EXISTS support_whatsapp_number VARCHAR(32);",
         "ALTER TYPE paymentmethod ADD VALUE IF NOT EXISTS 'creem';",
         "ALTER TYPE paymentmethod ADD VALUE IF NOT EXISTS 'suby';",
     ]

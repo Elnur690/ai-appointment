@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -10,6 +10,8 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { BrandLogo } from '../common/BrandLogo';
@@ -19,6 +21,20 @@ const Sidebar = () => {
   const { user, logout, language, setLanguage } = useAuthStore();
   const isAz = (language || 'az') !== 'en';
   const navigate = useNavigate();
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem('randevu_theme') || 'dark';
+    } catch {
+      return 'dark';
+    }
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem('randevu_theme', theme);
+    } catch {}
+  }, [theme]);
 
   const handleLogout = () => {
     logout();
@@ -69,11 +85,27 @@ const Sidebar = () => {
       </div>
 
       {!collapsed && (
-        <div style={{ padding: '0.75rem 1.25rem 0', display: 'flex', justifyContent: 'center' }}>
+        <div style={{ padding: '0.75rem 1.25rem 0', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+            className="btn-ghost"
+            style={{
+              padding: '0.38rem 0.55rem',
+              borderRadius: '999px',
+              border: '1px solid var(--border-color)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+          >
+            {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
           <div
             style={{
               display: 'inline-flex',
-              width: '100%',
+              flex: 1,
               background: 'rgba(255, 255, 255, 0.05)',
               border: '1px solid var(--border-color)',
               borderRadius: '999px',

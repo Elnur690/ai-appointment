@@ -68,6 +68,7 @@ class PlatformConfig(Base, TimestampMixin):
     config_key: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, default="global")
     payment_gateways: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=DEFAULT_PLATFORM_GATEWAYS)
     refund_rules: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True, default=DEFAULT_REFUND_RULES)
+    support_whatsapp_number: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
 
 class RefundRequest(Base, TimestampMixin):

@@ -181,8 +181,45 @@ const Payments = () => {
     },
   ];
 
+  const paymentStatusParam =
+    typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('payment') : null;
+
   return (
     <div>
+      {paymentStatusParam === 'success' && (
+        <div
+          style={{
+            marginBottom: '1.25rem',
+            padding: '0.9rem 1.25rem',
+            borderRadius: '10px',
+            background: 'rgba(16, 185, 129, 0.14)',
+            border: '1px solid var(--success)',
+            color: 'var(--success)',
+            fontWeight: 600,
+          }}
+        >
+          {isAz
+            ? '✓ Abunəlik ödənişiniz uğurla tamamlandı! Paketiniz avtomatik aktivləşdirilir.'
+            : '✓ Subscription payment completed! Your plan is being activated automatically.'}
+        </div>
+      )}
+      {paymentStatusParam === 'cancelled' && (
+        <div
+          style={{
+            marginBottom: '1.25rem',
+            padding: '0.9rem 1.25rem',
+            borderRadius: '10px',
+            background: 'rgba(245, 158, 11, 0.14)',
+            border: '1px solid var(--warning)',
+            color: 'var(--warning)',
+            fontWeight: 600,
+          }}
+        >
+          {isAz
+            ? 'Ödəniş ləğv edildi. İstədiyiniz zaman yenidən cəhd edə bilərsiniz.'
+            : 'Checkout was cancelled. You can retry upgrading your plan anytime.'}
+        </div>
+      )}
       <div
         style={{
           display: 'flex',

@@ -1,7 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import { LogOut, User } from 'lucide-react';
+import { LogOut, User, Sun, Moon } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { UI_TEXT } from '../../i18n/translations';
 import './Layout.css';
@@ -11,6 +11,20 @@ export const Layout = () => {
   const navigate = useNavigate();
   const lang = language || 'az';
   const t = (UI_TEXT[lang] || UI_TEXT.az).sidebar;
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem('randevu_theme') || 'dark';
+    } catch {
+      return 'dark';
+    }
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem('randevu_theme', theme);
+    } catch {}
+  }, [theme]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -38,7 +52,16 @@ export const Layout = () => {
               <span className="badge badge-info">{businessContext.custom_domain}</span>
             )}
           </div>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+              className="btn btn-secondary"
+              style={{ padding: '0.38rem 0.55rem', minHeight: 'auto' }}
+              title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
             {/* Language Switcher (AZ default | EN) */}
             <div
               style={{
