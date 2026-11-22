@@ -47,9 +47,12 @@ class RevenueSummaryResponse(BaseModel):
 GATEWAY_LABELS = {
     "cash": "Cash",
     "payriff": "Payriff",
-    "paymegate": "Paymegate",
-    "paymengate": "Paymegate",
     "epoint": "EPoint",
+    "suby": "Suby.fi",
+    # Legacy labels kept only for historical rows:
+    "paymegate": "Paymegate (Legacy)",
+    "paymengate": "Paymegate (Legacy)",
+    "creem": "Creem (Legacy)",
 }
 
 

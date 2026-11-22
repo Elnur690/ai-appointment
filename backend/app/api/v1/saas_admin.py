@@ -340,13 +340,13 @@ async def list_platform_payment_gateways(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
-    """List all platform payment gateways (Cash, Creem, Payriff, EPoint) and their enabled + .env status."""
+    """List all platform payment gateways (Cash, Suby.fi, Payriff, EPoint) and their enabled + .env status."""
     cfg = await _get_or_create_platform_config(db)
-    order = ["cash", "creem", "payriff", "epoint"]
+    order = ["cash", "suby", "payriff", "epoint"]
 
     def _mask_secret(val: str) -> str:
         s = (val or "").strip()
-        if not s or s.startswith("change_me") or s == "creem_your_api_key":
+        if not s or s.startswith("change_me"):
             return ""
         return f"••••{s[-4:]}" if len(s) >= 4 else "••••"
 
@@ -355,8 +355,8 @@ async def list_platform_payment_gateways(
         if k not in cfg.payment_gateways:
             continue
         item = dict(cfg.payment_gateways[k])
-        if k == "creem":
-            masked = _mask_secret(settings.CREEM_API_KEY)
+        if k == "suby":
+            masked = _mask_secret(settings.SUBY_API_KEY)
             item["env_configured"] = bool(masked)
             item["env_hint"] = masked
         elif k in {"payriff", "epoint"}:
@@ -380,33 +380,37 @@ async def test_live_payment_checkout(
     req: AdminPaymentTestRequest,
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
-    """Create a live Creem checkout session for any amount (auto-converting AZN -> USD at live FX rate)."""
+    """Create a live Suby.fi checkout session for any amount (auto-converting AZN -> USD at live FX rate)."""
     from decimal import Decimal
     from uuid import uuid4
-    from app.integrations.payments.fx import convert_to_usd
-    from app.integrations.payments.creem import CreemAdapter
+    from app.integrations.payments.suby import SubyAdapter, convert_azn_to_usd
+    # Disabled: from app.integrations.payments.creem import CreemAdapter
 
     if req.amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be greater than 0")
-    if not (settings.CREEM_API_KEY or "").strip():
-        raise HTTPException(status_code=400, detail="CREEM_API_KEY is not set in .env")
+    if not (settings.SUBY_API_KEY or "").strip():
+        raise HTTPException(status_code=400, detail="SUBY_API_KEY is not set in .env")
 
     orig_currency = (req.currency or "AZN").strip().upper()
-    if orig_currency not in {"AZN", "USD"}:
+    if orig_currency not in {"AZN", "USD", "EUR"}:
         orig_currency = "AZN"
 
     orig_amount = Decimal(str(req.amount)).quantize(Decimal("0.01"))
-    usd_amount, fx_rate = await convert_to_usd(orig_amount, orig_currency)
+    if orig_currency == "AZN":
+        usd_amount, fx_rate = await convert_azn_to_usd(orig_amount)
+    else:
+        usd_amount, fx_rate = orig_amount, Decimal("1.0")
 
     test_payment_id = uuid4()
-    res = await CreemAdapter().create_payment_link(
+    res = await SubyAdapter().create_payment_link(
         payment_id=test_payment_id,
         amount=orig_amount,
         currency=orig_currency,
         description=req.description or f"Randevu.vip Live Test ({orig_amount} {orig_currency})",
         merchant_config={
-            "type": "admin_test",
+            "mode": "payment",
             "customer_email": user.get("email") or settings.SAAS_ADMIN_EMAIL,
+            "metadata": {"type": "admin_test"},
         },
         return_url=f"https://admin.{settings.PLATFORM_DOMAIN}/payment-gateways",
     )
@@ -513,7 +517,7 @@ async def list_all_refund_requests(
             "reason": r.reason,
             "status": r.status,
             "admin_note": r.admin_note,
-            "creem_refund_id": r.creem_refund_id,
+            "suby_refund_id": getattr(r, "suby_refund_id", None),
             "created_at": r.created_at.isoformat() if r.created_at else None,
             "resolved_at": r.resolved_at.isoformat() if r.resolved_at else None,
         }
@@ -528,9 +532,10 @@ async def approve_refund_request(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
 ):
-    """Approve a pending refund request and trigger Creem refund if paid via Creem."""
+    """Approve a pending refund request and trigger Suby.fi refund if paid via Suby.fi."""
     from app.models.payment import PaymentMethod
-    from app.integrations.payments.creem import CreemAdapter
+    from app.integrations.payments.suby import SubyAdapter
+    # Disabled: from app.integrations.payments.creem import CreemAdapter
 
     rr = (await db.execute(select(RefundRequest).where(RefundRequest.id == UUID(refund_id)))).scalar_one_or_none()
     if not rr:
@@ -539,12 +544,13 @@ async def approve_refund_request(
         return {"status": rr.status}
 
     payment = (await db.execute(select(Payment).where(Payment.id == rr.payment_id))).scalar_one_or_none()
-    if payment and payment.method == PaymentMethod.creem and payment.gateway_transaction_id and settings.CREEM_API_KEY:
+    if payment and payment.method == PaymentMethod.suby and payment.gateway_transaction_id and settings.SUBY_API_KEY:
         try:
-            rf_res = await CreemAdapter().refund_payment(payment.gateway_transaction_id, rr.reason)
-            rr.creem_refund_id = str(rf_res.get("id") or "")
+            rf_res = await SubyAdapter().create_refund(payment_id=payment.gateway_transaction_id, reason=rr.reason)
+            data = rf_res.get("data") if isinstance(rf_res.get("data"), dict) else rf_res
+            rr.suby_refund_id = str(data.get("id") or "")
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=f"Creem refund failed: {exc}")
+            raise HTTPException(status_code=400, detail=f"Suby.fi refund failed: {exc}")
 
     if payment:
         payment.status = PaymentStatus.refunded
@@ -1040,3 +1046,250 @@ async def activate_model_version(
         "message": f"Successfully activated '{req.model_id}' for provider '{req.provider}' live with zero downtime.",
         "active_config": AIRegistryService.get_provider_config(req.provider),
     }
+
+
+# ----------------------------------------------------------------------
+# Suby.fi v3-beta Full API Admin Endpoints (Products, Checkouts,
+# Subscriptions, Customers, Payments, Off-Session, Refunds, Webhooks)
+# ----------------------------------------------------------------------
+@router.get("/suby/products")
+async def suby_list_products(
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+    limit: int = 50,
+    offset: int = 0,
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().list_products(limit=limit, offset=offset)
+
+
+@router.post("/suby/products")
+async def suby_create_product(
+    payload: dict[str, Any],
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().create_product(
+        name=payload["name"],
+        price=payload["price"],
+        currency=payload.get("currency", "USD"),
+        description=payload.get("description"),
+        recurring_interval=payload.get("recurringInterval") or payload.get("recurring_interval"),
+        metadata=payload.get("metadata"),
+    )
+
+
+@router.patch("/suby/products/{product_id}")
+async def suby_update_product(
+    product_id: str,
+    payload: dict[str, Any],
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().update_product(product_id, payload)
+
+
+@router.delete("/suby/products/{product_id}")
+async def suby_delete_product(
+    product_id: str,
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().delete_product(product_id)
+
+
+@router.get("/suby/checkout/sessions")
+async def suby_list_checkout_sessions(
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+    limit: int = 50,
+    offset: int = 0,
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().list_checkout_sessions(limit=limit, offset=offset)
+
+
+@router.get("/suby/checkout/sessions/{session_id}")
+async def suby_get_checkout_session(
+    session_id: str,
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().get_checkout_session(session_id)
+
+
+@router.post("/suby/checkout/sessions/{session_id}/cancel")
+async def suby_cancel_checkout_session(
+    session_id: str,
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().cancel_checkout_session(session_id)
+
+
+@router.get("/suby/subscriptions")
+async def suby_list_subscriptions(
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+    customer_id: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().list_subscriptions(customer_id=customer_id, status=status, limit=limit, offset=offset)
+
+
+@router.get("/suby/subscriptions/{subscription_id}")
+async def suby_get_subscription(
+    subscription_id: str,
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().get_subscription(subscription_id)
+
+
+@router.patch("/suby/subscriptions/{subscription_id}")
+async def suby_update_subscription(
+    subscription_id: str,
+    payload: dict[str, Any],
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().update_subscription(subscription_id, payload)
+
+
+@router.post("/suby/subscriptions/{subscription_id}/cancel")
+async def suby_cancel_subscription(
+    subscription_id: str,
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+    cancel_at_period_end: bool = False,
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().cancel_subscription(subscription_id, cancel_at_period_end=cancel_at_period_end)
+
+
+@router.post("/suby/subscriptions/{subscription_id}/pause")
+async def suby_pause_subscription(
+    subscription_id: str,
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().pause_subscription(subscription_id)
+
+
+@router.post("/suby/subscriptions/{subscription_id}/resume")
+async def suby_resume_subscription(
+    subscription_id: str,
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().resume_subscription(subscription_id)
+
+
+@router.get("/suby/customers")
+async def suby_list_customers(
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+    limit: int = 50,
+    offset: int = 0,
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().list_customers(limit=limit, offset=offset)
+
+
+@router.post("/suby/customers")
+async def suby_create_customer(
+    payload: dict[str, Any],
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().create_customer(
+        email=payload["email"],
+        name=payload.get("name"),
+        phone=payload.get("phone"),
+        metadata=payload.get("metadata"),
+    )
+
+
+@router.get("/suby/customers/{customer_id}/payment-methods")
+async def suby_list_customer_payment_methods(
+    customer_id: str,
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().list_customer_payment_methods(customer_id)
+
+
+@router.get("/suby/payments")
+async def suby_list_payments(
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+    limit: int = 50,
+    offset: int = 0,
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().list_payments(limit=limit, offset=offset)
+
+
+@router.post("/suby/payments/off-session")
+async def suby_create_off_session_payment(
+    payload: dict[str, Any],
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().create_off_session_payment(
+        customer_id=payload["customerId"],
+        payment_method_id=payload["paymentMethodId"],
+        amount=payload["amount"],
+        currency=payload.get("currency", "USD"),
+        description=payload.get("description"),
+        metadata=payload.get("metadata"),
+    )
+
+
+@router.get("/suby/refunds")
+async def suby_list_refunds(
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+    limit: int = 50,
+    offset: int = 0,
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().list_refunds(limit=limit, offset=offset)
+
+
+@router.post("/suby/refunds")
+async def suby_create_refund(
+    payload: dict[str, Any],
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().create_refund(
+        payment_id=payload["paymentId"],
+        amount=payload.get("amount"),
+        reason=payload.get("reason"),
+    )
+
+
+@router.get("/suby/webhooks")
+async def suby_list_webhooks(
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().list_webhooks()
+
+
+@router.post("/suby/webhooks")
+async def suby_create_webhook(
+    payload: dict[str, Any],
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().create_webhook(
+        url=payload.get("url") or f"https://api.{settings.PLATFORM_DOMAIN}/api/v1/webhooks/payments/suby",
+        events=payload.get("events"),
+    )
+
+
+@router.delete("/suby/webhooks/{webhook_id}")
+async def suby_delete_webhook(
+    webhook_id: str,
+    user: Annotated[dict[str, Any], Depends(require_role("saas_owner"))],
+):
+    from app.integrations.payments.suby import SubyAdapter
+    return await SubyAdapter().delete_webhook(webhook_id)

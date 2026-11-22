@@ -6,11 +6,10 @@ import { CreditCard, Banknote, ShieldCheck, CheckCircle2, XCircle, ExternalLink 
 
 const GATEWAY_ICONS = {
   cash: Banknote,
-  creem: CreditCard,
+  suby: CreditCard,
   payriff: CreditCard,
   epoint: ShieldCheck,
-  paymegate: ShieldCheck,
-  paymengate: ShieldCheck,
+  // Disabled: creem, paymegate
 };
 
 const PaymentGateways = () => {
@@ -84,7 +83,7 @@ const PaymentGateways = () => {
           <h1>{isAz ? 'Ödəniş Şlüzlərinin İdarə Edilməsi' : 'Payment Gateways Control'}</h1>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isAz
-              ? 'Randevu.vip platformasındakı bütün bizneslər üçün ödəniş şlüzlərini (Nağd, Creem, Payriff, EPoint) aktiv və ya deaktiv edin.'
+              ? 'Randevu.vip platformasındakı bütün bizneslər üçün ödəniş şlüzlərini (Nağd, Suby.fi, Payriff, EPoint) aktiv və ya deaktiv edin.'
               : 'Enable or disable payment gateways platform-wide across all businesses on Randevu.vip.'}
           </p>
         </div>
@@ -167,8 +166,8 @@ const PaymentGateways = () => {
                         ? `.env konfiqurasiyası: Aktiv (${gw.env_hint})`
                         : `.env configured (${gw.env_hint})`
                       : isAz
-                      ? `.env açarı təyin edilməyib (${gw.provider === 'creem' ? 'CREEM_API_KEY' : gw.provider === 'epoint' ? 'Biznes Paneli' : 'PAYRIFF_SECRET_KEY'})`
-                      : `Set ${gw.provider === 'creem' ? 'CREEM_API_KEY' : gw.provider === 'epoint' ? 'Business Dashboard' : 'PAYRIFF_SECRET_KEY'} in .env`
+                      ? `.env açarı təyin edilməyib (${gw.provider === 'suby' ? 'SUBY_API_KEY' : gw.provider === 'epoint' ? 'Biznes Paneli' : 'PAYRIFF_SECRET_KEY'})`
+                      : `Set ${gw.provider === 'suby' ? 'SUBY_API_KEY' : gw.provider === 'epoint' ? 'Business Dashboard' : 'PAYRIFF_SECRET_KEY'} in .env`
                     : isAz
                     ? 'Daxili kassa / nağd ödəniş üsulu'
                     : 'Built-in Ledger Method'}
@@ -194,16 +193,22 @@ const PaymentGateways = () => {
         })}
       </div>
 
-      {/* Live Creem Payment Test (with Live AZN -> USD Conversion) */}
+      {/* Live Suby.fi Payment Test (with Live AZN -> USD Conversion) */}
       <div className="glass-card" style={{ padding: '1.75rem', marginTop: '2rem', border: '1px solid rgba(212, 175, 55, 0.35)' }}>
         <h2 style={{ fontSize: '1.25rem', marginBottom: '0.35rem' }}>
-          {isAz ? 'Canlı Ödəniş Testi (Creem USD)' : 'Live Payment Test (Creem USD)'}
+          {isAz ? 'Canlı Ödəniş Testi (Suby.fi USD / EUR)' : 'Live Payment Test (Suby.fi USD / EUR)'}
         </h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
           {isAz
-            ? 'İstənilən məbləğ daxil edib real Creem ödəniş linki yaradın. AZN daxil etdikdə canlı məzənnə ilə avtomatik USD-yə çevrilir.'
-            : 'Enter any amount to generate a real Creem checkout session. AZN amounts are automatically converted to USD using the live exchange rate.'}
+            ? 'İstənilən məbləğ daxil edib real Suby.fi ödəniş sessiyası yaradın. AZN daxil etdikdə canlı məzənnə ilə avtomatik USD-yə çevrilir.'
+            : 'Enter any amount to generate a real Suby.fi checkout session. AZN amounts are automatically converted to USD using the live exchange rate.'}
         </p>
+        <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+          Webhook URL:{' '}
+          <code style={{ padding: '0.2rem 0.45rem', borderRadius: '6px', background: 'rgba(0,0,0,0.25)' }}>
+            https://api.randevu.vip/api/v1/webhooks/payments/suby
+          </code>
+        </div>
 
         <form onSubmit={handleRunLiveTest} style={{ display: 'flex', gap: '0.85rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div className="form-group" style={{ marginBottom: 0, minWidth: '160px' }}>
@@ -223,6 +228,7 @@ const PaymentGateways = () => {
             <select className="form-control" value={testCurrency} onChange={(e) => setTestCurrency(e.target.value)}>
               <option value="AZN">AZN</option>
               <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
             </select>
           </div>
           <button type="submit" className="btn btn-primary" disabled={testLoading}>

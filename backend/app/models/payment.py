@@ -10,10 +10,11 @@ from app.models.base import Base, TimestampMixin, generate_uuid7
 class PaymentMethod(str, enum.Enum):
     cash = "cash"
     payriff = "payriff"
-    paymegate = "paymegate"
-    paymengate = "paymengate"
+    paymegate = "paymegate"   # legacy enum value (provider disabled)
+    paymengate = "paymengate" # legacy enum value (provider disabled)
     epoint = "epoint"
-    creem = "creem"
+    creem = "creem"           # legacy enum value (provider disabled)
+    suby = "suby"
 
 class PaymentStatus(str, enum.Enum):
     pending = "pending"

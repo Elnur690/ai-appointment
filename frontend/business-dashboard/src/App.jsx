@@ -15,6 +15,7 @@ import Login from './pages/Login';
 import LandingPage from './pages/LandingPage';
 import PartnerPortal from './pages/PartnerPortal';
 import PublicBooking from './pages/PublicBooking';
+import LegalPolicyPage from './pages/LegalPolicyPage';
 
 const isApexMarketingHost = () => {
   if (typeof window === 'undefined') return false;
@@ -66,6 +67,12 @@ function App() {
           <Route path="/login" element={<RedirectToAppHost path="/login" />} />
           <Route path="/register" element={<RedirectToAppHost path="/register" />} />
           <Route path="/book/:businessId" element={<PublicBooking />} />
+          <Route path="/terms" element={<LegalPolicyPage defaultPolicy="terms" />} />
+          <Route path="/privacy" element={<LegalPolicyPage defaultPolicy="privacy" />} />
+          <Route path="/refund-policy" element={<LegalPolicyPage defaultPolicy="refund" />} />
+          <Route path="/returns" element={<LegalPolicyPage defaultPolicy="refund" />} />
+          <Route path="/cookies" element={<LegalPolicyPage defaultPolicy="cookies" />} />
+          <Route path="/acceptable-use" element={<LegalPolicyPage defaultPolicy="acceptableUse" />} />
           <Route path="*" element={<LandingPage />} />
         </Routes>
       </BrowserRouter>
@@ -76,6 +83,12 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/welcome" element={<LandingPage />} />
+        <Route path="/terms" element={<LegalPolicyPage defaultPolicy="terms" />} />
+        <Route path="/privacy" element={<LegalPolicyPage defaultPolicy="privacy" />} />
+        <Route path="/refund-policy" element={<LegalPolicyPage defaultPolicy="refund" />} />
+        <Route path="/returns" element={<LegalPolicyPage defaultPolicy="refund" />} />
+        <Route path="/cookies" element={<LegalPolicyPage defaultPolicy="cookies" />} />
+        <Route path="/acceptable-use" element={<LegalPolicyPage defaultPolicy="acceptableUse" />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Login initialMode="register" />} />
         <Route path="/partner" element={<PartnerPortal />} />

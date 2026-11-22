@@ -1667,6 +1667,47 @@ const LandingPage = () => {
             </a>
           </div>
         </div>
+
+        {/* Legal, Compliance & Contact Bar (Payment Processor Review Ready) */}
+        <div
+          style={{
+            maxWidth: '1200px',
+            margin: '1.5rem auto 0',
+            paddingTop: '1.25rem',
+            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem',
+            fontSize: '0.82rem',
+          }}
+        >
+          <div style={{ display: 'flex', gap: '1.15rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <a href="/terms" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>
+              {lang === 'az' ? 'İstifadə Şərtləri' : 'Terms of Service'}
+            </a>
+            <a href="/privacy" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>
+              {lang === 'az' ? 'Məxfilik Siyasəti' : 'Privacy Policy'}
+            </a>
+            <a href="/refund-policy" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>
+              {lang === 'az' ? 'Geri Ödəniş və Ləğv Siyasəti' : 'Refund & Cancellation Policy'}
+            </a>
+            <a href="/cookies" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>
+              {lang === 'az' ? 'Kuki Siyasəti' : 'Cookie Policy'}
+            </a>
+            <a href="/acceptable-use" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>
+              {lang === 'az' ? 'Məqbul İstifadə' : 'Acceptable Use'}
+            </a>
+          </div>
+
+          <div style={{ color: 'var(--text-secondary)' }}>
+            © {new Date().getFullYear()} Randevu.vip · Baku, Azerbaijan ·{' '}
+            <a href="mailto:support@randevu.vip" style={{ color: 'var(--text-secondary)', textDecoration: 'underline' }}>
+              support@randevu.vip
+            </a>
+          </div>
+        </div>
       </footer>
     </div>
   );

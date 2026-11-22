@@ -29,13 +29,16 @@ DEFAULT_PLATFORM_GATEWAYS = {
         "enabled": True,
         "requires_credentials": False,
     },
-    "creem": {
-        "provider": "creem",
-        "name": "Creem (Cards & Subscriptions)",
-        "description": "Global online card checkout and built-in recurring subscriptions via Creem API v1 (docs.creem.io).",
+    "suby": {
+        "provider": "suby",
+        "name": "Suby.fi (Cards, Crypto & Subscriptions)",
+        "description": "Global online card, APM, crypto checkout and recurring SaaS subscriptions via Suby.fi v3 API (docs.suby.fi).",
         "enabled": True,
         "requires_credentials": True,
     },
+    # Disabled providers (kept commented for reference):
+    # "creem": { ... }
+    # "paymegate": { ... }
 }
 
 
@@ -79,6 +82,7 @@ class RefundRequest(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")  # pending, auto_approved, approved, rejected, failed
     admin_note: Mapped[str | None] = mapped_column(String, nullable=True)
     creem_refund_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    suby_refund_id: Mapped[str | None] = mapped_column(String, nullable=True)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 

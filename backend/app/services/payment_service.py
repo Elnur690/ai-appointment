@@ -9,41 +9,46 @@ from app.core.security import decrypt_credentials_dict
 from app.models.payment import Payment, PaymentGatewayConfig, PaymentMethod, PaymentStatus
 from app.models.appointment import Appointment, AppointmentStatus
 from app.integrations.payments.payriff import PayriffAdapter
-from app.integrations.payments.paymegate import PaymegateAdapter
 from app.integrations.payments.epoint import EpointAdapter
-from app.integrations.payments.creem import CreemAdapter
+from app.integrations.payments.suby import SubyAdapter
+# Disabled providers (kept commented for reference):
+# from app.integrations.payments.paymegate import PaymegateAdapter
+# from app.integrations.payments.creem import CreemAdapter
 from app.integrations.payments.adapter import PaymentAdapter, PaymentLinkResult
 
 logger = logging.getLogger(__name__)
 
 
 class PaymentService:
-    """Manages cash payments and online payment gateway processing (Creem & Payriff)."""
+    """Manages cash payments and online payment gateway processing (Suby.fi, Payriff & EPoint)."""
 
     def __init__(self, db: AsyncSession, business_id: UUID):
         self.db = db
         self.business_id = business_id
         self.payriff_adapter = PayriffAdapter()
-        self.paymegate_adapter = PaymegateAdapter()
         self.epoint_adapter = EpointAdapter()
-        self.creem_adapter = CreemAdapter()
+        self.suby_adapter = SubyAdapter()
+        # self.paymegate_adapter = PaymegateAdapter()
+        # self.creem_adapter = CreemAdapter()
 
     def _get_adapter(self, provider: str) -> PaymentAdapter:
         norm = provider.lower().strip()
-        if norm == "creem":
-            return self.creem_adapter
+        if norm == "suby":
+            return self.suby_adapter
         if norm == "payriff":
             return self.payriff_adapter
-        if norm in {"paymegate", "paymengate"}:
-            return self.paymegate_adapter
+        # if norm == "creem":
+        #     return self.creem_adapter
+        # if norm in {"paymegate", "paymengate"}:
+        #     return self.paymegate_adapter
         return self.epoint_adapter
 
     async def get_gateway_config(self, provider: str) -> PaymentGatewayConfig | None:
-        norm = "paymegate" if provider.lower().strip() in {"paymegate", "paymengate"} else provider.lower().strip()
+        norm = provider.lower().strip()
         stmt = select(PaymentGatewayConfig).where(
             and_(
                 PaymentGatewayConfig.business_id == self.business_id,
-                PaymentGatewayConfig.provider.in_([norm, "paymengate"] if norm == "paymegate" else [norm]),
+                PaymentGatewayConfig.provider == norm,
                 PaymentGatewayConfig.is_active.is_(True),
             )
         )
@@ -54,18 +59,20 @@ class PaymentService:
         self,
         appointment_id: UUID | None,
         amount: Decimal,
-        provider: str,  # 'payriff' or 'paymegate'
+        provider: str,  # 'suby', 'payriff', or 'epoint'
         return_url: str,
         description: str | None = None,
         extra_metadata: dict | None = None,
     ) -> PaymentLinkResult:
         config = await self.get_gateway_config(provider)
-        norm = "paymegate" if provider.lower().strip() in {"paymegate", "paymengate"} else provider.lower().strip()
+        norm = provider.lower().strip()
         merchant_creds = decrypt_credentials_dict(config.merchant_credentials) if config else {}
-        if norm == "creem" and not merchant_creds.get("api_key") and not settings.CREEM_API_KEY:
-            raise ValueError("Creem API key is not configured.")
-        if norm == "paymegate" and not merchant_creds.get("api_key") and not settings.PAYMEGATE_API_KEY:
-            raise ValueError("Paymegate API key is not configured.")
+        if norm == "suby" and not merchant_creds.get("api_key") and not settings.SUBY_API_KEY:
+            raise ValueError("Suby API key is not configured.")
+        # if norm == "creem" and not merchant_creds.get("api_key") and not settings.CREEM_API_KEY:
+        #     raise ValueError("Creem API key is not configured.")
+        # if norm == "paymegate" and not merchant_creds.get("api_key") and not settings.PAYMEGATE_API_KEY:
+        #     raise ValueError("Paymegate API key is not configured.")
         if norm == "payriff" and not merchant_creds.get("secret_key") and not settings.PAYRIFF_SECRET_KEY:
             raise ValueError("Payriff credentials are not configured.")
 
@@ -74,7 +81,7 @@ class PaymentService:
             appointment_id=appointment_id,
             amount=amount,
             currency="AZN",
-            method=PaymentMethod(norm if norm in {"creem", "payriff", "paymegate", "epoint"} else "creem"),
+            method=PaymentMethod(norm if norm in {"suby", "payriff", "epoint"} else "suby"),
             status=PaymentStatus.pending,
             notes=description,
         )

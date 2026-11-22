@@ -595,7 +595,7 @@ async def get_business_subscription(
     plans = (await db.execute(select(Plan).where(Plan.is_active.is_(True)).order_by(Plan.price.asc()))).scalars().all()
     current_plan = next((p for p in plans if p.id == biz.plan_id), None)
     sub = (await db.execute(select(Subscription).where(Subscription.business_id == biz.id))).scalars().first()
-    has_creem_sub = bool(sub and sub.creem_subscription_id and sub.status == SubscriptionStatus.active)
+    has_suby_sub = bool(sub and sub.suby_subscription_id and sub.status == SubscriptionStatus.active)
 
     return {
         "current_plan_id": str(biz.plan_id) if biz.plan_id else None,
@@ -604,8 +604,9 @@ async def get_business_subscription(
         "subscription_status": biz.subscription_status or "trial",
         "trial_ends_at": biz.trial_ends_at.isoformat() if biz.trial_ends_at else None,
         "current_period_end": sub.current_period_end.isoformat() if sub and sub.current_period_end else None,
-        "has_active_creem_subscription": has_creem_sub,
-        "can_manage_billing": bool(sub and sub.creem_customer_id),
+        "has_active_suby_subscription": has_suby_sub,
+        "has_active_creem_subscription": has_suby_sub,
+        "can_manage_billing": bool(sub and sub.suby_customer_id),
         "plans": [
             {
                 "id": str(p.id),
@@ -625,10 +626,11 @@ async def create_subscription_checkout(
     user: Annotated[dict[str, Any], Depends(require_role("owner"))],
     business_id: Annotated[str, Depends(get_business_context)],
 ):
-    """Create a live Paymegate/Payriff checkout link for SaaS plan payment or upgrade."""
+    """Create a live Suby.fi recurring subscription checkout session for SaaS plan payment or upgrade."""
     from decimal import Decimal
-    from app.integrations.payments.creem import CreemAdapter
+    from app.integrations.payments.suby import SubyAdapter
     from app.integrations.payments.payriff import PayriffAdapter
+    # Disabled: from app.integrations.payments.creem import CreemAdapter
 
     biz = (await db.execute(select(Business).where(Business.id == UUID(business_id)))).scalar_one_or_none()
     if not biz:
@@ -653,7 +655,7 @@ async def create_subscription_checkout(
         appointment_id=None,
         amount=float(amount),
         currency="AZN",
-        method=PaymentMethod.creem if settings.CREEM_API_KEY else PaymentMethod.payriff,
+        method=PaymentMethod.suby if settings.SUBY_API_KEY else PaymentMethod.payriff,
         status=PaymentStatus.pending,
         notes=f"SaaS Subscription - {target_plan.name}",
     )
@@ -661,39 +663,46 @@ async def create_subscription_checkout(
     await db.flush()
 
     checkout_url: str | None = None
-    if settings.CREEM_API_KEY:
+    if settings.SUBY_API_KEY:
         from app.models.subscription import Subscription, SubscriptionStatus
         sub = (await db.execute(select(Subscription).where(Subscription.business_id == biz.id))).scalars().first()
-        if sub and sub.creem_subscription_id and sub.status == SubscriptionStatus.active and biz.plan_id != target_plan.id:
-            creem = CreemAdapter()
-            prod_id = await creem.create_recurring_product(
-                name=f"Randevu.vip {target_plan.name}",
-                amount=amount,
-                currency="AZN",
-            )
-            await creem.upgrade_subscription(sub.creem_subscription_id, prod_id)
-            biz.plan_id = target_plan.id
-            sub.plan_id = target_plan.id
-            await db.commit()
-            return {
-                "payment_id": str(sub_payment.id),
-                "plan_name": target_plan.name,
-                "amount": float(amount),
-                "currency": "AZN",
-                "checkout_url": None,
-                "upgraded_directly": True,
-            }
+        plan_features = dict(target_plan.features or {})
+        suby_product_id = plan_features.get("suby_product_id")
 
-        link_res = await CreemAdapter().create_payment_link(
+        suby = SubyAdapter()
+        if not suby_product_id:
+            from app.integrations.payments.suby import convert_azn_to_usd
+            usd_price, _ = await convert_azn_to_usd(amount)
+            prod = await suby.create_product(
+                name=f"Randevu.vip {target_plan.name}",
+                price=usd_price,
+                currency="USD",
+                description=f"Monthly SaaS subscription for {target_plan.name} plan",
+                recurring_interval="month",
+                metadata={"plan_id": str(target_plan.id), "plan_name": target_plan.name},
+            )
+            suby_product_id = prod.get("id") or prod.get("productId") or (prod.get("data") or {}).get("id")
+            if suby_product_id:
+                plan_features["suby_product_id"] = str(suby_product_id)
+                target_plan.features = plan_features
+
+        link_res = await suby.create_payment_link(
             payment_id=sub_payment.id,
             amount=amount,
             currency="AZN",
             description=f"Randevu.vip {target_plan.name} Subscription",
             merchant_config={
-                "business_id": str(biz.id),
-                "type": "saas_subscription",
-                "plan_id": str(target_plan.id),
+                "mode": "subscription",
+                "recurring_interval": "month",
+                "product_id": suby_product_id,
+                "customer_id": sub.suby_customer_id if sub and sub.suby_customer_id else None,
                 "customer_email": user.get("email"),
+                "customer_name": biz.name,
+                "metadata": {
+                    "business_id": str(biz.id),
+                    "type": "saas_subscription",
+                    "plan_id": str(target_plan.id),
+                },
             },
             return_url=f"https://app.{settings.PLATFORM_DOMAIN}/payments",
         )
@@ -727,17 +736,17 @@ async def cancel_business_subscription(
     user: Annotated[dict[str, Any], Depends(require_role("owner"))],
     business_id: Annotated[str, Depends(get_business_context)],
 ):
-    """Cancel the business's active Creem recurring subscription."""
+    """Cancel the business's active Suby.fi recurring subscription."""
     from app.models.subscription import Subscription, SubscriptionStatus
-    from app.integrations.payments.creem import CreemAdapter
+    from app.integrations.payments.suby import SubyAdapter
 
     biz = (await db.execute(select(Business).where(Business.id == UUID(business_id)))).scalar_one_or_none()
     if not biz:
         raise HTTPException(status_code=404, detail="Business not found")
 
     sub = (await db.execute(select(Subscription).where(Subscription.business_id == biz.id))).scalars().first()
-    if sub and sub.creem_subscription_id and settings.CREEM_API_KEY:
-        await CreemAdapter().cancel_subscription(sub.creem_subscription_id)
+    if sub and sub.suby_subscription_id and settings.SUBY_API_KEY:
+        await SubyAdapter().cancel_subscription(sub.suby_subscription_id)
 
     if sub:
         sub.status = SubscriptionStatus.cancelled
@@ -746,24 +755,60 @@ async def cancel_business_subscription(
     return {"status": "cancelled"}
 
 
+@router.post("/subscription/pause")
+async def pause_business_subscription(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("owner"))],
+    business_id: Annotated[str, Depends(get_business_context)],
+):
+    """Pause the business's active Suby.fi recurring subscription."""
+    from app.models.subscription import Subscription
+    from app.integrations.payments.suby import SubyAdapter
+
+    sub = (await db.execute(select(Subscription).where(Subscription.business_id == UUID(business_id)))).scalars().first()
+    if not sub or not sub.suby_subscription_id or not settings.SUBY_API_KEY:
+        raise HTTPException(status_code=400, detail="No active Suby.fi subscription found")
+    res = await SubyAdapter().pause_subscription(sub.suby_subscription_id)
+    return {"status": "paused", "suby": res}
+
+
+@router.post("/subscription/resume")
+async def resume_business_subscription(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict[str, Any], Depends(require_role("owner"))],
+    business_id: Annotated[str, Depends(get_business_context)],
+):
+    """Resume the business's paused Suby.fi recurring subscription."""
+    from app.models.subscription import Subscription
+    from app.integrations.payments.suby import SubyAdapter
+
+    sub = (await db.execute(select(Subscription).where(Subscription.business_id == UUID(business_id)))).scalars().first()
+    if not sub or not sub.suby_subscription_id or not settings.SUBY_API_KEY:
+        raise HTTPException(status_code=400, detail="No Suby.fi subscription found")
+    res = await SubyAdapter().resume_subscription(sub.suby_subscription_id)
+    return {"status": "active", "suby": res}
+
+
 @router.post("/subscription/portal")
 async def get_subscription_billing_portal(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[dict[str, Any], Depends(require_role("owner"))],
     business_id: Annotated[str, Depends(get_business_context)],
 ):
-    """Return a hosted Creem Customer Portal URL for managing cards and invoices."""
+    """Return Suby.fi customer billing summary and vaulted payment methods."""
     from app.models.subscription import Subscription
-    from app.integrations.payments.creem import CreemAdapter
+    from app.integrations.payments.suby import SubyAdapter
 
     sub = (
         await db.execute(select(Subscription).where(Subscription.business_id == UUID(business_id)))
     ).scalars().first()
-    if not sub or not sub.creem_customer_id:
-        raise HTTPException(status_code=400, detail="No active Creem customer billing profile found")
+    if not sub or not sub.suby_customer_id or not settings.SUBY_API_KEY:
+        raise HTTPException(status_code=400, detail="No active Suby.fi customer billing profile found")
 
-    portal_url = await CreemAdapter().create_billing_portal_url(sub.creem_customer_id)
-    return {"portal_url": portal_url}
+    suby = SubyAdapter()
+    pms = await suby.list_customer_payment_methods(sub.suby_customer_id)
+    sub_details = await suby.get_subscription(sub.suby_subscription_id) if sub.suby_subscription_id else None
+    return {"portal_url": None, "customer_id": sub.suby_customer_id, "payment_methods": pms, "subscription": sub_details}
 
 
 class CancelAccountRequest(BaseModel):
@@ -783,7 +828,8 @@ async def _process_refund_request(
     reason: str | None,
 ) -> dict[str, Any]:
     from app.models.saas import PlatformConfig, RefundRequest, DEFAULT_REFUND_RULES
-    from app.integrations.payments.creem import CreemAdapter
+    from app.integrations.payments.suby import SubyAdapter
+    # Disabled: from app.integrations.payments.creem import CreemAdapter
 
     cfg = (await db.execute(select(PlatformConfig).where(PlatformConfig.config_key == "global"))).scalar_one_or_none()
     rules = dict(DEFAULT_REFUND_RULES)
@@ -817,16 +863,17 @@ async def _process_refund_request(
         and amt_float <= float(rules.get("auto_refund_max_amount_azn", 100.0))
     )
 
-    creem_refund_id: str | None = None
+    suby_refund_id: str | None = None
     req_status = "pending"
     resolved_at = None
 
     if qualifies_auto:
-        if payment.method == PaymentMethod.creem and payment.gateway_transaction_id and settings.CREEM_API_KEY:
+        if payment.method == PaymentMethod.suby and payment.gateway_transaction_id and settings.SUBY_API_KEY:
             try:
-                rf_res = await CreemAdapter().refund_payment(payment.gateway_transaction_id, reason)
-                creem_refund_id = str(rf_res.get("id") or "")
-            except Exception as exc:
+                rf_res = await SubyAdapter().create_refund(payment_id=payment.gateway_transaction_id, reason=reason)
+                data = rf_res.get("data") if isinstance(rf_res.get("data"), dict) else rf_res
+                suby_refund_id = str(data.get("id") or "")
+            except Exception:
                 # Fall back to manual admin review if gateway refund API fails
                 qualifies_auto = False
                 req_status = "pending"
@@ -842,7 +889,7 @@ async def _process_refund_request(
         currency=payment.currency or "AZN",
         reason=reason.strip() if reason else None,
         status=req_status,
-        creem_refund_id=creem_refund_id,
+        suby_refund_id=suby_refund_id,
         resolved_at=resolved_at,
     )
     db.add(rr)
@@ -866,10 +913,10 @@ async def cancel_business_account(
     user: Annotated[dict[str, Any], Depends(require_role("owner"))],
     business_id: Annotated[str, Depends(get_business_context)],
 ):
-    """Cancel the business account, terminate active Creem subscription, and optionally request a refund."""
+    """Cancel the business account, terminate active Suby.fi subscription, and optionally request a refund."""
     from app.models.saas import PlatformConfig, DEFAULT_REFUND_RULES
     from app.models.subscription import Subscription, SubscriptionStatus
-    from app.integrations.payments.creem import CreemAdapter
+    from app.integrations.payments.suby import SubyAdapter
 
     cfg = (await db.execute(select(PlatformConfig).where(PlatformConfig.config_key == "global"))).scalar_one_or_none()
     rules = dict(DEFAULT_REFUND_RULES)
@@ -883,9 +930,9 @@ async def cancel_business_account(
         raise HTTPException(status_code=404, detail="Business not found")
 
     sub = (await db.execute(select(Subscription).where(Subscription.business_id == biz.id))).scalars().first()
-    if sub and sub.creem_subscription_id and settings.CREEM_API_KEY:
+    if sub and sub.suby_subscription_id and settings.SUBY_API_KEY:
         try:
-            await CreemAdapter().cancel_subscription(sub.creem_subscription_id)
+            await SubyAdapter().cancel_subscription(sub.suby_subscription_id, reason=req.reason)
         except Exception:
             pass
     if sub:

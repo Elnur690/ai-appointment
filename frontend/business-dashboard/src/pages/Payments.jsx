@@ -289,7 +289,7 @@ const Payments = () => {
                 {isAz ? 'Kart & Fakturalar' : 'Billing Portal'}
               </button>
             )}
-            {subscription.has_active_creem_subscription && (
+            {(subscription.has_active_suby_subscription || subscription.has_active_creem_subscription) && (
               <button
                 type="button"
                 className="btn btn-secondary"

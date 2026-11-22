@@ -135,123 +135,17 @@ async def _async_expire_overdue_trials():
 
 @celery_app.task(name="process_subscription_renewals")
 def process_subscription_renewals():
-    """Daily task to send Paymegate renewal links & authorizations for due/upcoming SaaS subscriptions."""
-    import asyncio
-    asyncio.run(_async_process_subscription_renewals())
+    """
+    Disabled: Paymegate manual renewal links are replaced by Suby.fi native recurring subscriptions
+    (Suby handles automatic off-session card renewals and crypto renewal emails).
+    """
+    logger.info("process_subscription_renewals skipped (Suby.fi handles native recurring subscriptions)")
+    return {"status": "disabled_suby_native_subscriptions"}
 
 
+# Legacy Paymegate renewal logic (disabled - Suby.fi handles recurring renewals natively):
+"""
 async def _async_process_subscription_renewals():
     from decimal import Decimal
-    from app.models.business import BusinessOwner
-    from app.models.payment import Payment, PaymentMethod, PaymentStatus
-    from app.models.saas import Plan
-    from app.models.subscription import Subscription, SubscriptionStatus
-    from app.integrations.payments.paymegate import PaymegateAdapter
-
-    now = datetime.now(timezone.utc)
-    due_window = now + timedelta(days=3)
-    grace_cutoff = now - timedelta(days=3)
-
-    evo_client = EvolutionAPIClient(base_url=settings.EVOLUTION_API_URL, api_key=settings.EVOLUTION_API_KEY)
-    sender = WhatsAppMessageSender(evo_client)
-
-    try:
-        async with AsyncSessionLocal() as session:
-            stmt = (
-                select(Subscription, Business, Plan)
-                .join(Business, Subscription.business_id == Business.id)
-                .join(Plan, Subscription.plan_id == Plan.id)
-                .where(
-                    and_(
-                        Subscription.status == SubscriptionStatus.active,
-                        Subscription.current_period_end <= due_window,
-                        Business.is_active.is_(True),
-                    )
-                )
-            )
-            rows = (await session.execute(stmt)).all()
-            for sub, biz, plan in rows:
-                if sub.current_period_end < grace_cutoff:
-                    sub.status = SubscriptionStatus.past_due
-                    biz.subscription_status = "past_due"
-                    continue
-
-                if not settings.PAYMEGATE_API_KEY:
-                    continue
-
-                owner = (
-                    await session.execute(select(BusinessOwner).where(BusinessOwner.business_id == biz.id))
-                ).scalars().first()
-                branch = (
-                    await session.execute(select(Branch).where(Branch.business_id == biz.id))
-                ).scalars().first()
-
-                renewal_payment = Payment(
-                    business_id=biz.id,
-                    appointment_id=None,
-                    amount=float(plan.price),
-                    currency="AZN",
-                    method=PaymentMethod.paymegate,
-                    status=PaymentStatus.pending,
-                    notes=f"Subscription Renewal - {plan.name}",
-                )
-                session.add(renewal_payment)
-                await session.flush()
-
-                try:
-                    link_res = await PaymegateAdapter().create_payment_link(
-                        payment_id=renewal_payment.id,
-                        amount=Decimal(str(plan.price)),
-                        currency="AZN",
-                        description=f"Randevu.vip {plan.name} Renewal",
-                        merchant_config={
-                            "business_id": str(biz.id),
-                            "type": "saas_subscription",
-                            "plan_id": str(plan.id),
-                            "customer_email": owner.email if owner else "owner@randevu.vip",
-                            "customer_name": owner.name if owner else biz.name,
-                        },
-                        return_url=f"https://app.{settings.PLATFORM_DOMAIN}/payments",
-                    )
-                    renewal_payment.gateway_transaction_id = link_res.transaction_id
-                except Exception as exc:
-                    logger.warning(f"Failed to generate renewal link for {biz.id}: {exc}")
-                    continue
-
-                due_date_str = sub.current_period_end.strftime("%Y-%m-%d")
-                msg = (
-                    f"Salam{(', ' + owner.name) if owner and owner.name else ''}! "
-                    f"{biz.name} üçün Randevu.vip ({plan.name} - {plan.price} AZN) abunəliyinizin yenilənmə tarixi: {due_date_str}.\n"
-                    f"Abunəliyi təsdiqləmək və ödəniş etmək üçün linkə keçid edin:\n{link_res.payment_url}"
-                )
-
-                if owner and owner.phone and branch:
-                    instance_name = branch.whatsapp_instance_id or f"randevu_{str(biz.id)[:8]}_main"
-                    await sender.send_response(instance_name=instance_name, to_phone=owner.phone, text=msg)
-
-                if owner and owner.email and settings.RESEND_API_KEY:
-                    import httpx
-                    try:
-                        async with httpx.AsyncClient(timeout=10.0) as client:
-                            await client.post(
-                                "https://api.resend.com/emails",
-                                headers={
-                                    "Authorization": f"Bearer {settings.RESEND_API_KEY}",
-                                    "Content-Type": "application/json",
-                                },
-                                json={
-                                    "from": settings.SMTP_FROM_EMAIL,
-                                    "to": [owner.email],
-                                    "subject": f"Randevu.vip — Abunəlik Yenilənməsi ({plan.name})",
-                                    "html": f"<p>{msg.replace(chr(10), '<br>')}</p>",
-                                },
-                            )
-                    except Exception:
-                        pass
-
-                logger.info(f"Sent subscription renewal checkout link to business {biz.id}")
-
-            await session.commit()
-    finally:
-        await evo_client.close()
-        await engine.dispose()
+    ...
+"""

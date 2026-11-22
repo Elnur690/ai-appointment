@@ -35,13 +35,18 @@ class Settings(BaseSettings):
     SAAS_ADMIN_EMAIL: str = "admin@randevu.vip"
     SAAS_ADMIN_PASSWORD: str = "admin123"
 
-    PAYMEGATE_API_KEY: str = ""
-    PAYMEGATE_WEBHOOK_SECRET: str = ""
+    # Disabled payment providers (kept commented for reference)
+    # PAYMEGATE_API_KEY: str = ""
+    # PAYMEGATE_WEBHOOK_SECRET: str = ""
+    # CREEM_API_KEY: str = ""
+    # CREEM_WEBHOOK_SECRET: str = ""
+    # CREEM_TEST_MODE: bool = False
+
     PAYRIFF_MERCHANT_ID: str = ""
     PAYRIFF_SECRET_KEY: str = ""
-    CREEM_API_KEY: str = ""
-    CREEM_WEBHOOK_SECRET: str = ""
-    CREEM_TEST_MODE: bool = False
+    SUBY_API_KEY: str = ""
+    SUBY_WEBHOOK_SECRET: str = ""
+    SUBY_API_URL: str = "https://api.beta.suby.fi/v3"
 
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587

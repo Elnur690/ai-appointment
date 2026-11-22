@@ -572,37 +572,44 @@ async def platform_payment_gateway_webhook(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Handle platform-level payment gateway webhooks (Creem, Payriff, Paymegate) without business_id in URL."""
+    """Handle platform-level payment gateway webhooks (Suby.fi, Payriff) without business_id in URL."""
     import json
     from datetime import datetime, timedelta, timezone
     from app.models.payment import Payment, PaymentStatus
     from app.models.business import Business
     from app.models.subscription import Subscription, SubscriptionStatus
-    from app.integrations.payments.creem import CreemAdapter
-    from app.integrations.payments.paymegate import PaymegateAdapter
+    from app.integrations.payments.suby import SubyAdapter
+    # Disabled providers (kept commented for reference):
+    # from app.integrations.payments.creem import CreemAdapter
+    # from app.integrations.payments.paymegate import PaymegateAdapter
 
     raw_body = await request.body()
     payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
     headers = dict(request.headers)
     prov = provider.lower().strip()
-    if prov == "paymengate":
-        prov = "paymegate"
 
-    obj = payload.get("object") if isinstance(payload.get("object"), dict) else {}
+    obj = (
+        payload.get("data")
+        if isinstance(payload.get("data"), dict)
+        else (payload.get("object") if isinstance(payload.get("object"), dict) else payload)
+    )
     metadata = (
         obj.get("metadata")
         if isinstance(obj.get("metadata"), dict)
         else (payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {})
     )
 
-    if prov == "creem":
-        creem_res = await CreemAdapter().verify_webhook(
+    if prov == "suby":
+        suby_res = await SubyAdapter().verify_webhook(
             payload=payload,
             headers=headers,
             merchant_config={},
             raw_body=raw_body,
         )
-        event_type = str(payload.get("eventType") or payload.get("type") or "").lower()
+        if not suby_res.is_valid:
+            raise HTTPException(status_code=401, detail="Invalid Suby.fi webhook signature")
+
+        event_type = str(payload.get("type") or payload.get("event") or payload.get("eventType") or "").upper()
         raw_biz = metadata.get("businessId") or metadata.get("business_id")
         biz_uuid: UUID | None = None
         if raw_biz:
@@ -611,22 +618,37 @@ async def platform_payment_gateway_webhook(
             except ValueError:
                 biz_uuid = None
 
-        ext_id = obj.get("request_id") or metadata.get("paymentId")
         payment = None
-        if ext_id:
-            try:
-                payment = (await db.execute(select(Payment).where(Payment.id == UUID(str(ext_id))))).scalar_one_or_none()
-            except ValueError:
-                payment = None
-        if not payment and creem_res.transaction_id:
+        if suby_res.payment_id:
+            payment = (await db.execute(select(Payment).where(Payment.id == suby_res.payment_id))).scalar_one_or_none()
+        if not payment and suby_res.transaction_id:
             payment = (
-                await db.execute(select(Payment).where(Payment.gateway_transaction_id == creem_res.transaction_id))
+                await db.execute(select(Payment).where(Payment.gateway_transaction_id == suby_res.transaction_id))
             ).scalar_one_or_none()
 
         if payment and not biz_uuid:
             biz_uuid = payment.business_id
 
-        if creem_res.is_successful:
+        suby_sub_id = (
+            obj.get("subscriptionId")
+            or (obj.get("subscription") or {}).get("id")
+            if isinstance(obj.get("subscription"), dict)
+            else (obj.get("id") if event_type.startswith("SUBSCRIPTION") else obj.get("subscriptionId"))
+        )
+        suby_cust_id = (
+            obj.get("customerId")
+            or ((obj.get("customer") or {}).get("id") if isinstance(obj.get("customer"), dict) else None)
+        )
+
+        # Fallback: look up business via stored suby_subscription_id
+        if not biz_uuid and suby_sub_id:
+            existing_sub = (
+                await db.execute(select(Subscription).where(Subscription.suby_subscription_id == str(suby_sub_id)))
+            ).scalars().first()
+            if existing_sub:
+                biz_uuid = existing_sub.business_id
+
+        if suby_res.is_successful:
             if payment:
                 payment.status = PaymentStatus.completed
                 if payment.appointment_id:
@@ -635,7 +657,7 @@ async def platform_payment_gateway_webhook(
                     if appt:
                         appt.status = AppointmentStatus.confirmed
 
-            if biz_uuid and metadata.get("type") == "saas_subscription":
+            if biz_uuid and (metadata.get("type") == "saas_subscription" or event_type.startswith("SUBSCRIPTION")):
                 biz = (await db.execute(select(Business).where(Business.id == biz_uuid))).scalar_one_or_none()
                 if biz:
                     now = datetime.now(timezone.utc)
@@ -650,26 +672,16 @@ async def platform_payment_gateway_webhook(
                     biz.is_active = True
                     biz.trial_ends_at = None
                     if plan_uuid:
-                        creem_sub_id = (
-                            (obj.get("subscription") or {}).get("id")
-                            if isinstance(obj.get("subscription"), dict)
-                            else (obj.get("id") if event_type.startswith("subscription.") else obj.get("subscription"))
-                        )
-                        creem_cust_id = (
-                            (obj.get("customer") or {}).get("id")
-                            if isinstance(obj.get("customer"), dict)
-                            else obj.get("customer_id")
-                        )
                         sub = (await db.execute(select(Subscription).where(Subscription.business_id == biz.id))).scalars().first()
                         if sub:
                             sub.plan_id = plan_uuid
                             sub.status = SubscriptionStatus.active
                             sub.current_period_start = now
                             sub.current_period_end = now + timedelta(days=30)
-                            if creem_sub_id:
-                                sub.creem_subscription_id = str(creem_sub_id)
-                            if creem_cust_id:
-                                sub.creem_customer_id = str(creem_cust_id)
+                            if suby_sub_id:
+                                sub.suby_subscription_id = str(suby_sub_id)
+                            if suby_cust_id:
+                                sub.suby_customer_id = str(suby_cust_id)
                         else:
                             db.add(
                                 Subscription(
@@ -678,40 +690,35 @@ async def platform_payment_gateway_webhook(
                                     status=SubscriptionStatus.active,
                                     current_period_start=now,
                                     current_period_end=now + timedelta(days=30),
-                                    creem_subscription_id=str(creem_sub_id) if creem_sub_id else None,
-                                    creem_customer_id=str(creem_cust_id) if creem_cust_id else None,
+                                    suby_subscription_id=str(suby_sub_id) if suby_sub_id else None,
+                                    suby_customer_id=str(suby_cust_id) if suby_cust_id else None,
                                 )
                             )
             await db.commit()
-            return {"status": "verified", "provider": "creem", "event": event_type}
+            return {"status": "verified", "provider": "suby", "event": event_type}
 
-        if biz_uuid and event_type == "subscription.trialing":
-            biz = (await db.execute(select(Business).where(Business.id == biz_uuid))).scalar_one_or_none()
-            if biz:
-                biz.subscription_status = "trial"
-                biz.is_active = True
-            sub = (await db.execute(select(Subscription).where(Subscription.business_id == biz_uuid))).scalars().first()
-            if sub:
-                sub.status = SubscriptionStatus.trial
-            await db.commit()
-            return {"status": "updated", "provider": "creem", "event": event_type}
-
-        if event_type in {"refund.created", "dispute.created"}:
+        if event_type in {"REFUND_CREATED", "REFUND_PROCESSED", "REFUND.CREATED"}:
             if payment:
                 payment.status = PaymentStatus.refunded
                 await db.commit()
-            return {"status": "refunded", "provider": "creem", "event": event_type}
+            return {"status": "refunded", "provider": "suby", "event": event_type}
+
+        if event_type in {"CHECKOUT_CANCELED", "PAYMENT_FAILED", "PAYMENT.FAILED"}:
+            if payment and payment.status == PaymentStatus.pending:
+                payment.status = PaymentStatus.failed
+                await db.commit()
+            return {"status": "updated", "provider": "suby", "event": event_type}
 
         if biz_uuid and event_type in {
-            "subscription.past_due",
-            "subscription.unpaid",
-            "subscription.canceled",
-            "subscription.expired",
-            "subscription.paused",
+            "SUBSCRIPTION_PAST_DUE",
+            "SUBSCRIPTION_CANCELED",
+            "SUBSCRIPTION_CANCELLED",
+            "SUBSCRIPTION_EXPIRED",
+            "SUBSCRIPTION_PAUSED",
         }:
             biz = (await db.execute(select(Business).where(Business.id == biz_uuid))).scalar_one_or_none()
-            is_past_due = event_type in {"subscription.past_due", "subscription.unpaid"}
-            is_expired = event_type == "subscription.expired"
+            is_past_due = event_type == "SUBSCRIPTION_PAST_DUE"
+            is_expired = event_type == "SUBSCRIPTION_EXPIRED"
             if biz:
                 biz.subscription_status = "past_due" if is_past_due else "suspended"
             sub = (await db.execute(select(Subscription).where(Subscription.business_id == biz_uuid))).scalars().first()
@@ -722,11 +729,15 @@ async def platform_payment_gateway_webhook(
                     else (SubscriptionStatus.expired if is_expired else SubscriptionStatus.cancelled)
                 )
             await db.commit()
-            return {"status": "updated", "provider": "creem", "event": event_type}
+            return {"status": "updated", "provider": "suby", "event": event_type}
 
-        return {"status": "received", "provider": "creem", "event": event_type}
+        return {"status": "received", "provider": "suby", "event": event_type}
 
-    # Try resolving business_id from metadata or existing Payment row (Payriff / Paymegate)
+    # Disabled providers (Creem & Paymegate commented out):
+    # if prov in {"creem", "paymegate", "paymengate"}:
+    #     return {"status": "disabled", "provider": prov}
+
+    # Try resolving business_id from metadata or existing Payment row (Payriff)
     biz_uuid = None
     raw_biz = metadata.get("businessId") or metadata.get("business_id") or payload.get("business_id")
     if raw_biz:
@@ -798,16 +809,9 @@ async def platform_payment_gateway_webhook(
                 await db.commit()
         return {"status": "verified" if verified else "ignored", "provider": prov}
 
-    # Test / live event where payment row is not yet matched (e.g. Paymegate Dashboard "Test Webhook")
-    if prov == "paymegate":
-        result = await PaymegateAdapter().verify_webhook(payload=payload, headers=headers, merchant_config={})
-        return {
-            "status": "received",
-            "provider": prov,
-            "event": payload.get("type"),
-            "verified": result.is_successful,
-            "orderUUID": result.transaction_id,
-        }
+    # Disabled: Paymegate test webhook block commented out
+    # if prov == "paymegate":
+    #     ...
 
     return {"status": "received", "provider": prov}
 

@@ -25,5 +25,7 @@ class Subscription(Base, TimestampMixin):
     ai_messages_used: Mapped[int] = mapped_column(default=0)
     creem_subscription_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     creem_customer_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    suby_subscription_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    suby_customer_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
     business: Mapped["Business"] = relationship("Business", back_populates="subscriptions")
