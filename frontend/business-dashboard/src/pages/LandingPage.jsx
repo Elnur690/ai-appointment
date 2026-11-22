@@ -1128,13 +1128,14 @@ const LandingPage = () => {
             </button>
           </div>
 
-          {/* WhatsApp Chat Mockup */}
+          {/* WhatsApp Chat Mockup (always dark WhatsApp surface with crisp light text) */}
           <div
             style={{
               maxWidth: '720px',
               margin: '0 auto',
               borderRadius: '16px',
-              background: 'rgba(7, 13, 22, 0.92)',
+              background: 'rgba(7, 13, 22, 0.94)',
+              color: '#f8fafc',
               border: '1px solid rgba(16, 185, 129, 0.35)',
               overflow: 'hidden',
             }}
@@ -1232,7 +1233,7 @@ const LandingPage = () => {
               background: 'rgba(239, 68, 68, 0.04)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem', color: '#fca5a5' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem', color: 'var(--danger-text)' }}>
               <AlertTriangle size={22} />
               <h3 style={{ fontSize: '1.2rem', margin: 0 }}>{t.painOldTitle}</h3>
             </div>
@@ -1254,7 +1255,7 @@ const LandingPage = () => {
               background: 'rgba(16, 185, 129, 0.05)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem', color: '#6ee7b7' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem', color: 'var(--success-text)' }}>
               <CheckCircle2 size={22} />
               <h3 style={{ fontSize: '1.2rem', margin: 0 }}>{t.painNewTitle}</h3>
             </div>
@@ -1328,7 +1329,7 @@ const LandingPage = () => {
               style={{
                 padding: '1.75rem',
                 borderRadius: '16px',
-                background: 'rgba(6, 8, 15, 0.75)',
+                background: 'var(--surface-elevated)',
                 border: '1px solid rgba(16, 185, 129, 0.4)',
                 textAlign: 'center',
               }}
@@ -1340,7 +1341,7 @@ const LandingPage = () => {
                 +{monthlyRecovered.toLocaleString()} AZN
                 <span style={{ fontSize: '1rem', fontWeight: 500 }}>{t.perMonth}</span>
               </div>
-              <div style={{ fontSize: '0.9rem', color: '#fde68a', fontWeight: 600, marginBottom: '0.75rem' }}>
+              <div style={{ fontSize: '0.9rem', color: 'var(--gold-text)', fontWeight: 600, marginBottom: '0.75rem' }}>
                 {t.roiYearlyRecovered} +{yearlyRecovered.toLocaleString()} AZN
               </div>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.15rem' }}>{t.roiNote}</p>
@@ -1511,6 +1512,7 @@ const LandingPage = () => {
                       width: 'max-content',
                       maxWidth: 'calc(100% - 1.5rem)',
                       background: 'linear-gradient(135deg, #2b220d 0%, #141821 100%)',
+                      color: '#fde68a',
                       boxShadow: '0 6px 18px rgba(0, 0, 0, 0.55)',
                       zIndex: 2,
                     }}
@@ -1764,7 +1766,7 @@ const LandingPage = () => {
                 fontFamily: 'monospace',
                 wordBreak: 'break-all',
                 marginBottom: '1.25rem',
-                color: '#fff',
+                color: 'var(--text-primary)',
               }}
             >
               {sellerResult.referral_url}
@@ -1804,7 +1806,7 @@ const LandingPage = () => {
                   borderRadius: '8px',
                   background: 'rgba(239, 68, 68, 0.15)',
                   border: '1px solid var(--danger)',
-                  color: '#fca5a5',
+                  color: 'var(--danger-text)',
                   marginBottom: '1rem',
                   fontSize: '0.88rem',
                 }}
