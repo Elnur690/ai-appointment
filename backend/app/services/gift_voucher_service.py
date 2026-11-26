@@ -1,7 +1,7 @@
 import logging
 import random
 import string
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from dataclasses import dataclass
 from typing import Optional, Dict
 from uuid import UUID, uuid4
@@ -24,6 +24,7 @@ class GiftVoucher:
     is_redeemed: bool
     payment_url: Optional[str]
     delivery_message: Optional[str]
+    redeemed_at: Optional[datetime] = None
 
 class GiftVoucherService:
     """WhatsApp Digital Gift Vouchers & Celebration Gifting Engine."""
@@ -140,6 +141,9 @@ class GiftVoucherService:
 
         discount = min(voucher.amount_azn, appointment_total_azn)
         remaining_balance = max(0.0, appointment_total_azn - discount)
+
+        voucher.is_redeemed = True
+        voucher.redeemed_at = datetime.now(timezone.utc)
 
         return {
             "success": True,

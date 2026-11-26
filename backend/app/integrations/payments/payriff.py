@@ -1,9 +1,13 @@
+import hashlib
+import hmac
+import json
 import logging
 from decimal import Decimal
 from uuid import UUID
 import httpx
 from app.core.config import settings
-from app.integrations.payments.adapter import PaymentAdapter, PaymentLinkResult, WebhookResult, PaymentStatus
+from app.integrations.payments.adapter import PaymentAdapter, PaymentLinkResult, WebhookResult
+from app.models.payment import PaymentStatus
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +57,38 @@ class PayriffAdapter(PaymentAdapter):
         payload: dict,
         headers: dict,
         merchant_config: dict,
+        raw_body: bytes | None = None,
     ) -> WebhookResult:
-        order_id = payload.get("orderId", "")
-        status_str = payload.get("paymentStatus", "")
+        secret_key = (
+            (merchant_config or {}).get("webhook_secret")
+            or (merchant_config or {}).get("secret_key")
+            or settings.PAYRIFF_SECRET_KEY
+            or ""
+        ).strip()
+        if secret_key:
+            lower_headers = {str(k).lower(): str(v).strip() for k, v in (headers or {}).items()}
+            provided_sig = (
+                lower_headers.get("x-payriff-signature")
+                or lower_headers.get("x-signature")
+                or lower_headers.get("authorization")
+                or str(payload.get("signature") or "").strip()
+            )
+            if not provided_sig:
+                logger.warning("Payriff webhook missing signature/secret header")
+                return WebhookResult(transaction_id="", is_successful=False, amount=Decimal("0"), raw_data=payload)
+
+            body_bytes = raw_body if raw_body is not None else json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+            expected_hmac = hmac.new(secret_key.encode("utf-8"), body_bytes, hashlib.sha256).hexdigest()
+            is_valid_sig = (
+                hmac.compare_digest(provided_sig.lower(), expected_hmac.lower())
+                or hmac.compare_digest(provided_sig, secret_key)
+            )
+            if not is_valid_sig:
+                logger.warning("Payriff webhook signature verification failed")
+                return WebhookResult(transaction_id="", is_successful=False, amount=Decimal("0"), raw_data=payload)
+
+        order_id = str(payload.get("orderId", ""))
+        status_str = str(payload.get("paymentStatus", ""))
         amount = Decimal(str(payload.get("amount", "0")))
         is_success = status_str.upper() in ["APPROVED", "SUCCESS", "PAID"]
         return WebhookResult(transaction_id=order_id, is_successful=is_success, amount=amount, raw_data=payload)

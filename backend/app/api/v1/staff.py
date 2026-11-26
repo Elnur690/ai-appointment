@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from app.core.database import get_db
 from app.core.dependencies import get_current_active_user, get_business_context
 from app.models.business import Branch
+from app.models.service import Service
 from app.models.staff import Staff, StaffSchedule, StaffService
 
 router = APIRouter()
@@ -66,12 +67,31 @@ class StaffScheduleResponse(StaffScheduleCreate):
     id: str
 
 
+def _parse_uuid(val: str, field: str = "id") -> UUID:
+    try:
+        return UUID(str(val))
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid {field}")
+
+
+async def _get_business_staff(db: AsyncSession, staff_id: str, business_id: str) -> Staff:
+    staff_uuid = _parse_uuid(staff_id, "staff_id")
+    stmt = select(Staff).where(Staff.id == staff_uuid, Staff.business_id == UUID(business_id))
+    staff = (await db.execute(stmt)).scalar_one_or_none()
+    if not staff:
+        raise HTTPException(status_code=404, detail="Staff member not found")
+    return staff
+
+
 async def _resolve_branch_id(db: AsyncSession, business_id: UUID, branch_id: str | None) -> UUID:
     if branch_id:
-        try:
-            return UUID(branch_id)
-        except ValueError:
-            pass
+        branch_uuid = _parse_uuid(branch_id, "branch_id")
+        branch_check = (
+            await db.execute(select(Branch).where(Branch.id == branch_uuid, Branch.business_id == business_id))
+        ).scalar_one_or_none()
+        if not branch_check:
+            raise HTTPException(status_code=404, detail="Branch not found")
+        return branch_check.id
     stmt = select(Branch).where(Branch.business_id == business_id).order_by(Branch.created_at.asc())
     branch = (await db.execute(stmt)).scalars().first()
     if branch:
@@ -160,10 +180,7 @@ async def get_staff(
     business_id: Annotated[str, Depends(get_business_context)],
 ):
     """Get staff member details."""
-    stmt = select(Staff).where(Staff.id == UUID(id), Staff.business_id == UUID(business_id))
-    s = (await db.execute(stmt)).scalar_one_or_none()
-    if not s:
-        raise HTTPException(status_code=404, detail="Staff member not found")
+    s = await _get_business_staff(db, id, business_id)
     return _to_response(s)
 
 
@@ -177,10 +194,7 @@ async def update_staff(
     business_id: Annotated[str, Depends(get_business_context)],
 ):
     """Update a staff member."""
-    stmt = select(Staff).where(Staff.id == UUID(id), Staff.business_id == UUID(business_id))
-    s = (await db.execute(stmt)).scalar_one_or_none()
-    if not s:
-        raise HTTPException(status_code=404, detail="Staff member not found")
+    s = await _get_business_staff(db, id, business_id)
     data = staff_update.model_dump(exclude_unset=True)
     if "role_title" in data and data["role_title"] is not None:
         s.role = data.pop("role_title")
@@ -203,10 +217,7 @@ async def deactivate_staff(
     business_id: Annotated[str, Depends(get_business_context)],
 ):
     """Deactivate a staff member."""
-    stmt = select(Staff).where(Staff.id == UUID(id), Staff.business_id == UUID(business_id))
-    s = (await db.execute(stmt)).scalar_one_or_none()
-    if not s:
-        raise HTTPException(status_code=404, detail="Staff member not found")
+    s = await _get_business_staff(db, id, business_id)
     s.is_active = False
     await db.flush()
     return {"status": "success"}
@@ -220,7 +231,8 @@ async def get_staff_schedules(
     business_id: Annotated[str, Depends(get_business_context)],
 ):
     """Get staff schedules."""
-    stmt = select(StaffSchedule).where(StaffSchedule.staff_id == UUID(id))
+    staff = await _get_business_staff(db, id, business_id)
+    stmt = select(StaffSchedule).where(StaffSchedule.staff_id == staff.id)
     res = await db.execute(stmt)
     return [
         StaffScheduleResponse(
@@ -245,7 +257,8 @@ async def update_staff_schedules(
     business_id: Annotated[str, Depends(get_business_context)],
 ):
     """Bulk update staff schedules."""
-    staff_uuid = UUID(id)
+    staff = await _get_business_staff(db, id, business_id)
+    staff_uuid = staff.id
     await db.execute(delete(StaffSchedule).where(StaffSchedule.staff_id == staff_uuid))
     created = []
     for sc in schedules:
@@ -285,7 +298,8 @@ async def get_staff_services(
     business_id: Annotated[str, Depends(get_business_context)],
 ):
     """Get assigned services for a staff member."""
-    stmt = select(StaffService).where(StaffService.staff_id == UUID(id))
+    staff = await _get_business_staff(db, id, business_id)
+    stmt = select(StaffService).where(StaffService.staff_id == staff.id)
     res = await db.execute(stmt)
     return [str(ss.service_id) for ss in res.scalars().all()]
 
@@ -299,9 +313,23 @@ async def assign_staff_services(
     business_id: Annotated[str, Depends(get_business_context)],
 ):
     """Assign services to staff member."""
-    staff_uuid = UUID(id)
+    biz_uuid = UUID(business_id)
+    staff = await _get_business_staff(db, id, business_id)
+    staff_uuid = staff.id
+    parsed_service_ids = [_parse_uuid(sid, "service_id") for sid in service_ids]
+    unique_service_ids = list(dict.fromkeys(parsed_service_ids))
+    if unique_service_ids:
+        found_ids = set(
+            (
+                await db.execute(
+                    select(Service.id).where(Service.id.in_(unique_service_ids), Service.business_id == biz_uuid)
+                )
+            ).scalars().all()
+        )
+        if len(found_ids) != len(unique_service_ids):
+            raise HTTPException(status_code=404, detail="One or more services not found for this business")
     await db.execute(delete(StaffService).where(StaffService.staff_id == staff_uuid))
-    for sid in service_ids:
-        db.add(StaffService(staff_id=staff_uuid, service_id=UUID(sid)))
+    for srv_uuid in unique_service_ids:
+        db.add(StaffService(staff_id=staff_uuid, service_id=srv_uuid))
     await db.flush()
-    return {"status": "success", "service_ids": service_ids}
+    return {"status": "success", "service_ids": [str(s) for s in unique_service_ids]}

@@ -148,7 +148,9 @@ class GeminiProvider(AIProvider):
                     )
                     
         finish_reason = FinishReason.STOP
-        if candidate.finish_reason == types.FinishReason.STOP:
+        if tool_calls:
+            finish_reason = FinishReason.TOOL_CALL
+        elif candidate.finish_reason == types.FinishReason.STOP:
             finish_reason = FinishReason.STOP
         elif candidate.finish_reason == types.FinishReason.MAX_TOKENS:
             finish_reason = FinishReason.MAX_TOKENS
@@ -156,9 +158,6 @@ class GeminiProvider(AIProvider):
             finish_reason = FinishReason.SAFETY
         elif candidate.finish_reason == types.FinishReason.OTHER:
             finish_reason = FinishReason.ERROR
-            
-        if not finish_reason and tool_calls:
-             finish_reason = FinishReason.TOOL_CALL
 
         usage = None
         if response.usage_metadata:

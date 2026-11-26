@@ -13,8 +13,11 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if settings.ENVIRONMENT == "prod" and "dev-secret-key" in settings.SECRET_KEY:
-        logger.warning("CRITICAL SECURITY WARNING: Replace SECRET_KEY in .env before running in production!")
+    if settings.ENVIRONMENT == "prod" and (
+        settings.SECRET_KEY == "dev-secret-key-change-in-prod"
+        or "dev-secret-key" in settings.SECRET_KEY
+    ):
+        raise RuntimeError("SECRET_KEY must be set in production")
     await init_db()
     await init_redis()
     yield

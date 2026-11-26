@@ -42,7 +42,7 @@ def _to_response(c: Customer, visits: int = 0) -> CustomerResponse:
         business_id=str(c.business_id),
         phone=c.phone_number,
         name=c.name or c.phone_number,
-        email=None,
+        email=c.email,
         visits=visits,
         tier=tier,
         language_pref=c.language_pref or "az",
@@ -83,6 +83,7 @@ async def create_customer(
         business_id=UUID(business_id),
         phone_number=payload.phone.strip(),
         name=payload.name.strip() if payload.name else None,
+        email=payload.email.strip() if payload.email else None,
         language_pref=payload.language_pref or "az",
     )
     db.add(cust)
@@ -125,7 +126,11 @@ async def get_customer(
     business_id: Annotated[str, Depends(get_business_context)],
 ):
     """Get customer details & appointment history from PostgreSQL."""
-    stmt = select(Customer).where(Customer.id == UUID(id), Customer.business_id == UUID(business_id))
+    try:
+        cust_uuid = UUID(id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid customer ID")
+    stmt = select(Customer).where(Customer.id == cust_uuid, Customer.business_id == UUID(business_id))
     c = (await db.execute(stmt)).scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=404, detail="Customer not found")
@@ -134,6 +139,7 @@ async def get_customer(
         business_id=str(c.business_id),
         phone=c.phone_number,
         name=c.name,
+        email=c.email,
         language_pref=c.language_pref or "az",
         appointments=[],
     )

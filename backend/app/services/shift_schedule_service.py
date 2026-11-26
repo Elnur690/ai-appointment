@@ -33,6 +33,7 @@ class ShiftScheduleService:
         custom_shift_end: time | None = None,
         allow_overtime: bool = False,
         plan_allows_shift_management: bool = True,
+        max_overtime_minutes: int = 120,
     ) -> ShiftValidationResult:
         """Validates whether a requested booking slot falls within assigned staff/owner shift hours if plan permits."""
         if not plan_allows_shift_management:
@@ -50,7 +51,6 @@ class ShiftScheduleService:
             req_time = datetime.strptime(requested_time_str, "%H:%M").time()
             req_minutes = req_time.hour * 60 + req_time.minute
             end_minutes = req_minutes + service_duration_minutes
-            req_end_time = time(end_minutes // 60, end_minutes % 60)
 
             if shift_type in self.SHIFT_PRESETS:
                 s_start, s_end = self.SHIFT_PRESETS[shift_type]
@@ -61,6 +61,16 @@ class ShiftScheduleService:
 
             s_start_min = s_start.hour * 60 + s_start.minute
             s_end_min = s_end.hour * 60 + s_end.minute
+
+            if end_minutes > 1440:
+                return ShiftValidationResult(
+                    is_valid=False,
+                    reason=f"Requested slot {requested_time_str} ({service_duration_minutes}m) extends past midnight.",
+                    shift_name=shift_type.replace("_", " ").title(),
+                    is_overtime=False,
+                    shift_start=s_start.strftime("%H:%M"),
+                    shift_end=s_end.strftime("%H:%M"),
+                )
 
             is_within = (req_minutes >= s_start_min) and (end_minutes <= s_end_min)
 
@@ -75,6 +85,21 @@ class ShiftScheduleService:
                 )
 
             if allow_overtime:
+                overtime_before = max(0, s_start_min - req_minutes)
+                overtime_after = max(0, end_minutes - s_end_min)
+                total_overtime = overtime_before + overtime_after
+                if total_overtime > max_overtime_minutes:
+                    return ShiftValidationResult(
+                        is_valid=False,
+                        reason=(
+                            f"Requested slot {requested_time_str} requires {total_overtime}m overtime, "
+                            f"exceeding the {max_overtime_minutes}m overtime limit."
+                        ),
+                        shift_name=shift_type.replace("_", " ").title(),
+                        is_overtime=False,
+                        shift_start=s_start.strftime("%H:%M"),
+                        shift_end=s_end.strftime("%H:%M"),
+                    )
                 logger.warning(
                     f"[SHIFT OVERTIME] Booking at {requested_time_str} ({service_duration_minutes}m) "
                     f"approved as OVERTIME outside shift bounds {s_start.strftime('%H:%M')}-{s_end.strftime('%H:%M')}"

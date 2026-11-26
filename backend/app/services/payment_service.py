@@ -1,3 +1,4 @@
+import inspect
 import logging
 from decimal import Decimal
 from uuid import UUID
@@ -106,12 +107,22 @@ class PaymentService:
         await self.db.commit()
         return result
 
-    async def handle_webhook_callback(self, provider: str, payload: dict, headers: dict) -> bool:
+    async def handle_webhook_callback(
+        self,
+        provider: str,
+        payload: dict,
+        headers: dict,
+        raw_body: bytes | None = None,
+    ) -> bool:
         config = await self.get_gateway_config(provider)
         merchant_creds = decrypt_credentials_dict(config.merchant_credentials) if config else {}
 
         adapter = self._get_adapter(provider)
-        verify_res = await adapter.verify_webhook(payload, headers, merchant_creds)
+        sig = inspect.signature(adapter.verify_webhook)
+        if "raw_body" in sig.parameters:
+            verify_res = await adapter.verify_webhook(payload, headers, merchant_creds, raw_body=raw_body)
+        else:
+            verify_res = await adapter.verify_webhook(payload, headers, merchant_creds)
 
         if verify_res.is_successful and verify_res.transaction_id:
             stmt = select(Payment).where(
@@ -138,6 +149,28 @@ class PaymentService:
                         payment = None
 
             if payment:
+                # Never overwrite refunded or cancelled payments back to completed
+                if payment.status == PaymentStatus.refunded or str(payment.status.value).lower() in {"refunded", "cancelled"}:
+                    logger.warning(f"Ignoring webhook for payment {payment.id} in terminal status {payment.status}")
+                    return False
+
+                # Verify amount matches expected payment amount (when present and same currency)
+                if verify_res.amount is not None and verify_res.amount > Decimal("0"):
+                    raw_curr = None
+                    if isinstance(verify_res.raw_data, dict):
+                        raw_curr = verify_res.raw_data.get("currency")
+                    if not raw_curr:
+                        raw_curr = payload.get("currency") or payload.get("currencyType")
+                    same_currency = (not raw_curr) or (str(raw_curr).upper() == str(payment.currency or "AZN").upper())
+                    if same_currency:
+                        expected_amt = Decimal(str(payment.amount))
+                        if abs(Decimal(str(verify_res.amount)) - expected_amt) > Decimal("0.05"):
+                            logger.warning(
+                                f"Payment webhook amount mismatch for {payment.id}: "
+                                f"received={verify_res.amount}, expected={expected_amt}"
+                            )
+                            return False
+
                 payment.status = PaymentStatus.completed
                 if payment.appointment_id:
                     appt = (
@@ -145,7 +178,11 @@ class PaymentService:
                             select(Appointment).where(Appointment.id == payment.appointment_id)
                         )
                     ).scalar_one_or_none()
-                    if appt:
+                    if appt and appt.status not in (
+                        AppointmentStatus.cancelled,
+                        AppointmentStatus.completed,
+                        AppointmentStatus.no_show,
+                    ):
                         appt.status = AppointmentStatus.confirmed
                 await self.db.commit()
                 return True

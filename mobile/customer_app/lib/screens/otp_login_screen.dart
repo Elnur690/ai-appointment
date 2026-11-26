@@ -35,13 +35,34 @@ class _OtpLoginScreenState extends State<OtpLoginScreen> {
       _error = null;
     });
     try {
-      await _api.sendOtp(phone);
-    } catch (_) {}
-    if (!mounted) return;
-    setState(() {
-      _loading = false;
-      _otpSent = true;
-    });
+      final sent = await _api.sendOtp(phone);
+      if (!mounted) return;
+      if (!sent) {
+        const message = 'Failed to send OTP code. Please try again.';
+        setState(() {
+          _loading = false;
+          _error = message;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(message)),
+        );
+        return;
+      }
+      setState(() {
+        _loading = false;
+        _otpSent = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      final message = 'Failed to send OTP: ${e.toString().replaceFirst('Exception: ', '')}';
+      setState(() {
+        _loading = false;
+        _error = message;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
   }
 
   Future<void> _verifyOtp() async {
@@ -55,14 +76,26 @@ class _OtpLoginScreenState extends State<OtpLoginScreen> {
       _error = null;
     });
     try {
-      await _api.verifyOtp(_phoneController.text.trim(), code);
-    } catch (_) {
-      await _api.saveToken('customer-preview-jwt');
+      final data = await _api.verifyOtp(_phoneController.text.trim(), code);
+      final accessToken = data['access_token'] as String?;
+      if (accessToken == null || accessToken.isEmpty) {
+        throw Exception('Invalid authentication response. Please try again.');
+      }
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final message = e.toString().replaceFirst('Exception: ', '');
+      setState(() {
+        _loading = false;
+        _error = message;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
     }
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const CustomerHomeScreen()),
-    );
   }
 
   @override

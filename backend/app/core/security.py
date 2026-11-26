@@ -55,6 +55,7 @@ def create_access_token(
     role: str,
     business_id: str | None = None,
     extra_claims: dict | None = None,
+    expires_delta: timedelta | None = None,
 ) -> str:
     """Create a new signed JWT access token."""
     to_encode = {"sub": subject, "role": role, "type": "access"}
@@ -63,16 +64,20 @@ def create_access_token(
     if extra_claims:
         to_encode.update(extra_claims)
 
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + (
+        expires_delta if expires_delta is not None else timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
     to_encode.update({"exp": expire})
 
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def create_refresh_token(subject: str) -> str:
+def create_refresh_token(subject: str, extra_claims: dict | None = None) -> str:
     """Create a new signed JWT refresh token."""
     expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode = {"sub": subject, "type": "refresh", "exp": expire}
+    if extra_claims:
+        to_encode.update(extra_claims)
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 

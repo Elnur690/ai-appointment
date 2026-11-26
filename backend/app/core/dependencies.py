@@ -1,19 +1,33 @@
 from typing import Annotated, Any
+from uuid import UUID
 from fastapi import Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.security import decode_token
 from app.core.exceptions import UnauthorizedException, ForbiddenException
+from app.models.business import Business, BusinessOwner
+from app.models.saas import SaasOwner
+from app.models.reseller import Reseller
 
 security = HTTPBearer()
+
+
+def _try_uuid(value: Any) -> UUID | None:
+    if not value:
+        return None
+    try:
+        return UUID(str(value))
+    except (ValueError, TypeError):
+        return None
 
 
 async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict[str, Any]:
-    """Decode JWT and extract validated user claims."""
+    """Decode JWT, extract validated user claims, and verify active status in DB."""
     try:
         payload = decode_token(credentials.credentials)
         if payload.get("type") != "access":
@@ -23,13 +37,51 @@ async def get_current_user(
         if user_id is None:
             raise UnauthorizedException(detail="Could not validate credentials")
 
+        role = payload.get("role")
+        business_id = payload.get("business_id")
+        reseller_id = payload.get("reseller_id")
+        is_active = bool(payload.get("is_active", True))
+
+        if role in {"owner", "business_owner", "staff"}:
+            user_uuid = _try_uuid(user_id)
+            if role in {"owner", "business_owner"} and user_uuid is not None:
+                owner_row = (
+                    await db.execute(select(BusinessOwner.is_active).where(BusinessOwner.id == user_uuid))
+                ).scalar_one_or_none()
+                if owner_row is not None and not owner_row:
+                    raise ForbiddenException(detail="Account is disabled")
+            biz_uuid = _try_uuid(business_id)
+            if biz_uuid is not None:
+                biz_active = (
+                    await db.execute(select(Business.is_active).where(Business.id == biz_uuid))
+                ).scalar_one_or_none()
+                if biz_active is not None and not biz_active:
+                    raise ForbiddenException(detail="Business account is disabled")
+        elif role in {"saas_owner", "admin"}:
+            saas_uuid = _try_uuid(user_id)
+            if saas_uuid is not None:
+                saas_active = (
+                    await db.execute(select(SaasOwner.is_active).where(SaasOwner.id == saas_uuid))
+                ).scalar_one_or_none()
+                if saas_active is not None and not saas_active:
+                    raise ForbiddenException(detail="Account is disabled")
+        elif role == "reseller":
+            res_uuid = _try_uuid(reseller_id) or _try_uuid(user_id)
+            if res_uuid is not None:
+                res_active = (
+                    await db.execute(select(Reseller.is_active).where(Reseller.id == res_uuid))
+                ).scalar_one_or_none()
+                if res_active is not None and not res_active:
+                    raise ForbiddenException(detail="Reseller account is disabled")
+
         return {
             "id": user_id,
             "email": payload.get("email"),
-            "role": payload.get("role"),
-            "business_id": payload.get("business_id"),
-            "reseller_id": payload.get("reseller_id"),
-            "is_active": payload.get("is_active", True),
+            "phone": payload.get("phone"),
+            "role": role,
+            "business_id": business_id,
+            "reseller_id": reseller_id,
+            "is_active": is_active,
         }
     except ValueError:
         raise UnauthorizedException(detail="Could not validate credentials")

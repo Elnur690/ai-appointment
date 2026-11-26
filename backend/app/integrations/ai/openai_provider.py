@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Any
 import httpx
@@ -35,10 +36,35 @@ class OpenAIProvider(AIProvider):
             "Content-Type": "application/json",
         }
         
-        openai_messages = [{"role": "system", "content": system_prompt}]
+        openai_messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
         for msg in messages:
-            if msg.role in ["user", "assistant"]:
-                openai_messages.append({"role": msg.role, "content": msg.content or ""})
+            if msg.role == "user":
+                openai_messages.append({"role": "user", "content": msg.content or ""})
+            elif msg.role == "assistant":
+                entry: dict[str, Any] = {"role": "assistant", "content": msg.content}
+                if msg.tool_calls:
+                    entry["tool_calls"] = [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.name,
+                                "arguments": json.dumps(tc.arguments or {}),
+                            },
+                        }
+                        for tc in msg.tool_calls
+                    ]
+                elif entry["content"] is None:
+                    entry["content"] = ""
+                openai_messages.append(entry)
+            elif msg.role == "tool":
+                openai_messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": msg.tool_call_id or "",
+                        "content": msg.content or "",
+                    }
+                )
         
         payload: dict[str, Any] = {
             "model": self.model_name,

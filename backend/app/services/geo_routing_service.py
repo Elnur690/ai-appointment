@@ -63,8 +63,8 @@ class GeoRoutingService:
 
         results = []
         for branch in branches:
-            b_lat = branch.get("latitude", 40.3798)
-            b_lng = branch.get("longitude", 49.8475)
+            b_lat = branch.get("latitude") if branch.get("latitude") is not None else 40.3798
+            b_lng = branch.get("longitude") if branch.get("longitude") is not None else 49.8475
             dist = self._haversine_km(target_lat, target_lng, b_lat, b_lng)
             results.append(
                 BranchDistanceResult(

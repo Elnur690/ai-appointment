@@ -1,7 +1,7 @@
 import enum
 from uuid import UUID
 from datetime import date, datetime
-from sqlalchemy import String, Text, ForeignKey, Date, Enum as SAEnum, Boolean
+from sqlalchemy import String, Text, ForeignKey, Date, DateTime, Enum as SAEnum, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base, TimestampMixin, generate_uuid7
 
@@ -25,4 +25,4 @@ class WaitlistEntry(Base, TimestampMixin):
     preferred_date: Mapped[date] = mapped_column(Date, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[WaitlistStatus] = mapped_column(SAEnum(WaitlistStatus, name="waitliststatus"), nullable=False, default=WaitlistStatus.PENDING)
-    notified_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -1,3 +1,6 @@
+import hashlib
+import hmac
+import json
 import logging
 from datetime import datetime, timezone
 from uuid import UUID
@@ -119,14 +122,14 @@ async def evolution_webhook(
     from app.models.knowledge import KnowledgeEntry, KnowledgeEntryType, KnowledgeEntryStatus
     from app.integrations.whatsapp.client import EvolutionAPIClient
     from app.integrations.whatsapp.message_sender import WhatsAppMessageSender
-    from app.integrations.ai.gemini import GeminiProvider
+    from app.integrations.ai.gemini_provider import GeminiProvider
     from app.integrations.ai.provider import AIMessage, FinishReason
     from app.integrations.ai.tools import get_internal_group_tools
     from app.integrations.ai.internal_tool_executor import InternalGroupToolExecutor
     from app.integrations.ai.conversation_handler import ConversationHandler
 
-    if apikey and settings.EVOLUTION_API_KEY and apikey != settings.EVOLUTION_API_KEY:
-        if settings.ENVIRONMENT == "prod":
+    if settings.EVOLUTION_API_KEY:
+        if not apikey or not hmac.compare_digest(apikey, settings.EVOLUTION_API_KEY):
             raise HTTPException(status_code=401, detail="Invalid Evolution API webhook key")
 
     payload = await request.json()
@@ -142,13 +145,10 @@ async def evolution_webhook(
         ).scalar_one_or_none()
         if branch:
             biz = (await db.execute(select(Business).where(Business.id == branch.business_id))).scalar_one_or_none()
-    if not biz:
-        biz = (await db.execute(select(Business).where(Business.is_active == True))).scalars().first()
-        if biz and not branch:
-            branch = (await db.execute(select(Branch).where(Branch.business_id == biz.id))).scalars().first()
 
     if not biz or not branch:
-        return {"status": "ignored", "reason": "no_matching_business"}
+        logger.warning(f"WhatsApp webhook ignored: no matching business for instance={parsed.instance_name!r}")
+        return {"status": "ignored", "reason": "unknown_business"}
 
     instance_name = parsed.instance_name or branch.whatsapp_instance_id or f"randevu_{str(biz.id)[:8]}_main"
     evo_client = EvolutionAPIClient(base_url=settings.EVOLUTION_API_URL, api_key=settings.EVOLUTION_API_KEY)
@@ -351,9 +351,9 @@ async def evolution_webhook(
                 business_id=biz.id,
                 branch_id=branch.id,
             )
-            conv_res = await handler.handle_incoming_message(
-                customer_phone=parsed.sender_phone,
+            conv_res = await handler.handle_customer_message(
                 message_text=parsed.message_text,
+                customer_phone=parsed.sender_phone,
                 customer_name=parsed.sender_name,
             )
             ai_reply = conv_res.response_text
@@ -427,7 +427,15 @@ async def verify_instagram_webhook(
     hub_challenge: str | None = Query(default=None, alias="hub.challenge"),
 ):
     """Meta Graph API Webhook Verification endpoint for Instagram Direct."""
+    expected_token = (
+        getattr(settings, "INSTAGRAM_VERIFY_TOKEN", None)
+        or getattr(settings, "WHATSAPP_VERIFY_TOKEN", None)
+        or ""
+    ).strip()
     if hub_mode == "subscribe" and hub_challenge:
+        if expected_token:
+            if not hub_verify_token or not hmac.compare_digest(hub_verify_token, expected_token):
+                raise HTTPException(status_code=403, detail="Webhook verification failed")
         return PlainTextResponse(content=str(hub_challenge), status_code=200)
     raise HTTPException(status_code=403, detail="Webhook verification failed")
 
@@ -438,7 +446,19 @@ async def instagram_webhook(
     db: AsyncSession = Depends(get_db),
 ):
     """Receive Instagram Direct Messages from Meta Graph API."""
-    payload = await request.json()
+    raw_body = await request.body()
+    app_secret = (
+        getattr(settings, "INSTAGRAM_APP_SECRET", None)
+        or getattr(settings, "META_APP_SECRET", None)
+        or ""
+    ).strip()
+    if app_secret:
+        sig_header = (request.headers.get("x-hub-signature-256") or "").strip()
+        expected_sig = "sha256=" + hmac.new(app_secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
+        if not sig_header or not hmac.compare_digest(sig_header, expected_sig):
+            raise HTTPException(status_code=401, detail="Invalid Instagram webhook signature")
+
+    payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
     parsed = omnichannel_handler.parse_meta_webhook(payload, channel="instagram")
     if not parsed:
         return {"status": "ignored", "channel": "instagram"}
@@ -461,25 +481,26 @@ async def instagram_webhook(
             if cfg.get("instagram_page_id") and str(cfg.get("instagram_page_id")) == recipient_page_id:
                 matched_biz = b
                 break
-        if not matched_biz and businesses:
-            matched_biz = businesses[0]
 
-        if matched_biz:
-            plan = matched_biz.plan
-            ig_allowed = bool(
-                not plan
-                or getattr(plan, "allows_instagram", False)
-                or getattr(plan, "allows_omnichannel_messaging", False)
-            )
-            if not ig_allowed:
-                return {"status": "plan_disabled", "channel": "instagram"}
+        if not matched_biz:
+            logger.warning(f"Instagram webhook ignored: no matching business for page_id={recipient_page_id!r}")
+            return {"status": "ignored", "reason": "unknown_business"}
 
-            await _persist_incoming_message(
-                db=db,
-                biz=matched_biz,
-                parsed=parsed,
-                guardrail_out_of_scope=bool(guardrail_result and guardrail_result.is_out_of_scope),
-            )
+        plan = matched_biz.plan
+        ig_allowed = bool(
+            not plan
+            or getattr(plan, "allows_instagram", False)
+            or getattr(plan, "allows_omnichannel_messaging", False)
+        )
+        if not ig_allowed:
+            return {"status": "plan_disabled", "channel": "instagram"}
+
+        await _persist_incoming_message(
+            db=db,
+            biz=matched_biz,
+            parsed=parsed,
+            guardrail_out_of_scope=bool(guardrail_result and guardrail_result.is_out_of_scope),
+        )
     except Exception as exc:
         logger.warning(f"Instagram webhook persistence skipped: {exc}")
 
@@ -493,7 +514,13 @@ async def telegram_webhook(
     business_id: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """Receive Telegram Bot updates for a specific business or default active business."""
+    """Receive Telegram Bot updates for a specific business."""
+    tg_secret = (getattr(settings, "TELEGRAM_WEBHOOK_SECRET", None) or "").strip()
+    if tg_secret:
+        req_secret = (request.headers.get("x-telegram-bot-api-secret-token") or "").strip()
+        if not req_secret or not hmac.compare_digest(req_secret, tg_secret):
+            raise HTTPException(status_code=401, detail="Invalid Telegram webhook secret")
+
     payload = await request.json()
     parsed = omnichannel_handler.parse_telegram_webhook(payload, business_id=business_id or "default")
     if not parsed:
@@ -507,59 +534,64 @@ async def telegram_webhook(
             is_solo_business=False,
         )
 
+    matched_biz = None
+    if business_id:
+        try:
+            biz_uuid = UUID(str(business_id))
+            stmt = select(Business).where(Business.id == biz_uuid, Business.is_active == True).options(selectinload(Business.plan))
+            matched_biz = (await db.execute(stmt)).scalar_one_or_none()
+        except ValueError:
+            matched_biz = None
+
+    if not matched_biz:
+        logger.warning(f"Telegram webhook ignored: no matching business for business_id={business_id!r}")
+        return {"status": "ignored", "reason": "unknown_business"}
+
+    cfg = matched_biz.default_ai_tone_config or {}
+    biz_tg_secret = (cfg.get("telegram_webhook_secret") or "").strip()
+    if biz_tg_secret:
+        req_secret = (request.headers.get("x-telegram-bot-api-secret-token") or "").strip()
+        if not req_secret or not hmac.compare_digest(req_secret, biz_tg_secret):
+            raise HTTPException(status_code=401, detail="Invalid Telegram webhook secret")
+
     try:
-        matched_biz = None
-        if business_id:
-            try:
-                biz_uuid = UUID(str(business_id))
-                stmt = select(Business).where(Business.id == biz_uuid).options(selectinload(Business.plan))
-                matched_biz = (await db.execute(stmt)).scalar_one_or_none()
-            except ValueError:
-                matched_biz = None
+        plan = matched_biz.plan
+        tg_allowed = bool(
+            not plan
+            or getattr(plan, "allows_telegram", False)
+            or getattr(plan, "allows_omnichannel_messaging", False)
+        )
+        if not tg_allowed:
+            return {"status": "plan_disabled", "channel": "telegram"}
 
-        if not matched_biz:
-            stmt = select(Business).where(Business.is_active == True).options(selectinload(Business.plan))
-            matched_biz = (await db.execute(stmt)).scalars().first()
-
-        if matched_biz:
-            plan = matched_biz.plan
-            tg_allowed = bool(
-                not plan
-                or getattr(plan, "allows_telegram", False)
-                or getattr(plan, "allows_omnichannel_messaging", False)
+        conv = await _persist_incoming_message(
+            db=db,
+            biz=matched_biz,
+            parsed=parsed,
+            guardrail_out_of_scope=bool(guardrail_result and guardrail_result.is_out_of_scope),
+        )
+        bot_token = cfg.get("telegram_bot_token")
+        if bot_token and conv and conv.ai_active and parsed.message_text:
+            reply_text = (
+                f"Salam! {matched_biz.name} AI köməkçisinə xoş gəlmisiniz. "
+                f"Mesajınız qeydə alındı: '{parsed.message_text}'. Hansı xidmət və saat üçün randevu istərdiniz?"
             )
-            if not tg_allowed:
-                return {"status": "plan_disabled", "channel": "telegram"}
-
-            conv = await _persist_incoming_message(
-                db=db,
-                biz=matched_biz,
-                parsed=parsed,
-                guardrail_out_of_scope=bool(guardrail_result and guardrail_result.is_out_of_scope),
+            sent = await omnichannel_handler.send_telegram_message(
+                bot_token=bot_token,
+                chat_id=parsed.sender_phone,
+                text=reply_text,
             )
-            cfg = matched_biz.default_ai_tone_config or {}
-            bot_token = cfg.get("telegram_bot_token")
-            if bot_token and conv and conv.ai_active and parsed.message_text:
-                reply_text = (
-                    f"Salam! {matched_biz.name} AI köməkçisinə xoş gəlmisiniz. "
-                    f"Mesajınız qeydə alındı: '{parsed.message_text}'. Hansı xidmət və saat üçün randevu istərdiniz?"
-                )
-                sent = await omnichannel_handler.send_telegram_message(
-                    bot_token=bot_token,
-                    chat_id=parsed.sender_phone,
-                    text=reply_text,
-                )
-                if sent:
-                    db.add(
-                        Message(
-                            conversation_id=conv.id,
-                            direction=MessageDirection.outbound,
-                            sender_role="ai",
-                            content=reply_text,
-                            message_type="text",
-                        )
+            if sent:
+                db.add(
+                    Message(
+                        conversation_id=conv.id,
+                        direction=MessageDirection.outbound,
+                        sender_role="ai",
+                        content=reply_text,
+                        message_type="text",
                     )
-                    await db.flush()
+                )
+                await db.flush()
     except Exception as exc:
         logger.warning(f"Telegram webhook persistence skipped: {exc}")
 
@@ -606,7 +638,8 @@ async def platform_payment_gateway_webhook(
             merchant_config={},
             raw_body=raw_body,
         )
-        if not suby_res.is_valid:
+        raw_meta = suby_res.raw_data if isinstance(suby_res.raw_data, dict) else {}
+        if not raw_meta.get("is_valid", True):
             raise HTTPException(status_code=401, detail="Invalid Suby.fi webhook signature")
 
         event_type = str(payload.get("type") or payload.get("event") or payload.get("eventType") or "").upper()
@@ -619,8 +652,12 @@ async def platform_payment_gateway_webhook(
                 biz_uuid = None
 
         payment = None
-        if suby_res.payment_id:
-            payment = (await db.execute(select(Payment).where(Payment.id == suby_res.payment_id))).scalar_one_or_none()
+        suby_payment_id = raw_meta.get("payment_id")
+        if suby_payment_id:
+            try:
+                payment = (await db.execute(select(Payment).where(Payment.id == UUID(str(suby_payment_id))))).scalar_one_or_none()
+            except ValueError:
+                payment = None
         if not payment and suby_res.transaction_id:
             payment = (
                 await db.execute(select(Payment).where(Payment.gateway_transaction_id == suby_res.transaction_id))
@@ -649,12 +686,12 @@ async def platform_payment_gateway_webhook(
                 biz_uuid = existing_sub.business_id
 
         if suby_res.is_successful:
-            if payment:
+            if payment and payment.status != PaymentStatus.refunded:
                 payment.status = PaymentStatus.completed
                 if payment.appointment_id:
                     from app.models.appointment import Appointment, AppointmentStatus
                     appt = (await db.execute(select(Appointment).where(Appointment.id == payment.appointment_id))).scalar_one_or_none()
-                    if appt:
+                    if appt and appt.status not in (AppointmentStatus.cancelled, AppointmentStatus.completed, AppointmentStatus.no_show):
                         appt.status = AppointmentStatus.confirmed
 
             if biz_uuid and (metadata.get("type") == "saas_subscription" or event_type.startswith("SUBSCRIPTION")):
@@ -767,7 +804,12 @@ async def platform_payment_gateway_webhook(
 
     if biz_uuid:
         service = PaymentService(db=db, business_id=biz_uuid)
-        verified = await service.handle_webhook_callback(provider=prov, payload=payload, headers=headers)
+        verified = await service.handle_webhook_callback(
+            provider=prov,
+            payload=payload,
+            headers=headers,
+            raw_body=raw_body,
+        )
         if verified and metadata.get("type") == "saas_subscription" and metadata.get("plan_id"):
             from datetime import datetime, timedelta, timezone
             from app.models.business import Business
@@ -829,19 +871,25 @@ async def payment_gateway_webhook(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid business ID")
 
+    raw_body = await request.body()
     content_type = (request.headers.get("content-type") or "").lower()
     if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
         form_data = await request.form()
         payload = {k: v for k, v in form_data.items()}
     else:
         try:
-            payload = await request.json()
+            payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
         except Exception:
-            raw_txt = (await request.body()).decode("utf-8", errors="ignore")
+            raw_txt = raw_body.decode("utf-8", errors="ignore")
             from urllib.parse import parse_qs
             parsed_qs = parse_qs(raw_txt)
             payload = {k: v[0] for k, v in parsed_qs.items()} if parsed_qs else {}
     headers = dict(request.headers)
     service = PaymentService(db=db, business_id=biz_uuid)
-    verified = await service.handle_webhook_callback(provider=provider, payload=payload, headers=headers)
+    verified = await service.handle_webhook_callback(
+        provider=provider,
+        payload=payload,
+        headers=headers,
+        raw_body=raw_body,
+    )
     return {"status": "verified" if verified else "ignored", "provider": provider}

@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from sqlalchemy import select, and_
 from app.tasks.celery_app import celery_app
 from app.core.database import AsyncSessionLocal, engine
@@ -87,7 +88,13 @@ async def _async_send_reminders():
                 )
                 rows = (await session.execute(stmt)).all()
                 for appt, cust, svc, br, biz in rows:
-                    time_str = appt.start_time.strftime("%Y-%m-%d %H:%M")
+                    tz_name = br.timezone if br and br.timezone else "Asia/Baku"
+                    try:
+                        local_tz = ZoneInfo(tz_name)
+                    except Exception:
+                        local_tz = ZoneInfo("Asia/Baku")
+                    start_utc = appt.start_time if appt.start_time.tzinfo else appt.start_time.replace(tzinfo=timezone.utc)
+                    time_str = start_utc.astimezone(local_tz).strftime("%Y-%m-%d %H:%M")
                     svc_name = svc.name if svc else "Randevu"
                     biz_name = biz.name if biz else "Randevu.vip"
                     msg = (
@@ -116,21 +123,23 @@ def expire_overdue_trials():
 
 async def _async_expire_overdue_trials():
     now = datetime.now(timezone.utc)
-    async with AsyncSessionLocal() as session:
-        stmt = select(Business).where(
-            and_(
-                Business.subscription_status == "trial",
-                Business.trial_ends_at.is_not(None),
-                Business.trial_ends_at < now,
-                Business.is_active.is_(True),
+    try:
+        async with AsyncSessionLocal() as session:
+            stmt = select(Business).where(
+                and_(
+                    Business.subscription_status == "trial",
+                    Business.trial_ends_at.is_not(None),
+                    Business.trial_ends_at < now,
+                    Business.is_active.is_(True),
+                )
             )
-        )
-        expired = (await session.execute(stmt)).scalars().all()
-        for biz in expired:
-            biz.subscription_status = "trial_expired"
-            logger.info(f"Marked overdue trial as trial_expired for business {biz.id}")
-        await session.commit()
-    await engine.dispose()
+            expired = (await session.execute(stmt)).scalars().all()
+            for biz in expired:
+                biz.subscription_status = "trial_expired"
+                logger.info(f"Marked overdue trial as trial_expired for business {biz.id}")
+            await session.commit()
+    finally:
+        await engine.dispose()
 
 
 @celery_app.task(name="process_subscription_renewals")

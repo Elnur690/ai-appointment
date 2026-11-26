@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import json
 import logging
 from decimal import Decimal
 from uuid import UUID
@@ -21,7 +22,7 @@ class CreemAdapter(PaymentAdapter):
     def _get_base_url(self, api_key: str, merchant_config: dict) -> str:
         if merchant_config.get("base_url"):
             return str(merchant_config["base_url"]).rstrip("/")
-        if settings.CREEM_TEST_MODE or api_key.startswith("creem_test_"):
+        if getattr(settings, "CREEM_TEST_MODE", False) or api_key.startswith("creem_test_"):
             return self.TEST_URL
         return self.PROD_URL
 
@@ -37,7 +38,7 @@ class CreemAdapter(PaymentAdapter):
         api_key = (
             merchant_config.get("api_key")
             or merchant_config.get("creem_api_key")
-            or settings.CREEM_API_KEY
+            or getattr(settings, "CREEM_API_KEY", "")
             or ""
         ).strip()
         if not api_key:
@@ -127,7 +128,7 @@ class CreemAdapter(PaymentAdapter):
         webhook_secret = (
             merchant_config.get("webhook_secret")
             or merchant_config.get("creem_webhook_secret")
-            or settings.CREEM_WEBHOOK_SECRET
+            or getattr(settings, "CREEM_WEBHOOK_SECRET", "")
             or ""
         ).strip()
 
@@ -138,10 +139,11 @@ class CreemAdapter(PaymentAdapter):
             or ""
         ).strip()
 
-        if webhook_secret and raw_body is not None:
+        if webhook_secret:
+            body_bytes = raw_body if raw_body is not None else json.dumps(payload, separators=(",", ":")).encode("utf-8")
             expected = hmac.new(
                 webhook_secret.encode("utf-8"),
-                raw_body,
+                body_bytes,
                 hashlib.sha256,
             ).hexdigest()
             if not sig_header or not hmac.compare_digest(expected, sig_header):
@@ -187,7 +189,7 @@ class CreemAdapter(PaymentAdapter):
         )
 
     async def check_status(self, transaction_id: str, merchant_config: dict) -> str:
-        api_key = (merchant_config.get("api_key") or settings.CREEM_API_KEY or "").strip()
+        api_key = (merchant_config.get("api_key") or getattr(settings, "CREEM_API_KEY", "") or "").strip()
         if not api_key:
             return "pending"
         base_url = self._get_base_url(api_key, merchant_config)
@@ -207,7 +209,7 @@ class CreemAdapter(PaymentAdapter):
 
     async def create_recurring_product(self, name: str, amount: Decimal, currency: str = "AZN") -> str:
         """Create a monthly recurring Creem product and return its product_id."""
-        api_key = (settings.CREEM_API_KEY or "").strip()
+        api_key = (getattr(settings, "CREEM_API_KEY", "") or "").strip()
         if not api_key:
             raise ValueError("CREEM_API_KEY is not configured")
         base_url = self._get_base_url(api_key, {})
@@ -232,7 +234,7 @@ class CreemAdapter(PaymentAdapter):
 
     async def upgrade_subscription(self, subscription_id: str, product_id: str) -> dict:
         """Upgrade or switch a Creem subscription via POST /v1/subscriptions/{id}/upgrade."""
-        api_key = (settings.CREEM_API_KEY or "").strip()
+        api_key = (getattr(settings, "CREEM_API_KEY", "") or "").strip()
         if not api_key:
             raise ValueError("CREEM_API_KEY is not configured")
         base_url = self._get_base_url(api_key, {})
@@ -248,7 +250,7 @@ class CreemAdapter(PaymentAdapter):
 
     async def cancel_subscription(self, subscription_id: str) -> dict:
         """Cancel a Creem subscription via POST /v1/subscriptions/{id}/cancel."""
-        api_key = (settings.CREEM_API_KEY or "").strip()
+        api_key = (getattr(settings, "CREEM_API_KEY", "") or "").strip()
         if not api_key:
             raise ValueError("CREEM_API_KEY is not configured")
         base_url = self._get_base_url(api_key, {})
@@ -263,7 +265,7 @@ class CreemAdapter(PaymentAdapter):
 
     async def create_billing_portal_url(self, customer_id: str) -> str:
         """Create a Creem Customer Portal link via POST /v1/customers/billing."""
-        api_key = (settings.CREEM_API_KEY or "").strip()
+        api_key = (getattr(settings, "CREEM_API_KEY", "") or "").strip()
         if not api_key:
             raise ValueError("CREEM_API_KEY is not configured")
         base_url = self._get_base_url(api_key, {})
@@ -280,7 +282,7 @@ class CreemAdapter(PaymentAdapter):
 
     async def refund_payment(self, transaction_id: str, reason: str | None = None) -> dict:
         """Issue a full refund via Creem POST /v1/refunds (transaction or checkout id)."""
-        api_key = (settings.CREEM_API_KEY or "").strip()
+        api_key = (getattr(settings, "CREEM_API_KEY", "") or "").strip()
         if not api_key:
             raise ValueError("CREEM_API_KEY is not configured")
         base_url = self._get_base_url(api_key, {})

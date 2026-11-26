@@ -45,7 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _buildHomeTab(context),
       const DiscoverScreen(),
       const AppointmentsHistoryScreen(),
-      const ProfileScreen(),
+      const CustomerProfileSettingsScreen(),
     ];
 
     return Scaffold(

@@ -14,10 +14,8 @@ const CalendarPage = () => {
   const loadSchedule = async (dateStr) => {
     setLoading(true);
     try {
-      const startIso = `${dateStr}T00:00:00`;
-      const endIso = `${dateStr}T23:59:59`;
       const res = await api.get('/appointments/calendar', {
-        params: { start_date: startIso, end_date: endIso },
+        params: { start_date: dateStr, end_date: dateStr },
       });
       setAppointments(res.data || []);
     } catch {

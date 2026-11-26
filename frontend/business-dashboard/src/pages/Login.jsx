@@ -55,8 +55,17 @@ const Login = ({ initialMode = 'login' }) => {
     setSubmitting(true);
     try {
       const res = await api.post('/auth/login', { email, password });
-      localStorage.setItem('access_token', res.data.access_token);
       const userRole = res.data.role || 'owner';
+      if (userRole === 'saas_owner') {
+        localStorage.removeItem('access_token');
+        setError(
+          lang === 'en'
+            ? 'Platform Administrator accounts must sign in through the Admin Dashboard.'
+            : 'Platforma Administratoru hesabları Admin Panelindən daxil olmalıdır.'
+        );
+        return;
+      }
+      localStorage.setItem('access_token', res.data.access_token);
       login({
         name: email.split('@')[0],
         email,

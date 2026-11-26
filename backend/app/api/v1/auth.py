@@ -1,3 +1,7 @@
+import hmac
+import logging
+import secrets
+import time as _time
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any, Optional
 from uuid import UUID
@@ -10,6 +14,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.email_validation import assert_allowed_registration_email
 from app.core.dependencies import get_current_active_user
+from app.core.redis import get_redis
 from app.core.security import (
     hash_password,
     verify_password,
@@ -21,7 +26,44 @@ from app.models.saas import SaasOwner, Plan
 from app.models.business import Business, BusinessOwner, Branch
 from app.models.reseller import Reseller
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# In-memory TTL fallback store for OTP codes when Redis is unavailable: phone -> (code, expires_monotonic)
+_OTP_FALLBACK_STORE: dict[str, tuple[str, float]] = {}
+_OTP_TTL_SECONDS = 300
+
+
+async def _store_otp(phone: str, code: str, ttl_seconds: int = _OTP_TTL_SECONDS) -> None:
+    try:
+        redis_conn = get_redis()
+        await redis_conn.setex(f"otp:{phone}", ttl_seconds, code)
+    except Exception as exc:
+        logger.warning(f"Redis unavailable for OTP storage, falling back to in-memory store: {exc}")
+        _OTP_FALLBACK_STORE[phone] = (code, _time.monotonic() + ttl_seconds)
+
+
+async def _verify_and_consume_otp(phone: str, submitted_code: str) -> bool:
+    try:
+        redis_conn = get_redis()
+        stored = await redis_conn.get(f"otp:{phone}")
+        if stored and hmac.compare_digest(str(stored), submitted_code):
+            await redis_conn.delete(f"otp:{phone}")
+            return True
+        return False
+    except Exception as exc:
+        logger.warning(f"Redis unavailable for OTP verification, checking in-memory store: {exc}")
+        entry = _OTP_FALLBACK_STORE.get(phone)
+        if not entry:
+            return False
+        stored_code, expires_at = entry
+        if _time.monotonic() > expires_at:
+            _OTP_FALLBACK_STORE.pop(phone, None)
+            return False
+        if hmac.compare_digest(stored_code, submitted_code):
+            _OTP_FALLBACK_STORE.pop(phone, None)
+            return True
+        return False
 
 
 class LoginRequest(BaseModel):
@@ -83,7 +125,12 @@ async def login(
     saas_owner = (
         await db.execute(select(SaasOwner).where(SaasOwner.email == email_clean))
     ).scalar_one_or_none()
-    if saas_owner and verify_password(request.password, saas_owner.password_hash):
+    if saas_owner is not None:
+        if not verify_password(request.password, saas_owner.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password",
+            )
         if not saas_owner.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is disabled")
         access = create_access_token(
@@ -91,17 +138,27 @@ async def login(
             role="saas_owner",
             extra_claims={"email": saas_owner.email},
         )
-        refresh = create_refresh_token(subject=str(saas_owner.id))
+        refresh = create_refresh_token(
+            subject=str(saas_owner.id),
+            extra_claims={"role": "saas_owner", "email": saas_owner.email},
+        )
         return TokenResponse(access_token=access, refresh_token=refresh, role="saas_owner")
 
-    # 2. Fallback check against env-configured SAAS_ADMIN_EMAIL
-    if email_clean == settings.SAAS_ADMIN_EMAIL.lower() and request.password == settings.SAAS_ADMIN_PASSWORD:
+    # 2. Fallback check against env-configured SAAS_ADMIN_EMAIL (dev/non-prod only, and only if no DB SaasOwner exists)
+    if (
+        settings.ENVIRONMENT != "prod"
+        and email_clean == settings.SAAS_ADMIN_EMAIL.lower()
+        and hmac.compare_digest(request.password, settings.SAAS_ADMIN_PASSWORD)
+    ):
         access = create_access_token(
             subject="saas-root-admin",
             role="saas_owner",
             extra_claims={"email": email_clean},
         )
-        refresh = create_refresh_token(subject="saas-root-admin")
+        refresh = create_refresh_token(
+            subject="saas-root-admin",
+            extra_claims={"role": "saas_owner", "email": email_clean},
+        )
         return TokenResponse(access_token=access, refresh_token=refresh, role="saas_owner")
 
     # 3. Check Business Owner
@@ -118,7 +175,10 @@ async def login(
             business_id=biz_id_str,
             extra_claims={"email": biz_owner.email},
         )
-        refresh = create_refresh_token(subject=str(biz_owner.id))
+        refresh = create_refresh_token(
+            subject=str(biz_owner.id),
+            extra_claims={"role": "owner", "business_id": biz_id_str, "email": biz_owner.email},
+        )
         return TokenResponse(
             access_token=access,
             refresh_token=refresh,
@@ -139,7 +199,10 @@ async def login(
             role="reseller",
             extra_claims={"email": reseller.email, "reseller_id": res_id_str},
         )
-        refresh = create_refresh_token(subject=res_id_str)
+        refresh = create_refresh_token(
+            subject=res_id_str,
+            extra_claims={"role": "reseller", "reseller_id": res_id_str, "email": reseller.email},
+        )
         return TokenResponse(
             access_token=access,
             refresh_token=refresh,
@@ -203,7 +266,7 @@ async def register_business(
         name=request.business_name.strip(),
         plan_id=selected_plan.id if selected_plan else None,
         reseller_id=reseller_id,
-        subscription_status="trial" if allows_trial else "active",
+        subscription_status="trial" if allows_trial else "pending_payment",
         trial_ends_at=trial_ends,
         category=request.category,
         is_active=True,
@@ -237,7 +300,10 @@ async def register_business(
         business_id=biz_id_str,
         extra_claims={"email": owner.email},
     )
-    refresh = create_refresh_token(subject=str(owner.id))
+    refresh = create_refresh_token(
+        subject=str(owner.id),
+        extra_claims={"role": "owner", "business_id": biz_id_str, "email": owner.email},
+    )
     return TokenResponse(
         access_token=access,
         refresh_token=refresh,
@@ -260,16 +326,69 @@ async def refresh_token(
         if not subject:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token subject")
 
+        role = payload.get("role")
+        business_id = payload.get("business_id")
+        reseller_id = payload.get("reseller_id")
+        phone = payload.get("phone")
+        email = payload.get("email")
+
+        # Fallback DB resolution for legacy refresh tokens missing role claim; never default blindly to "owner"
+        if not role:
+            if str(subject).startswith("customer:"):
+                role = "customer"
+                phone = phone or str(subject).removeprefix("customer:")
+            else:
+                try:
+                    sub_uuid = UUID(str(subject))
+                except ValueError:
+                    sub_uuid = None
+                if sub_uuid is not None:
+                    saas_owner = (
+                        await db.execute(select(SaasOwner).where(SaasOwner.id == sub_uuid))
+                    ).scalar_one_or_none()
+                    if saas_owner and saas_owner.is_active:
+                        role = "saas_owner"
+                        email = email or saas_owner.email
+                    else:
+                        biz_owner = (
+                            await db.execute(select(BusinessOwner).where(BusinessOwner.id == sub_uuid))
+                        ).scalar_one_or_none()
+                        if biz_owner and biz_owner.is_active:
+                            role = "owner"
+                            business_id = business_id or str(biz_owner.business_id)
+                            email = email or biz_owner.email
+                        else:
+                            reseller = (
+                                await db.execute(select(Reseller).where(Reseller.id == sub_uuid))
+                            ).scalar_one_or_none()
+                            if reseller and reseller.is_active:
+                                role = "reseller"
+                                reseller_id = reseller_id or str(reseller.id)
+                                email = email or reseller.email
+
+        if not role:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token: missing role")
+
+        extra_claims: dict[str, Any] = {}
+        if email:
+            extra_claims["email"] = email
+        if reseller_id:
+            extra_claims["reseller_id"] = reseller_id
+        if phone:
+            extra_claims["phone"] = phone
+
         access = create_access_token(
             subject=subject,
-            role=payload.get("role", "owner"),
-            business_id=payload.get("business_id"),
+            role=role,
+            business_id=business_id,
+            extra_claims=extra_claims or None,
         )
         return TokenResponse(
             access_token=access,
             refresh_token=req.refresh_token,
-            role=payload.get("role", "owner"),
-            business_id=payload.get("business_id"),
+            role=role,
+            business_id=business_id,
+            reseller_id=reseller_id,
         )
     except ValueError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token")
@@ -278,15 +397,33 @@ async def refresh_token(
 @router.post("/otp/send")
 async def send_customer_otp(req: OtpSendRequest):
     """Send WhatsApp OTP verification code to customer phone."""
-    return {"status": "sent", "phone": req.phone, "expires_in_seconds": 300}
+    phone = (req.phone or "").strip()
+    if not phone:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phone number is required")
+    code = f"{secrets.randbelow(1000000):06d}"
+    await _store_otp(phone, code, ttl_seconds=_OTP_TTL_SECONDS)
+    if settings.ENVIRONMENT != "prod":
+        logger.info(f"OTP generated for {phone}: {code}")
+    else:
+        logger.info(f"OTP generated for {phone}")
+    return {"status": "sent", "phone": phone, "expires_in_seconds": _OTP_TTL_SECONDS}
 
 
 @router.post("/otp/verify", response_model=TokenResponse)
 async def verify_customer_otp(req: OtpVerifyRequest):
     """Verify customer OTP code and return customer session JWT."""
-    if not req.code or len(req.code.strip()) < 4:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OTP code")
-    access = create_access_token(subject=f"customer:{req.phone}", role="customer")
+    phone = (req.phone or "").strip()
+    code = (req.code or "").strip()
+    if not phone or not code:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired OTP code")
+    valid = await _verify_and_consume_otp(phone, code)
+    if not valid:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired OTP code")
+    access = create_access_token(
+        subject=f"customer:{phone}",
+        role="customer",
+        extra_claims={"phone": phone},
+    )
     return TokenResponse(access_token=access, role="customer")
 
 
@@ -514,7 +651,7 @@ async def reset_password(
 
     try:
         payload = decode_token(req.token)
-    except JWTError:
+    except (JWTError, ValueError):
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
 
     if payload.get("purpose") != "password_reset":
@@ -522,10 +659,15 @@ async def reset_password(
 
     user_id = payload.get("sub")
     role = payload.get("role")
+    try:
+        user_uuid = UUID(str(user_id))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid reset token")
+
     if role == "owner":
-        user = (await db.execute(select(BusinessOwner).where(BusinessOwner.id == UUID(user_id)))).scalar_one_or_none()
+        user = (await db.execute(select(BusinessOwner).where(BusinessOwner.id == user_uuid))).scalar_one_or_none()
     elif role == "reseller":
-        user = (await db.execute(select(Reseller).where(Reseller.id == UUID(user_id)))).scalar_one_or_none()
+        user = (await db.execute(select(Reseller).where(Reseller.id == user_uuid))).scalar_one_or_none()
     else:
         user = None
 

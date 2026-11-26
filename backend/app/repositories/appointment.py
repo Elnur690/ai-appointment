@@ -1,4 +1,4 @@
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timezone as dt_timezone
 from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -36,7 +36,7 @@ class AppointmentRepository(BaseRepository[Appointment]):
         return list(result.scalars().all())
         
     async def get_upcoming_by_customer(self, customer_id: UUID) -> list[Appointment]:
-        now = datetime.utcnow()
+        now = datetime.now(dt_timezone.utc)
         stmt = self._scoped_query().where(
             Appointment.customer_id == customer_id,
             Appointment.start_time >= now,
@@ -47,7 +47,7 @@ class AppointmentRepository(BaseRepository[Appointment]):
         
     async def get_today_appointments(self, branch_id: UUID, timezone: str) -> list[Appointment]:
         # Simple approximation, in a real scenario would use DB TZ functions or local calculation
-        now = datetime.utcnow()
+        now = datetime.now(dt_timezone.utc)
         today = now.date()
         start = to_utc(datetime.combine(today, time.min), timezone)
         end = to_utc(datetime.combine(today, time.max), timezone)

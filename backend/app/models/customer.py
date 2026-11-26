@@ -12,6 +12,7 @@ class Customer(Base, TimestampMixin):
     business_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("businesses.id"), nullable=False, index=True)
     phone_number: Mapped[str] = mapped_column(String, nullable=False)
     name: Mapped[str | None] = mapped_column(String, nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     language_pref: Mapped[str] = mapped_column(String(10), nullable=False, default="az")
 
     __table_args__ = (

@@ -155,6 +155,7 @@ const Sidebar = () => {
           <NavLink
             key={item.path}
             to={item.path}
+            end={item.path === '/'}
             style={({ isActive }) => ({
               display: 'flex',
               alignItems: 'center',

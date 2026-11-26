@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 from typing import Optional, List, Dict
 from uuid import UUID, uuid4
@@ -68,7 +68,18 @@ class FlashDropService:
             logger.info(f"[PLAN GATED] Flash drops disabled for plan. Business: {business_id}")
             return None
 
-        now = current_time or datetime.now()
+        if current_time is not None:
+            now = current_time
+        elif slot_datetime.tzinfo is not None:
+            now = datetime.now(timezone.utc).astimezone(slot_datetime.tzinfo)
+        else:
+            now = datetime.now(timezone.utc)
+            slot_datetime = slot_datetime.replace(tzinfo=timezone.utc)
+        if (slot_datetime.tzinfo is None) != (now.tzinfo is None):
+            if slot_datetime.tzinfo is None:
+                slot_datetime = slot_datetime.replace(tzinfo=now.tzinfo)
+            else:
+                now = now.replace(tzinfo=slot_datetime.tzinfo)
         hours_until_slot = (slot_datetime - now).total_seconds() / 3600.0
 
         # Trigger only if cancellation happens within 0.5 to 4.5 hours of slot
@@ -122,7 +133,18 @@ class FlashDropService:
         claim_time: Optional[datetime] = None,
     ) -> Dict[str, any]:
         """Atomically claims a flash drop slot for the first replying customer."""
-        now = claim_time or datetime.now()
+        if claim_time is not None:
+            now = claim_time
+        elif offer.expires_at.tzinfo is not None:
+            now = datetime.now(timezone.utc).astimezone(offer.expires_at.tzinfo)
+        else:
+            now = datetime.now(timezone.utc)
+        offer_exp = offer.expires_at
+        if (offer_exp.tzinfo is None) != (now.tzinfo is None):
+            if offer_exp.tzinfo is None:
+                offer_exp = offer_exp.replace(tzinfo=now.tzinfo)
+            else:
+                now = now.replace(tzinfo=offer_exp.tzinfo)
 
         if offer.is_claimed:
             return {
@@ -131,7 +153,7 @@ class FlashDropService:
                 "reason": "already_claimed",
             }
 
-        if now > offer.expires_at:
+        if now > offer_exp:
             return {
                 "success": False,
                 "message": "Bu qaynar təklifin vaxtı artıq bitmişdir.",

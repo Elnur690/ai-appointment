@@ -15,7 +15,8 @@ from app.core.dependencies import require_role, get_business_context
 from app.models.business import Business, Branch
 from app.models.appointment import Appointment
 from app.models.conversation import Conversation, Message
-from app.models.payment import Payment, PaymentGatewayConfig
+from app.models.payment import Payment, PaymentGatewayConfig, PaymentMethod, PaymentStatus
+from app.models.saas import Plan
 from app.services.custom_domain_service import CustomDomainService
 from app.integrations.whatsapp.client import EvolutionAPIClient
 
@@ -235,8 +236,8 @@ async def update_own_business(
         if biz:
             if update_data.name is not None:
                 biz.name = update_data.name
-            if update_data.custom_domain is not None:
-                biz.custom_domain = update_data.custom_domain.strip().lower() or None
+            if "custom_domain" in update_data.model_fields_set:
+                biz.custom_domain = (update_data.custom_domain or "").strip().lower() or None
             if update_data.settings is not None:
                 merged_settings = dict(biz.default_ai_tone_config or {})
                 merged_settings.update(update_data.settings)
@@ -424,7 +425,13 @@ async def get_whatsapp_pairing_qr(
     instance_name = f"randevu_{business_id[:8]}_{branch_id[:8] if branch_id else 'main'}"
     biz_uuid = _parse_uuid_safe(business_id)
     if biz_uuid:
-        branch = (await db.execute(select(Branch).where(Branch.business_id == biz_uuid))).scalars().first()
+        branch_stmt = select(Branch).where(Branch.business_id == biz_uuid)
+        if branch_id:
+            branch_uuid = _parse_uuid_safe(branch_id)
+            if not branch_uuid:
+                raise HTTPException(status_code=400, detail="Invalid branch_id")
+            branch_stmt = branch_stmt.where(Branch.id == branch_uuid)
+        branch = (await db.execute(branch_stmt)).scalars().first()
         if branch and not branch.whatsapp_instance_id:
             branch.whatsapp_instance_id = instance_name
             await db.flush()
@@ -1058,7 +1065,7 @@ async def discover_public_businesses(
             "id": str(b.id),
             "name": b.name,
             "category": b.category or "Service Business",
-            "address": b.branches[0].address if getattr(b, "branches", None) and b.branches[0].address else "Baku",
+            "address": b.branches[0].location if getattr(b, "branches", None) and b.branches[0].location else "Baku",
             "branches_count": len(b.branches) if getattr(b, "branches", None) else 0,
             "services_count": len([s for s in (b.services or []) if s.is_active]),
         }

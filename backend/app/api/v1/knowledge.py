@@ -63,12 +63,20 @@ class SearchResponse(BaseModel):
     results: List[KnowledgeResponse]
 
 
+_DB_ENUM_CATEGORIES = {"faq", "correction", "best_practice"}
+_EXTENDED_CATEGORIES = {"policy", "service_info"}
+_ALLOWED_CATEGORIES = _DB_ENUM_CATEGORIES | _EXTENDED_CATEGORIES
+
+
 def _to_response(k: KnowledgeEntry) -> KnowledgeResponse:
+    raw_type = k.entry_type.value if hasattr(k.entry_type, "value") else str(k.entry_type)
+    stored_category = k.tags.get("category") if isinstance(k.tags, dict) else None
+    display_type = stored_category if stored_category in _ALLOWED_CATEGORIES else raw_type
     return KnowledgeResponse(
         id=str(k.id),
         business_id=str(k.business_id),
         branch_id=str(k.branch_id) if k.branch_id else None,
-        type=k.entry_type.value if hasattr(k.entry_type, "value") else str(k.entry_type),
+        type=display_type,
         title=k.title,
         content=k.answer_content,
         question_context=k.question_context,
@@ -89,15 +97,24 @@ async def list_knowledge(
 ):
     """List knowledge entries from PostgreSQL."""
     stmt = select(KnowledgeEntry).where(KnowledgeEntry.business_id == UUID(business_id))
-    if type:
-        stmt = stmt.where(KnowledgeEntry.entry_type == KnowledgeEntryType(type.lower()))
+    type_filter = type.lower() if type else None
+    if type_filter:
+        if type_filter in _DB_ENUM_CATEGORIES:
+            stmt = stmt.where(KnowledgeEntry.entry_type == KnowledgeEntryType(type_filter))
+        elif type_filter in _EXTENDED_CATEGORIES:
+            stmt = stmt.where(KnowledgeEntry.tags["category"].astext == type_filter)
+        else:
+            return []
     if status:
         stmt = stmt.where(KnowledgeEntry.status == KnowledgeEntryStatus(status.lower()))
     if branch_id:
         stmt = stmt.where(KnowledgeEntry.branch_id == UUID(branch_id))
     stmt = stmt.order_by(KnowledgeEntry.created_at.desc())
     res = await db.execute(stmt)
-    return [_to_response(k) for k in res.scalars().all()]
+    items = [_to_response(k) for k in res.scalars().all()]
+    if type_filter in _DB_ENUM_CATEGORIES:
+        items = [it for it in items if it.type == type_filter]
+    return items
 
 
 @router.post("/", response_model=KnowledgeResponse)
@@ -107,21 +124,31 @@ async def create_knowledge(
     user: Annotated[dict[str, Any], Depends(get_current_active_user)],
     business_id: Annotated[str, Depends(get_business_context)],
 ):
-    """Create a new knowledge entry (FAQ, policy, or correction) in PostgreSQL."""
+    """Create a new knowledge entry (FAQ, policy, service_info, best_practice, or correction) in PostgreSQL."""
     entry_type_val = entry.type.lower() if entry.type else "faq"
-    if entry_type_val not in {"faq", "correction", "best_practice"}:
+    if entry_type_val not in _ALLOWED_CATEGORIES:
         entry_type_val = "faq"
+    db_entry_type = (
+        KnowledgeEntryType(entry_type_val)
+        if entry_type_val in _DB_ENUM_CATEGORIES
+        else KnowledgeEntryType.FAQ
+    )
+    tags_payload: dict[str, Any] = {}
+    if entry.tags:
+        tags_payload["items"] = entry.tags
+    if entry_type_val in _EXTENDED_CATEGORIES:
+        tags_payload["category"] = entry_type_val
     q_text = (entry.question_context or entry.title or entry.content or "General Info").strip()
     a_text = (entry.answer_content or entry.content or entry.question_context or "").strip()
     row = KnowledgeEntry(
         business_id=UUID(business_id),
         branch_id=UUID(entry.branch_id) if entry.branch_id else None,
-        entry_type=KnowledgeEntryType(entry_type_val),
+        entry_type=db_entry_type,
         status=KnowledgeEntryStatus.ACTIVE,
         title=entry.title or q_text[:80],
         question_context=q_text,
         answer_content=a_text,
-        tags={"items": entry.tags} if entry.tags else None,
+        tags=tags_payload or None,
     )
     db.add(row)
     await db.flush()

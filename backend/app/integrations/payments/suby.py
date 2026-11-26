@@ -10,7 +10,8 @@ from uuid import UUID
 import httpx
 
 from app.core.config import settings
-from app.integrations.payments.adapter import PaymentAdapter, PaymentLinkResult, PaymentStatus, WebhookResult
+from app.integrations.payments.adapter import PaymentAdapter, PaymentLinkResult, WebhookResult
+from app.models.payment import PaymentStatus
 
 logger = logging.getLogger(__name__)
 
@@ -478,7 +479,6 @@ class SubyAdapter(PaymentAdapter):
         return PaymentLinkResult(
             payment_url=checkout_url,
             transaction_id=session_id,
-            raw_response=session,
         )
 
     async def verify_webhook(
@@ -507,14 +507,29 @@ class SubyAdapter(PaymentAdapter):
         if secret:
             if not sig_header or not ts_header:
                 logger.warning("Suby webhook missing X-Webhook-Signature or X-Webhook-Timestamp")
-                return WebhookResult(is_valid=False, is_successful=False, transaction_id="")
+                return WebhookResult(
+                    transaction_id="",
+                    is_successful=False,
+                    amount=Decimal("0"),
+                    raw_data={"is_valid": False, "payload": payload},
+                )
             try:
                 event_ts = int(float(ts_header))
                 if abs(int(time.time()) - event_ts) > 300:
                     logger.warning(f"Suby webhook timestamp outside 5m tolerance: {ts_header}")
-                    return WebhookResult(is_valid=False, is_successful=False, transaction_id="")
+                    return WebhookResult(
+                        transaction_id="",
+                        is_successful=False,
+                        amount=Decimal("0"),
+                        raw_data={"is_valid": False, "payload": payload},
+                    )
             except ValueError:
-                return WebhookResult(is_valid=False, is_successful=False, transaction_id="")
+                return WebhookResult(
+                    transaction_id="",
+                    is_successful=False,
+                    amount=Decimal("0"),
+                    raw_data={"is_valid": False, "payload": payload},
+                )
 
             body_bytes = raw_body if raw_body is not None else json.dumps(payload, separators=(",", ":")).encode("utf-8")
             signed_payload = f"{ts_header}.".encode("utf-8") + body_bytes
@@ -526,7 +541,12 @@ class SubyAdapter(PaymentAdapter):
 
             if not hmac.compare_digest(provided_sig.lower(), expected_hex.lower()):
                 logger.warning("Suby webhook HMAC-SHA256 signature verification failed")
-                return WebhookResult(is_valid=False, is_successful=False, transaction_id="")
+                return WebhookResult(
+                    transaction_id="",
+                    is_successful=False,
+                    amount=Decimal("0"),
+                    raw_data={"is_valid": False, "payload": payload},
+                )
 
         event_type = str(payload.get("type") or payload.get("event") or payload.get("eventType") or "").upper()
         data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
@@ -559,14 +579,18 @@ class SubyAdapter(PaymentAdapter):
         }
         is_successful = event_type in success_events
         amount_val = data.get("amount") or data.get("price")
-        amount_paid = Decimal(str(amount_val)) if amount_val is not None else None
+        amount_paid = Decimal(str(amount_val)) if amount_val is not None else Decimal("0")
 
         return WebhookResult(
-            is_valid=True,
-            is_successful=is_successful,
             transaction_id=tx_id,
-            payment_id=payment_uuid,
-            amount_paid=amount_paid,
+            is_successful=is_successful,
+            amount=amount_paid,
+            raw_data={
+                "is_valid": True,
+                "payment_id": str(payment_uuid) if payment_uuid else None,
+                "currency": data.get("currency"),
+                "payload": payload,
+            },
         )
 
     async def check_status(self, transaction_id: str, merchant_config: dict) -> PaymentStatus:

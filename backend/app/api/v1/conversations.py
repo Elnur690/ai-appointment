@@ -89,19 +89,27 @@ async def get_conversation(
     business_id: Annotated[str, Depends(get_business_context)],
 ):
     """Get conversation details with messages from PostgreSQL."""
+    try:
+        conv_uuid = UUID(id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid conversation ID")
     stmt = (
         select(Conversation)
-        .where(Conversation.id == UUID(id), Conversation.business_id == UUID(business_id))
+        .where(Conversation.id == conv_uuid, Conversation.business_id == UUID(business_id))
         .options(selectinload(Conversation.customer), selectinload(Conversation.messages))
     )
     c = (await db.execute(stmt)).scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=404, detail="Conversation not found")
+    phone = c.customer.phone_number if c.customer else "Unknown"
+    name = c.customer.name if c.customer else None
+    display_customer = f"{phone} ({name})" if name else phone
     return ConversationDetailResponse(
         id=str(c.id),
         business_id=str(c.business_id),
-        customer_phone=c.customer.phone_number if c.customer else "Unknown",
-        customer_name=c.customer.name if c.customer else None,
+        customer=display_customer,
+        customer_phone=phone,
+        customer_name=name,
         branch_id=str(c.branch_id),
         ai_active=bool(c.ai_active),
         status="ai_active" if c.ai_active else "human_takeover",

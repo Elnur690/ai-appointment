@@ -295,8 +295,8 @@ const Plans = () => {
 
   const toggleTrialFeature = (key) => {
     setNewPlan((prev) => {
-      const nextTrialFeats = { ...(prev.trial_features || {}) };
-      nextTrialFeats[key] = !nextTrialFeats[key];
+      const current = Boolean(prev.trial_features?.[key] ?? prev[key]);
+      const nextTrialFeats = { ...(prev.trial_features || {}), [key]: !current };
       return { ...prev, trial_features: nextTrialFeats };
     });
   };

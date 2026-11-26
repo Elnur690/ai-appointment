@@ -55,7 +55,7 @@ const Businesses = () => {
     setSelectedBusiness(row);
     setCustomDomainInput(row.customDomain || '');
     setSelectedPlanInput(row.plan || (plans[0]?.name ?? ''));
-    setTrialDaysInput(row.trialDaysRemaining || 14);
+    setTrialDaysInput(row.trialDaysRemaining ?? 0);
     setTrialFeaturesOverride(row.trialFeaturesOverride || {});
   };
 
@@ -261,7 +261,7 @@ const Businesses = () => {
                     await updateBusinessStatus(selectedBusiness.id, 'active', {
                       custom_domain: customDomainInput,
                       plan: selectedPlanInput,
-                      trial_days: Number(trialDaysInput),
+                      trial_days: 0,
                       trial_features_override: trialFeaturesOverride,
                     });
                     setSelectedBusiness(null);
@@ -284,12 +284,15 @@ const Businesses = () => {
               <button
                 className="btn btn-primary"
                 onClick={async () => {
-                  await updateBusinessStatus(selectedBusiness.id, selectedBusiness.status, {
+                  const payload = {
                     custom_domain: customDomainInput,
                     plan: selectedPlanInput,
-                    trial_days: Number(trialDaysInput),
                     trial_features_override: trialFeaturesOverride,
-                  });
+                  };
+                  if (selectedBusiness.status === 'trial') {
+                    payload.trial_days = Number(trialDaysInput);
+                  }
+                  await updateBusinessStatus(selectedBusiness.id, selectedBusiness.status, payload);
                   setSelectedBusiness(null);
                 }}
               >

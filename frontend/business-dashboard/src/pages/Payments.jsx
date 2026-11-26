@@ -21,6 +21,7 @@ const Payments = () => {
   const [refundPaymentId, setRefundPaymentId] = useState('');
   const [refundMsg, setRefundMsg] = useState('');
   const [refunds, setRefunds] = useState([]);
+  const [billingPortalModal, setBillingPortalModal] = useState({ open: false, data: null });
   const [form, setForm] = useState({ amount: '', currency: 'AZN', method: 'cash', status: 'paid', notes: '' });
 
   const paymentMethods = [
@@ -121,6 +122,8 @@ const Payments = () => {
       const res = await api.post('/businesses/subscription/portal');
       if (res.data?.portal_url) {
         window.open(res.data.portal_url, '_blank', 'noopener,noreferrer');
+      } else {
+        setBillingPortalModal({ open: true, data: res.data || {} });
       }
     } catch (err) {
       setCheckoutMessage(err.response?.data?.detail || 'Billing portal unavailable.');
@@ -485,6 +488,100 @@ const Payments = () => {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        isOpen={billingPortalModal.open}
+        onClose={() => setBillingPortalModal({ open: false, data: null })}
+        title={isAz ? 'Kart, Fakturalar və Abunəlik Məlumatı' : 'Billing & Subscription Details'}
+      >
+        {(() => {
+          const portalData = billingPortalModal.data || {};
+          const portalSub = portalData.subscription || {};
+          const methods = Array.isArray(portalData.payment_methods) ? portalData.payment_methods : [];
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div
+                style={{
+                  padding: '0.9rem 1rem',
+                  borderRadius: '8px',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                  {isAz ? 'Cari Abunəlik' : 'Current Subscription'}
+                </div>
+                <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>
+                  {portalSub.plan_name || subscription?.current_plan_name || '—'}
+                  {subscription?.current_plan_price != null ? ` (${subscription.current_plan_price} AZN/ay)` : ''}
+                </div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                  {isAz ? 'Status:' : 'Status:'}{' '}
+                  <strong>{portalSub.status || subscription?.subscription_status || '—'}</strong>
+                  {portalSub.current_period_end || portalSub.next_billing_date ? (
+                    <>
+                      {' • '}
+                      {isAz ? 'Növbəti yeniləmə:' : 'Next billing:'}{' '}
+                      <strong>{portalSub.current_period_end || portalSub.next_billing_date}</strong>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.45rem' }}>
+                  {isAz ? 'Yadda Saxlanılmış Ödəniş Üsulları' : 'Saved Payment Methods'}
+                </div>
+                {methods.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                    {methods.map((pm, idx) => (
+                      <div
+                        key={pm.id || idx}
+                        style={{
+                          padding: '0.6rem 0.85rem',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border)',
+                          fontSize: '0.86rem',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <span>
+                          {pm.brand || pm.type || (isAz ? 'Kart' : 'Card')}
+                          {pm.last4 ? ` •••• ${pm.last4}` : ''}
+                        </span>
+                        {pm.exp_month && pm.exp_year && (
+                          <span style={{ color: 'var(--text-secondary)' }}>
+                            {String(pm.exp_month).padStart(2, '0')}/{pm.exp_year}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
+                    {portalData.message ||
+                      (isAz
+                        ? 'Xarici ödəniş portalı bu hesab üçün aktiv deyil. Abunəlik paketini yeniləmək, ləğv etmək və ya geri ödəniş tələb etmək üçün birbaşa bu səhifədəki Abunəlik bölməsindən istifadə edin.'
+                        : 'An external hosted billing portal is not configured for this provider. You can upgrade, cancel, or request refunds directly from the Subscription section on this page.')}
+                  </p>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => setBillingPortalModal({ open: false, data: null })}
+                >
+                  {isAz ? 'Bağla' : 'Close'}
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </Modal>
     </div>
   );

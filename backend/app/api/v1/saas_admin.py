@@ -779,8 +779,10 @@ async def update_business_status(
             biz.plan = plan_obj
     if status_update.trial_days is not None:
         if status_update.trial_days > 0:
-            biz.subscription_status = "trial"
-            biz.is_active = True
+            requested_status = (status_update.status or "").lower()
+            if requested_status not in {"active", "suspended"}:
+                biz.subscription_status = "trial"
+                biz.is_active = True
             biz.trial_ends_at = datetime.now(timezone.utc) + timedelta(days=int(status_update.trial_days))
         else:
             biz.trial_ends_at = None

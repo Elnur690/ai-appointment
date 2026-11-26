@@ -1,11 +1,13 @@
 import base64
 import hashlib
+import hmac
 import json
 import logging
 from decimal import Decimal
 from uuid import UUID
 import httpx
-from app.integrations.payments.adapter import PaymentAdapter, PaymentLinkResult, WebhookResult, PaymentStatus
+from app.integrations.payments.adapter import PaymentAdapter, PaymentLinkResult, WebhookResult
+from app.models.payment import PaymentStatus
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +25,10 @@ class EpointAdapter(PaymentAdapter):
         merchant_config: dict,
         return_url: str,
     ) -> PaymentLinkResult:
-        public_key = merchant_config.get("public_key")
-        private_key = merchant_config.get("private_key")
+        public_key = (merchant_config.get("public_key") or "").strip()
+        private_key = (merchant_config.get("private_key") or "").strip()
+        if not private_key:
+            raise ValueError("EPoint private_key is not configured")
         
         json_data = {
             "public_key": public_key,
@@ -61,14 +65,17 @@ class EpointAdapter(PaymentAdapter):
         headers: dict,
         merchant_config: dict,
     ) -> WebhookResult:
-        data_b64 = payload.get("data", "")
+        data_b64 = (payload.get("data") or "").strip()
         sig = (payload.get("signature") or "").strip()
         private_key = (merchant_config.get("private_key") or "").strip()
         try:
-            if private_key and sig and data_b64:
+            if private_key:
+                if not sig or not data_b64:
+                    logger.warning("EPoint webhook missing signature or data")
+                    return WebhookResult(transaction_id="", is_successful=False, amount=Decimal("0"), raw_data=payload)
                 sign_str = private_key + data_b64 + private_key
                 expected_sig = base64.b64encode(hashlib.sha1(sign_str.encode("utf-8")).digest()).decode("utf-8")
-                if sig != expected_sig:
+                if not hmac.compare_digest(sig, expected_sig):
                     logger.warning("EPoint webhook signature mismatch")
                     return WebhookResult(transaction_id="", is_successful=False, amount=Decimal("0"), raw_data=payload)
             raw_bytes = base64.b64decode(data_b64)

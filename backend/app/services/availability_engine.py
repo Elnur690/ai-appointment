@@ -18,15 +18,19 @@ class AvailableSlot:
     end_time: datetime    # UTC
     service_id: UUID
     service_name: str
+    timezone: str | None = None
     
-    def to_dict(self) -> dict:
+    def to_dict(self, tz: str | None = None) -> dict:
+        target_tz = tz or self.timezone
+        display_start = from_utc(self.start_time, target_tz) if target_tz else self.start_time
+        display_end = from_utc(self.end_time, target_tz) if target_tz else self.end_time
         return {
             'staff_id': str(self.staff_id),
             'staff_name': self.staff_name,
-            'start_time': self.start_time.isoformat(),
-            'end_time': self.end_time.isoformat(),
-            'date': self.start_time.strftime('%Y-%m-%d'),
-            'time': self.start_time.strftime('%H:%M'),
+            'start_time': display_start.isoformat(),
+            'end_time': display_end.isoformat(),
+            'date': display_start.strftime('%Y-%m-%d'),
+            'time': display_start.strftime('%H:%M'),
         }
 
 class AvailabilityEngine:
@@ -111,15 +115,23 @@ class AvailabilityEngine:
         branch = await self._get_branch(branch_id)
         if not branch:
             return False
+
+        eligible_staff = await self._get_eligible_staff(branch_id, service_id, staff_id)
+        if not eligible_staff:
+            return False
         
         local_start = from_utc(start_time, branch.timezone)
+        local_end = from_utc(end_time, branch.timezone)
+        if local_end.date() != local_start.date():
+            return False
+
         day_of_week = local_start.weekday()
         branch_hours = self._get_branch_hours_for_day(branch.working_hours, day_of_week)
         if not branch_hours:
             return False
         
         local_start_time = local_start.time()
-        local_end_time = from_utc(end_time, branch.timezone).time()
+        local_end_time = local_end.time()
         
         if local_start_time < branch_hours['start'] or local_end_time > branch_hours['end']:
             return False
@@ -131,7 +143,7 @@ class AvailabilityEngine:
             return False
         
         has_conflict = await self._check_appointment_conflict(
-            staff_id, start_time - buffer, end_time + buffer
+            staff_id, start_time, end_time + buffer
         )
         return not has_conflict
     
@@ -256,15 +268,13 @@ class AvailabilityEngine:
             slot_start_utc = to_utc(current_time_dt, timezone)
             slot_end_utc = slot_start_utc + duration
             slot_buffered_end_utc = slot_start_utc + total_needed
-            slot_buffered_start_utc = slot_start_utc - buffer
             
             conflict = False
             for appt in existing_appointments:
                 appt_buffer = timedelta(minutes=appt.service.buffer_minutes if appt.service else 0)
-                appt_buffered_start = appt.start_time - appt_buffer
                 appt_buffered_end = appt.end_time + appt_buffer
                 
-                if max(slot_buffered_start_utc, appt_buffered_start) < min(slot_buffered_end_utc, appt_buffered_end):
+                if slot_start_utc < appt_buffered_end and slot_buffered_end_utc > appt.start_time:
                     conflict = True
                     break
                     
@@ -275,7 +285,8 @@ class AvailabilityEngine:
                     start_time=slot_start_utc,
                     end_time=slot_end_utc,
                     service_id=service.id,
-                    service_name=service.name
+                    service_name=service.name,
+                    timezone=timezone,
                 ))
                 
             current_time_dt += timedelta(minutes=self.SLOT_INCREMENT_MINUTES)

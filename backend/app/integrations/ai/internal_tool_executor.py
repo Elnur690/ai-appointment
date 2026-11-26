@@ -1,6 +1,6 @@
 import logging
 from uuid import UUID
-from datetime import date, datetime, timedelta, timezone
+from datetime import date as date_type, datetime, timedelta, timezone
 from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -106,16 +106,25 @@ class InternalGroupToolExecutor:
     async def _get_daily_revenue_summary(self, date: str | None = None) -> dict:
         if self.sender_role != 'owner':
             return {'error': 'Revenue details are restricted to business owners.'}
-        
+
+        if date:
+            target_date = date_type.fromisoformat(date)
+        else:
+            target_date = datetime.now(timezone.utc).date()
+        day_start = datetime.combine(target_date, datetime.min.time(), tzinfo=timezone.utc)
+        day_end = day_start + timedelta(days=1)
+
         stmt = select(func.sum(Payment.amount)).where(
             and_(
                 Payment.business_id == self.business_id,
                 Payment.status == PaymentStatus.completed,
+                Payment.created_at >= day_start,
+                Payment.created_at < day_end,
             )
         )
         result = await self.db.execute(stmt)
         total = result.scalar() or 0
-        return {'total_revenue': float(total), 'currency': 'AZN'}
+        return {'date': target_date.isoformat(), 'total_revenue': float(total), 'currency': 'AZN'}
 
     async def _get_no_shows(self, days: int = 7) -> dict:
         since = datetime.now(timezone.utc) - timedelta(days=days)

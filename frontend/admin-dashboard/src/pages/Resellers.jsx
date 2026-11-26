@@ -12,6 +12,8 @@ const Resellers = () => {
   const { language } = useAuthStore();
   const isAz = (language || 'az') !== 'en';
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [createSubmitting, setCreateSubmitting] = useState(false);
   const [selectedReseller, setSelectedReseller] = useState(null);
   const [copiedCode, setCopiedCode] = useState('');
 
@@ -42,19 +44,31 @@ const Resellers = () => {
     setTimeout(() => setCopiedCode(''), 2000);
   };
 
-  const handleCreateSubmit = (e) => {
+  const handleCreateSubmit = async (e) => {
     e.preventDefault();
-    createReseller(form);
-    setIsCreateOpen(false);
-    setForm({
-      name: '',
-      company_name: '',
-      email: '',
-      phone: '',
-      referral_code: '',
-      commission_rate_percent: 20,
-      white_label_domain: '',
-    });
+    setCreateError('');
+    setCreateSubmitting(true);
+    try {
+      await createReseller(form);
+      setIsCreateOpen(false);
+      setForm({
+        name: '',
+        company_name: '',
+        email: '',
+        phone: '',
+        referral_code: '',
+        commission_rate_percent: 20,
+        white_label_domain: '',
+      });
+    } catch (err) {
+      setCreateError(
+        err.response?.data?.detail ||
+          err.message ||
+          (isAz ? 'Partnyor yaradıla bilmədi.' : 'Could not create reseller.')
+      );
+    } finally {
+      setCreateSubmitting(false);
+    }
   };
 
   const columns = [
@@ -141,7 +155,13 @@ const Resellers = () => {
             )}
           </p>
         </div>
-        <button className="btn btn-primary" onClick={() => setIsCreateOpen(true)}>
+        <button
+          className="btn btn-primary"
+          onClick={() => {
+            setCreateError('');
+            setIsCreateOpen(true);
+          }}
+        >
           <Plus size={18} />
           {isAz ? 'Yeni Partnyor Əlavə Et' : 'Add Reseller Partner'}
         </button>
@@ -159,29 +179,21 @@ const Resellers = () => {
           title={isAz ? 'Aktiv Partnyorlar' : 'Active Reseller Partners'}
           value={resellers.length}
           icon={Users}
-          trend="up"
-          isPositive={true}
         />
         <StatCard
           title={isAz ? 'Partnyor Salonları' : 'Partner-Driven Salons'}
           value={totalReferredTenants}
           icon={Globe}
-          trend="up"
-          isPositive={true}
         />
         <StatCard
           title={isAz ? 'Partnyor MRR Gəliri' : 'Partner-Generated MRR'}
           value={`${totalPartnerMrr.toFixed(0)} AZN`}
           icon={DollarSign}
-          trend="up"
-          isPositive={true}
         />
         <StatCard
           title={isAz ? 'Gözləyən Komissiya' : 'Pending Partner Payouts'}
           value={`${totalPendingPayouts.toFixed(2)} AZN`}
           icon={Percent}
-          trend="up"
-          isPositive={true}
         />
       </div>
 
@@ -190,10 +202,28 @@ const Resellers = () => {
       {/* Create Reseller Modal */}
       <Modal
         isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
+        onClose={() => {
+          setCreateError('');
+          setIsCreateOpen(false);
+        }}
         title={isAz ? 'Yeni Partnyor / Agentlik Qeydiyyatı' : 'Register New Reseller / Agency Partner'}
       >
         <form onSubmit={handleCreateSubmit}>
+          {createError && (
+            <div
+              style={{
+                padding: '0.65rem 0.9rem',
+                background: 'rgba(239, 68, 68, 0.14)',
+                border: '1px solid var(--error)',
+                borderRadius: '8px',
+                color: '#fca5a5',
+                fontSize: '0.85rem',
+                marginBottom: '1rem',
+              }}
+            >
+              {createError}
+            </div>
+          )}
           <div className="form-group">
             <label className="form-label">{isAz ? 'Partnyorun Adı və Soyadı' : 'Partner Full Name'}</label>
             <input
@@ -279,11 +309,24 @@ const Resellers = () => {
           </div>
 
           <div className="flex-between" style={{ marginTop: '1.5rem' }}>
-            <button type="button" className="btn btn-ghost" onClick={() => setIsCreateOpen(false)}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                setCreateError('');
+                setIsCreateOpen(false);
+              }}
+            >
               {isAz ? 'Ləğv et' : 'Cancel'}
             </button>
-            <button type="submit" className="btn btn-primary">
-              {isAz ? 'Partnyoru Yarat' : 'Create Reseller Partner'}
+            <button type="submit" className="btn btn-primary" disabled={createSubmitting}>
+              {createSubmitting
+                ? isAz
+                  ? 'Yaradılır...'
+                  : 'Creating...'
+                : isAz
+                ? 'Partnyoru Yarat'
+                : 'Create Reseller Partner'}
             </button>
           </div>
         </form>

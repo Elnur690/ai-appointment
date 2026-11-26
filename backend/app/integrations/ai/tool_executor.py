@@ -1,12 +1,13 @@
 from datetime import datetime, date as date_type, time as time_type, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID
+from zoneinfo import ZoneInfo
 from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.integrations.ai.provider import ToolCall
 from app.models.appointment import Appointment, AppointmentStatus, AppointmentSource
-from app.models.business import Business
+from app.models.business import Business, Branch
 from app.models.payment import Payment, PaymentMethod, PaymentStatus
 from app.models.saas import Plan
 from app.models.service import Service
@@ -101,6 +102,21 @@ class ToolExecutor:
             ]
         }
 
+    async def _get_branch(self) -> Branch | None:
+        if not self.branch_id:
+            return None
+        return (
+            await self.db.execute(select(Branch).where(Branch.id == self.branch_id))
+        ).scalar_one_or_none()
+
+    async def _get_branch_tz(self, branch: Branch | None = None) -> ZoneInfo:
+        br = branch or await self._get_branch()
+        tz_name = br.timezone if br and br.timezone else "Asia/Baku"
+        try:
+            return ZoneInfo(tz_name)
+        except Exception:
+            return ZoneInfo("Asia/Baku")
+
     async def _check_availability(self, service_id: str, date: str, staff_id: str | None = None) -> dict:
         target_date = date_type.fromisoformat(date)
         duration_minutes = 30
@@ -118,10 +134,31 @@ class ToolExecutor:
         except ValueError:
             pass
 
+        branch = await self._get_branch()
+        branch_tz = await self._get_branch_tz(branch)
+
+        # Determine local working hours for the target weekday (fallback 09:00-20:00)
+        start_t = time_type(9, 0)
+        end_t = time_type(20, 0)
+        if branch and branch.working_hours:
+            days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+            day_cfg = branch.working_hours.get(days[target_date.weekday()])
+            if isinstance(day_cfg, dict) and day_cfg.get("start") and day_cfg.get("end"):
+                sh, sm = map(int, str(day_cfg["start"]).split(":")[:2])
+                eh, em = map(int, str(day_cfg["end"]).split(":")[:2])
+                start_t, end_t = time_type(sh, sm), time_type(eh, em)
+            elif isinstance(day_cfg, str) and "-" in day_cfg:
+                s_part, e_part = day_cfg.split("-", 1)
+                sh, sm = map(int, s_part.strip().split(":")[:2])
+                eh, em = map(int, e_part.strip().split(":")[:2])
+                start_t, end_t = time_type(sh, sm), time_type(eh, em)
+
         staff_stmt = select(Staff).where(
             Staff.business_id == self.business_id,
             Staff.is_active.is_(True),
         )
+        if self.branch_id:
+            staff_stmt = staff_stmt.where(Staff.branch_id == self.branch_id)
         if staff_id:
             try:
                 staff_stmt = staff_stmt.where(Staff.id == UUID(str(staff_id)))
@@ -129,36 +166,44 @@ class ToolExecutor:
                 pass
         staff_list = (await self.db.execute(staff_stmt)).scalars().all()
 
-        day_start = datetime.combine(target_date, time_type(0, 0), tzinfo=timezone.utc)
-        day_end = day_start + timedelta(days=1)
+        day_start_local = datetime.combine(target_date, time_type(0, 0), tzinfo=branch_tz)
+        day_end_local = day_start_local + timedelta(days=1)
+        day_start_utc = day_start_local.astimezone(timezone.utc)
+        day_end_utc = day_end_local.astimezone(timezone.utc)
 
         booked_rows = (
             await self.db.execute(
                 select(Appointment).where(
                     Appointment.business_id == self.business_id,
-                    Appointment.start_time >= day_start,
-                    Appointment.start_time < day_end,
-                    Appointment.status.notin_([AppointmentStatus.cancelled]),
+                    Appointment.start_time < day_end_utc,
+                    Appointment.end_time > day_start_utc,
+                    Appointment.status.notin_([AppointmentStatus.cancelled, AppointmentStatus.no_show]),
                 )
             )
         ).scalars().all()
 
+        work_start_dt = datetime.combine(target_date, start_t, tzinfo=branch_tz)
+        work_end_dt = datetime.combine(target_date, end_t, tzinfo=branch_tz)
+
         slots = []
         for st in staff_list:
             st_booked = [b for b in booked_rows if b.staff_id == st.id]
-            for hour in range(9, 19):
-                for minute in (0, 30):
-                    slot_start = datetime.combine(target_date, time_type(hour, minute), tzinfo=timezone.utc)
-                    slot_end = slot_start + timedelta(minutes=duration_minutes)
-                    if slot_end.hour > 20 or (slot_end.hour == 20 and slot_end.minute > 0):
-                        continue
-                    overlaps = any(b.start_time < slot_end and b.end_time > slot_start for b in st_booked)
-                    if not overlaps:
-                        slots.append({
-                            "time": f"{hour:02d}:{minute:02d}",
-                            "staff_id": str(st.id),
-                            "staff_name": st.name,
-                        })
+            cursor = work_start_dt
+            while cursor + timedelta(minutes=duration_minutes) <= work_end_dt:
+                slot_start_utc = cursor.astimezone(timezone.utc)
+                slot_end_utc = (cursor + timedelta(minutes=duration_minutes)).astimezone(timezone.utc)
+                overlaps = any(
+                    (b.start_time if b.start_time.tzinfo else b.start_time.replace(tzinfo=timezone.utc)) < slot_end_utc
+                    and (b.end_time if b.end_time.tzinfo else b.end_time.replace(tzinfo=timezone.utc)) > slot_start_utc
+                    for b in st_booked
+                )
+                if not overlaps:
+                    slots.append({
+                        "time": cursor.strftime("%H:%M"),
+                        "staff_id": str(st.id),
+                        "staff_name": st.name,
+                    })
+                cursor += timedelta(minutes=30)
         return {"available_slots": slots[:20]}
 
     async def _create_appointment(
@@ -194,10 +239,25 @@ class ToolExecutor:
         if not st:
             return {"error": "Staff member not found."}
 
+        branch_tz = await self._get_branch_tz()
         target_date = date_type.fromisoformat(date)
         hh, mm = map(int, time.split(":")[:2])
-        start_dt = datetime.combine(target_date, time_type(hh, mm), tzinfo=timezone.utc)
+        start_dt = datetime.combine(target_date, time_type(hh, mm), tzinfo=branch_tz).astimezone(timezone.utc)
         end_dt = start_dt + timedelta(minutes=svc.duration_minutes)
+
+        conflict = (
+            await self.db.execute(
+                select(Appointment.id).where(
+                    Appointment.business_id == self.business_id,
+                    Appointment.staff_id == st.id,
+                    Appointment.status.notin_([AppointmentStatus.cancelled, AppointmentStatus.no_show]),
+                    Appointment.start_time < end_dt,
+                    Appointment.end_time > start_dt,
+                ).limit(1)
+            )
+        ).scalar_one_or_none()
+        if conflict:
+            return {"error": "Selected time slot is already booked for this staff member."}
 
         # Evaluate real customer history & business Beh (deposit) rules
         no_show_count = (
@@ -361,24 +421,47 @@ class ToolExecutor:
         new_time: str,
         new_staff_id: str | None = None,
     ) -> dict:
+        if not self.customer_id:
+            return {"error": "Customer context is required to reschedule an appointment."}
+
         appt = (
             await self.db.execute(
                 select(Appointment).where(
                     Appointment.id == UUID(str(appointment_id)),
                     Appointment.business_id == self.business_id,
+                    Appointment.customer_id == self.customer_id,
                 )
             )
         ).scalar_one_or_none()
         if not appt:
             return {"error": "Appointment not found."}
 
+        branch_tz = await self._get_branch_tz()
         duration = appt.end_time - appt.start_time
         target_date = date_type.fromisoformat(new_date)
         hh, mm = map(int, new_time.split(":")[:2])
-        appt.start_time = datetime.combine(target_date, time_type(hh, mm), tzinfo=timezone.utc)
-        appt.end_time = appt.start_time + duration
-        if new_staff_id:
-            appt.staff_id = UUID(str(new_staff_id))
+        new_start = datetime.combine(target_date, time_type(hh, mm), tzinfo=branch_tz).astimezone(timezone.utc)
+        new_end = new_start + duration
+        target_staff_id = UUID(str(new_staff_id)) if new_staff_id else appt.staff_id
+
+        conflict = (
+            await self.db.execute(
+                select(Appointment.id).where(
+                    Appointment.business_id == self.business_id,
+                    Appointment.staff_id == target_staff_id,
+                    Appointment.id != appt.id,
+                    Appointment.status.notin_([AppointmentStatus.cancelled, AppointmentStatus.no_show]),
+                    Appointment.start_time < new_end,
+                    Appointment.end_time > new_start,
+                ).limit(1)
+            )
+        ).scalar_one_or_none()
+        if conflict:
+            return {"error": "Selected time slot is already booked for this staff member."}
+
+        appt.start_time = new_start
+        appt.end_time = new_end
+        appt.staff_id = target_staff_id
         await self.db.commit()
 
         return {
@@ -392,11 +475,15 @@ class ToolExecutor:
         }
 
     async def _cancel_appointment(self, appointment_id: str, reason: str | None = None) -> dict:
+        if not self.customer_id:
+            return {"error": "Customer context is required to cancel an appointment."}
+
         appt = (
             await self.db.execute(
                 select(Appointment).where(
                     Appointment.id == UUID(str(appointment_id)),
                     Appointment.business_id == self.business_id,
+                    Appointment.customer_id == self.customer_id,
                 )
             )
         ).scalar_one_or_none()

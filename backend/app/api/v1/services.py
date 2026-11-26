@@ -44,12 +44,22 @@ class ServiceResponse(ServiceBase):
     is_active: bool
 
 
+def _parse_uuid(val: str, field: str = "id") -> UUID:
+    try:
+        return UUID(str(val))
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid {field}")
+
+
 async def _resolve_branch_id(db: AsyncSession, business_id: UUID, branch_id: str | None) -> UUID:
     if branch_id:
-        try:
-            return UUID(branch_id)
-        except ValueError:
-            pass
+        branch_uuid = _parse_uuid(branch_id, "branch_id")
+        branch_check = (
+            await db.execute(select(Branch).where(Branch.id == branch_uuid, Branch.business_id == business_id))
+        ).scalar_one_or_none()
+        if not branch_check:
+            raise HTTPException(status_code=404, detail="Branch not found")
+        return branch_check.id
     stmt = select(Branch).where(Branch.business_id == business_id).order_by(Branch.created_at.asc())
     branch = (await db.execute(stmt)).scalars().first()
     if branch:
@@ -123,7 +133,7 @@ async def get_service(
     business_id: Annotated[str, Depends(get_business_context)],
 ):
     """Get a service by ID."""
-    stmt = select(Service).where(Service.id == UUID(id), Service.business_id == UUID(business_id))
+    stmt = select(Service).where(Service.id == _parse_uuid(id, "service_id"), Service.business_id == UUID(business_id))
     s = (await db.execute(stmt)).scalar_one_or_none()
     if not s:
         raise HTTPException(status_code=404, detail="Service not found")
@@ -139,7 +149,7 @@ async def update_service(
     business_id: Annotated[str, Depends(get_business_context)],
 ):
     """Update a service."""
-    stmt = select(Service).where(Service.id == UUID(id), Service.business_id == UUID(business_id))
+    stmt = select(Service).where(Service.id == _parse_uuid(id, "service_id"), Service.business_id == UUID(business_id))
     s = (await db.execute(stmt)).scalar_one_or_none()
     if not s:
         raise HTTPException(status_code=404, detail="Service not found")
@@ -158,7 +168,7 @@ async def deactivate_service(
     business_id: Annotated[str, Depends(get_business_context)],
 ):
     """Deactivate a service."""
-    stmt = select(Service).where(Service.id == UUID(id), Service.business_id == UUID(business_id))
+    stmt = select(Service).where(Service.id == _parse_uuid(id, "service_id"), Service.business_id == UUID(business_id))
     s = (await db.execute(stmt)).scalar_one_or_none()
     if not s:
         raise HTTPException(status_code=404, detail="Service not found")

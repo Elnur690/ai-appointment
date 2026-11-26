@@ -84,6 +84,7 @@ async def init_db() -> None:
         "ALTER TABLE platform_configs ADD COLUMN IF NOT EXISTS support_whatsapp_number VARCHAR(32);",
         "ALTER TYPE paymentmethod ADD VALUE IF NOT EXISTS 'creem';",
         "ALTER TYPE paymentmethod ADD VALUE IF NOT EXISTS 'suby';",
+        "ALTER TABLE customers ADD COLUMN IF NOT EXISTS email VARCHAR(255);",
     ]
     for stmt_sql in alter_statements:
         try:

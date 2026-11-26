@@ -2,6 +2,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import UUID
+from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -148,12 +149,18 @@ class ConversationHandler:
             )
         ).scalars().all()
 
+        tz_name = branch.timezone if branch and branch.timezone else "Asia/Baku"
+        try:
+            branch_tz = ZoneInfo(tz_name)
+        except Exception:
+            branch_tz = ZoneInfo("Asia/Baku")
+
         system_prompt = build_customer_system_prompt(
             business_name=biz.name if biz else "Business",
             business_description=(biz.description or "") if biz else "",
             branch_name=branch.name if branch else "Main Branch",
             working_hours=(branch.working_hours if branch and branch.working_hours else {"monday": "09:00-18:00"}),
-            timezone=(branch.timezone if branch else "Asia/Baku"),
+            timezone=tz_name,
             services=[
                 {
                     "name": s.name,
@@ -164,7 +171,7 @@ class ConversationHandler:
                 for s in srv_rows
             ],
             tone_config=(biz.default_ai_tone_config or {}) if biz else {},
-            current_datetime=datetime.now(timezone.utc).isoformat(),
+            current_datetime=datetime.now(timezone.utc).astimezone(branch_tz).isoformat(),
         )
         greeting_msg = ((biz.default_ai_tone_config or {}).get("greeting_message") or "").strip() if biz else ""
         if greeting_msg:

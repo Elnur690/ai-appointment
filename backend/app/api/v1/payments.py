@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_active_user, get_business_context
+from app.models.appointment import Appointment
 from app.models.payment import Payment, PaymentMethod, PaymentStatus
 from app.models.saas import PlatformConfig, DEFAULT_PLATFORM_GATEWAYS
 
@@ -128,9 +129,24 @@ async def log_payment(
     if method_str not in {"cash", "payriff", "paymegate", "epoint"}:
         method_str = "cash"
 
+    biz_uuid = UUID(business_id)
+    appt_uuid: UUID | None = None
+    if payment.appointment_id:
+        try:
+            appt_uuid = UUID(payment.appointment_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid appointment_id")
+        appt_row = (
+            await db.execute(
+                select(Appointment.id).where(Appointment.id == appt_uuid, Appointment.business_id == biz_uuid)
+            )
+        ).scalar_one_or_none()
+        if not appt_row:
+            raise HTTPException(status_code=404, detail="Appointment not found")
+
     row = Payment(
-        business_id=UUID(business_id),
-        appointment_id=UUID(payment.appointment_id) if payment.appointment_id else None,
+        business_id=biz_uuid,
+        appointment_id=appt_uuid,
         amount=payment.amount,
         currency=payment.currency or "AZN",
         method=PaymentMethod(method_str),

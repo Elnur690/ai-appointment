@@ -50,13 +50,40 @@ class EmergencyReassignmentService:
             )
         ).all()
 
+        candidate_ids = [sid for sid in (available_staff_ids or []) if sid != sick_staff_id]
+        busy_by_staff: dict[UUID, list[tuple[datetime, datetime]]] = {sid: [] for sid in candidate_ids}
+        if candidate_ids:
+            existing_rows = (
+                await db.execute(
+                    select(Appointment).where(
+                        Appointment.branch_id == branch_id,
+                        Appointment.staff_id.in_(candidate_ids),
+                        Appointment.start_time < day_end,
+                        Appointment.end_time > day_start,
+                        Appointment.status.notin_([AppointmentStatus.cancelled, AppointmentStatus.no_show]),
+                    )
+                )
+            ).scalars().all()
+            for existing in existing_rows:
+                busy_by_staff.setdefault(existing.staff_id, []).append((existing.start_time, existing.end_time))
+
         outcomes: list[ReassignmentOutcome] = []
-        replacement = available_staff_ids[0] if available_staff_ids else None
+        any_reassigned = False
 
         for appt, customer in rows:
+            replacement: UUID | None = None
+            for cand_id in candidate_ids:
+                intervals = busy_by_staff.get(cand_id, [])
+                has_conflict = any(s < appt.end_time and e > appt.start_time for s, e in intervals)
+                if not has_conflict:
+                    replacement = cand_id
+                    break
+
             if replacement:
                 appt.staff_id = replacement
+                busy_by_staff[replacement].append((appt.start_time, appt.end_time))
                 status = "reassigned"
+                any_reassigned = True
             else:
                 status = "reschedule_requested"
 
@@ -75,7 +102,7 @@ class EmergencyReassignmentService:
                 )
             )
 
-        if replacement and outcomes:
+        if any_reassigned:
             await db.commit()
 
         return outcomes

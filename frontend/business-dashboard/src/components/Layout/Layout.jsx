@@ -27,19 +27,57 @@ export const Layout = () => {
   }, [theme]);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && user?.role !== 'reseller' && user?.role !== 'saas_owner') {
       fetchBusinessProfile();
     }
-  }, [isAuthenticated, fetchBusinessProfile]);
+  }, [isAuthenticated, user?.role, fetchBusinessProfile]);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (user?.role === 'reseller') {
+    return <Navigate to="/partner" replace />;
   }
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+  if (user?.role === 'saas_owner') {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '2rem',
+        }}
+      >
+        <div className="glass-card" style={{ maxWidth: '460px', width: '100%', padding: '2rem', textAlign: 'center' }}>
+          <h2 style={{ marginBottom: '0.75rem' }}>
+            {lang === 'en' ? 'Admin Account Detected' : 'Admin Hesabı Aşkar Edildi'}
+          </h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', lineHeight: 1.55 }}>
+            {lang === 'en'
+              ? 'This account has Platform Administrator (saas_owner) privileges and does not belong to a business workspace. Please sign in through the Admin Dashboard.'
+              : 'Bu hesab Platforma Administratoru (saas_owner) hüququna malikdir və biznes panelinə aid deyil. Zəhmət olmasa Admin Panelindən daxil olun.'}
+          </p>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="btn btn-primary"
+            style={{ width: '100%', justifyContent: 'center' }}
+          >
+            <LogOut size={16} />
+            {lang === 'en' ? 'Sign Out & Switch Account' : 'Çıxış Et və Hesabı Dəyiş'}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="layout">

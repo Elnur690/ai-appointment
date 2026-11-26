@@ -192,11 +192,20 @@ const Settings = () => {
   const handleSaveSettings = async (e) => {
     if (e) e.preventDefault();
     setSaveMessage('');
-    await api.put('/businesses/', {
+    const trimmedDomain = customDomain.trim();
+    const res = await api.put('/businesses/', {
       name: businessName,
-      custom_domain: customDomain || null,
+      custom_domain: trimmedDomain || null,
       settings: aiTone,
     });
+    const savedDomain = res.data?.custom_domain || '';
+    setCustomDomain(savedDomain);
+    if (!savedDomain) {
+      setDomainVerifyResult(null);
+    }
+    if (res.data?.name !== undefined) {
+      setBusinessName(res.data.name || '');
+    }
     await fetchBusinessProfile();
     setSaveMessage(
       isAz

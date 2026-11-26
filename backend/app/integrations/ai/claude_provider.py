@@ -37,10 +37,41 @@ class ClaudeProvider(AIProvider):
         }
         
         # Convert internal messages to Claude format
-        claude_messages = []
+        claude_messages: list[dict[str, Any]] = []
         for msg in messages:
-            if msg.role in ["user", "assistant"]:
-                claude_messages.append({"role": msg.role, "content": msg.content or ""})
+            if msg.role == "user":
+                claude_messages.append({"role": "user", "content": msg.content or ""})
+            elif msg.role == "assistant":
+                if msg.tool_calls:
+                    blocks: list[dict[str, Any]] = []
+                    if msg.content:
+                        blocks.append({"type": "text", "text": msg.content})
+                    for tc in msg.tool_calls:
+                        blocks.append(
+                            {
+                                "type": "tool_use",
+                                "id": tc.id,
+                                "name": tc.name,
+                                "input": tc.arguments or {},
+                            }
+                        )
+                    claude_messages.append({"role": "assistant", "content": blocks})
+                else:
+                    claude_messages.append({"role": "assistant", "content": msg.content or ""})
+            elif msg.role == "tool":
+                tool_block = {
+                    "type": "tool_result",
+                    "tool_use_id": msg.tool_call_id or "",
+                    "content": msg.content or "",
+                }
+                if (
+                    claude_messages
+                    and claude_messages[-1]["role"] == "user"
+                    and isinstance(claude_messages[-1]["content"], list)
+                ):
+                    claude_messages[-1]["content"].append(tool_block)
+                else:
+                    claude_messages.append({"role": "user", "content": [tool_block]})
         
         payload: dict[str, Any] = {
             "model": self.model_name,

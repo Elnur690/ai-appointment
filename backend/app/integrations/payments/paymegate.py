@@ -6,7 +6,8 @@ from decimal import Decimal
 from uuid import UUID
 import httpx
 from app.core.config import settings
-from app.integrations.payments.adapter import PaymentAdapter, PaymentLinkResult, WebhookResult, PaymentStatus
+from app.integrations.payments.adapter import PaymentAdapter, PaymentLinkResult, WebhookResult
+from app.models.payment import PaymentStatus
 from app.integrations.payments.fx import convert_to_usd
 
 logger = logging.getLogger(__name__)
@@ -30,7 +31,7 @@ class PaymegateAdapter(PaymentAdapter):
             merchant_config.get("api_key")
             or merchant_config.get("paymegate_api_key")
             or merchant_config.get("paymengate_api_key")
-            or settings.PAYMEGATE_API_KEY
+            or getattr(settings, "PAYMEGATE_API_KEY", "")
             or ""
         ).strip()
         base_url = (merchant_config.get("base_url") or self.BASE_URL).rstrip("/")
@@ -113,6 +114,7 @@ class PaymegateAdapter(PaymentAdapter):
         payload: dict,
         headers: dict,
         merchant_config: dict,
+        raw_body: bytes | None = None,
     ) -> WebhookResult:
         """
         Verify Paymegate `order.paid` webhook event:
@@ -131,24 +133,31 @@ class PaymegateAdapter(PaymentAdapter):
             merchant_config.get("webhook_secret")
             or merchant_config.get("secret_key")
             or merchant_config.get("paymegate_webhook_secret")
-            or settings.PAYMEGATE_WEBHOOK_SECRET
+            or getattr(settings, "PAYMEGATE_WEBHOOK_SECRET", "")
             or ""
         ).strip()
+        lower_headers = {str(k).lower(): str(v).strip() for k, v in (headers or {}).items()}
         sig_header = (
-            headers.get("x-paymegate-signature")
-            or headers.get("x-signature")
-            or headers.get("X-Paymegate-Signature")
-            or headers.get("X-Signature")
+            lower_headers.get("x-paymegate-signature")
+            or lower_headers.get("x-signature")
+            or ""
         )
-        if webhook_secret and sig_header:
+        if webhook_secret:
+            if not sig_header:
+                logger.warning("Paymegate webhook missing signature header")
+                return WebhookResult(transaction_id="", is_successful=False, amount=Decimal("0"), raw_data=payload)
+            candidates = []
+            if raw_body is not None:
+                candidates.append(
+                    hmac.new(webhook_secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
+                )
             raw_str = json.dumps(payload, separators=(",", ":"), sort_keys=True)
-            expected = hmac.new(
-                webhook_secret.encode("utf-8"),
-                raw_str.encode("utf-8"),
-                hashlib.sha256,
-            ).hexdigest()
-            if not hmac.compare_digest(expected, sig_header) and sig_header != expected:
-                logger.warning("Paymegate webhook signature mismatch; checking order status via API")
+            candidates.append(
+                hmac.new(webhook_secret.encode("utf-8"), raw_str.encode("utf-8"), hashlib.sha256).hexdigest()
+            )
+            if not any(hmac.compare_digest(exp.lower(), sig_header.lower()) for exp in candidates):
+                logger.warning("Paymegate webhook signature verification failed")
+                return WebhookResult(transaction_id="", is_successful=False, amount=Decimal("0"), raw_data=payload)
 
         event_type = str(payload.get("type") or "").lower()
         status_str = str(payload.get("status") or "").upper()
@@ -181,7 +190,7 @@ class PaymegateAdapter(PaymentAdapter):
         api_key = (
             merchant_config.get("api_key")
             or merchant_config.get("paymegate_api_key")
-            or settings.PAYMEGATE_API_KEY
+            or getattr(settings, "PAYMEGATE_API_KEY", "")
             or ""
         ).strip()
         base_url = (merchant_config.get("base_url") or self.BASE_URL).rstrip("/")

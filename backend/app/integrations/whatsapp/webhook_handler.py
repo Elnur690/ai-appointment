@@ -43,11 +43,12 @@ class WebhookHandler:
         message_id = key.get("id", "")
         
         is_group = "@g.us" in remote_jid
-        sender_jid = data.get("pushName") if is_group else remote_jid # In groups, the sender is in participant or we can get it from the actual jid if provided
         group_jid = remote_jid if is_group else None
-        
+
         if is_group:
-            sender_jid = data.get("participant", remote_jid)
+            sender_jid = key.get("participant") or data.get("participant") or remote_jid
+        else:
+            sender_jid = remote_jid
 
         sender_phone = sender_jid.split("@")[0]
         sender_name = data.get("pushName")
